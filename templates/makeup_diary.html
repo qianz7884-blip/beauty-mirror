@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}美妆镜 - 妆容日记{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold"><i class="bi bi-journal-text"></i> 妆容日记</h2>
+    <button class="btn btn-pink" data-bs-toggle="modal" data-bs-target="#diaryModal" onclick="clearDiaryForm()">
+        <i class="bi bi-plus-lg"></i> 写日记
+    </button>
+</div>
+
+<!-- 日记列表 -->
+{% if diaries %}
+<div class="row g-4">
+    {% for diary in diaries %}
+    <div class="col-12">
+        <div class="card border-0 shadow-sm diary-card">
+            <div class="card-body">
+                <div class="row">
+                    <!-- 照片 -->
+                    {% if diary.photo %}
+                    <div class="col-md-3 mb-3 mb-md-0">
+                        <img src="{{ url_for('static', filename='uploads/diary/' + diary.photo) }}"
+                             class="rounded img-fluid w-100" style="max-height:200px;object-fit:cover" alt="妆容照">
+                    </div>
+                    {% endif %}
+                    <!-- 内容 -->
+                    <div class="{% if diary.photo %}col-md-9{% else %}col-12{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="fs-3">{{ diary.mood }}</span>
+                                <span class="text-muted small ms-2">{{ diary.created_date }}</span>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary"
+                                        onclick="editDiary({{ diary.to_dict() | tojson | safe }})"
+                                        title="编辑">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-outline-danger"
+                                        onclick="confirmDiaryDelete({{ diary.id }}, '{{ diary.title }}')"
+                                        title="删除">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <h5 class="fw-bold">{{ diary.title }}</h5>
+                        <p class="text-muted">{{ diary.content[:200] }}{% if diary.content|length > 200 %}...{% endif %}</p>
+
+                        <!-- 关联产品标签 -->
+                        {% if diary.get_product_ids() %}
+                        <div class="mt-2">
+                            {% for pid in diary.get_product_ids() %}
+                            {% set p = product_map.get(pid) %}
+                            {% if p %}
+                            <span class="badge bg-pink-soft text-pink me-1 mb-1">
+                                🔗 {{ p.name }}
+                                {% if p.brand %}<small class="text-muted">({{ p.brand }})</small>{% endif %}
+                            </span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<!-- 空状态 -->
+<div class="text-center py-5">
+    <i class="bi bi-journal-plus fs-1 d-block mb-3 text-muted"></i>
+    <h5 class="text-muted">还没有妆容日记</h5>
+    <p class="text-muted">记录你的每日妆容，见证美丽的成长 ✨</p>
+    <button class="btn btn-pink mt-2" data-bs-toggle="modal" data-bs-target="#diaryModal" onclick="clearDiaryForm()">
+        <i class="bi bi-plus-lg"></i> 写第一篇日记
+    </button>
+</div>
+{% endif %}
+
+<!-- 写/编辑日记 Modal -->
+<div class="modal fade" id="diaryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="diaryForm" method="POST" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="diaryModalTitle">✍️ 写日记</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold">标题 <span class="text-danger">*</span></label>
+                            <input type="text" name="title" id="diaryTitle" class="form-control" required
+                                   placeholder="如：今日约会玫瑰妆 🌹">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">日期</label>
+                            <input type="date" name="created_date" id="diaryDate" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">心情</label>
+                            <div class="btn-group w-100 mood-selector" role="group">
+                                {% for emoji, label in moods %}
+                                <input type="radio" class="btn-check" name="mood" value="{{ emoji }}"
+                                       id="mood-{{ loop.index }}" {% if loop.index == 2 %}checked{% endif %}>
+                                <label class="btn btn-outline-secondary" for="mood-{{ loop.index }}">
+                                    <span class="fs-4">{{ emoji }}</span><br><small>{{ label }}</small>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">内容</label>
+                            <textarea name="content" id="diaryContent" class="form-control" rows="4"
+                                      placeholder="记录今天的妆容灵感、使用心得、场合感受..."></textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">妆容照片</label>
+                            <input type="file" name="photo" class="form-control" accept="image/*">
+                            <small class="text-muted">编辑时留空则不修改已有照片</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">使用的产品</label>
+                            <div class="card border-0 bg-light p-2" style="max-height:150px;overflow-y:auto">
+                                {% set all_products = namespace(items=[]) %}
+                                {% for p in product_map.values() %}
+                                {% set _ = all_products.items.append(p) %}
+                                {% endfor %}
+                                {% if all_products.items %}
+                                {% for p in all_products.items %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="product_ids"
+                                           value="{{ p.id }}" id="diaryProd{{ p.id }}">
+                                    <label class="form-check-label small" for="diaryProd{{ p.id }}">
+                                        {{ p.name }} {% if p.brand %}({{ p.brand }}){% endif %}
+                                    </label>
+                                </div>
+                                {% endfor %}
+                                {% else %}
+                                <p class="text-muted small mb-0">还没有产品，先去添加产品吧</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-pink"><i class="bi bi-check-lg"></i> 保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 删除确认 Modal -->
+<div class="modal fade" id="diaryDeleteModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold text-danger">⚠️ 确认删除</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>确定要删除日记 <strong id="diaryDeleteTitle"></strong> 吗？</p>
+                <small class="text-muted">此操作不可恢复</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <form id="diaryDeleteForm" method="POST">
+                    <button type="submit" class="btn btn-danger">确认删除</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function clearDiaryForm() {
+    document.getElementById('diaryModalTitle').innerHTML = '✍️ 写日记';
+    document.getElementById('diaryForm').action = "{{ url_for('diary_add') }}";
+    document.getElementById('diaryTitle').value = '';
+    document.getElementById('diaryContent').value = '';
+    document.getElementById('diaryDate').value = new Date().toISOString().split('T')[0];
+    document.querySelector('input[name="mood"][value="😊"]').checked = true;
+    // uncheck all product checkboxes
+    document.querySelectorAll('input[name="product_ids"]').forEach(cb => cb.checked = false);
+}
+
+function editDiary(diary) {
+    document.getElementById('diaryModalTitle').innerHTML = '✏️ 编辑日记';
+    document.getElementById('diaryForm').action = "{{ url_for('diary_edit', did=999) }}".replace('999', diary.id);
+    document.getElementById('diaryTitle').value = diary.title;
+    document.getElementById('diaryContent').value = diary.content;
+    document.getElementById('diaryDate').value = diary.created_date;
+    // mood
+    const moodRadio = document.querySelector('input[name="mood"][value="' + diary.mood + '"]');
+    if (moodRadio) moodRadio.checked = true;
+    // product checkboxes
+    document.querySelectorAll('input[name="product_ids"]').forEach(cb => cb.checked = false);
+    (diary.product_ids || []).forEach(pid => {
+        const cb = document.getElementById('diaryProd' + pid);
+        if (cb) cb.checked = true;
+    });
+    new bootstrap.Modal(document.getElementById('diaryModal')).show();
+}
+
+function confirmDiaryDelete(id, title) {
+    document.getElementById('diaryDeleteTitle').textContent = title;
+    document.getElementById('diaryDeleteForm').action = "{{ url_for('diary_delete', did=999) }}".replace('999', id);
+    new bootstrap.Modal(document.getElementById('diaryDeleteModal')).show();
+}
+</script>
+{% endblock %}

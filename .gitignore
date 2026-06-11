@@ -1,0 +1,7 @@
+instance/
+__pycache__/
+*.pyc
+static/uploads/products/*
+static/uploads/diary/*
+!static/uploads/products/.gitkeep
+!static/uploads/diary/.gitkeep

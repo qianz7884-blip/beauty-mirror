@@ -1,0 +1,228 @@
+/* ============================================================
+   美妆镜 — 玫瑰粉主题样式
+   ============================================================ */
+
+:root {
+    --pink: #e91e63;
+    --pink-dark: #c2185b;
+    --pink-light: #fce4ec;
+    --pink-soft: #f8bbd0;
+}
+
+/* ---- 导航栏 ---- */
+#main-nav {
+    background: linear-gradient(135deg, #fff0f5 0%, #fce4ec 100%);
+    box-shadow: 0 2px 12px rgba(233, 30, 99, 0.08);
+}
+
+#main-nav .navbar-brand {
+    color: var(--pink) !important;
+    font-size: 1.3rem;
+}
+
+#main-nav .nav-link {
+    color: #555 !important;
+    border-radius: 8px;
+    margin: 0 2px;
+    transition: all 0.2s;
+}
+
+#main-nav .nav-link:hover {
+    background: rgba(233, 30, 99, 0.08);
+    color: var(--pink) !important;
+}
+
+#main-nav .nav-link.active {
+    background: var(--pink) !important;
+    color: #fff !important;
+}
+
+/* ---- 按钮 ---- */
+.btn-pink {
+    background-color: var(--pink);
+    color: #fff;
+    border: none;
+}
+
+.btn-pink:hover {
+    background-color: var(--pink-dark);
+    color: #fff;
+}
+
+.btn-outline-pink {
+    color: var(--pink);
+    border-color: var(--pink);
+}
+
+.btn-outline-pink:hover {
+    background-color: var(--pink);
+    color: #fff;
+}
+
+/* ---- 统计卡片 ---- */
+.stat-card {
+    border-radius: 16px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1) !important;
+}
+
+.text-pink {
+    color: var(--pink) !important;
+}
+
+/* ---- 徽章 ---- */
+.bg-pink-soft {
+    background-color: var(--pink-light) !important;
+}
+
+.badge.bg-pink-soft.text-pink {
+    color: var(--pink) !important;
+}
+
+/* ---- 产品卡片 ---- */
+.product-card {
+    border-radius: 16px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(233, 30, 99, 0.15) !important;
+}
+
+.product-img-wrapper {
+    height: 180px;
+    overflow: hidden;
+    background: #fafafa;
+}
+
+.product-img-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+}
+
+.product-card:hover .product-img-wrapper img {
+    transform: scale(1.05);
+}
+
+.product-img-placeholder {
+    height: 180px;
+    background: #f5f5f5;
+}
+
+/* ---- 首页缩略图 ---- */
+.product-thumb {
+    height: 100px;
+    object-fit: cover;
+    border-radius: 8px 8px 0 0;
+}
+
+.product-thumb-placeholder {
+    height: 100px;
+    border-radius: 8px 8px 0 0;
+}
+
+/* ---- 日记卡片 ---- */
+.diary-card {
+    border-radius: 16px;
+    transition: box-shadow 0.2s;
+}
+
+.diary-card:hover {
+    box-shadow: 0 4px 18px rgba(0,0,0,0.08) !important;
+}
+
+.diary-card img {
+    border-radius: 12px;
+}
+
+/* ---- 心情选择器 ---- */
+.mood-selector .btn {
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+
+.mood-selector .btn-check:checked + .btn {
+    background-color: var(--pink-light);
+    border-color: var(--pink);
+    color: var(--pink);
+}
+
+/* ---- 分类 Tab ---- */
+.nav-pills .nav-link {
+    border-radius: 20px;
+    padding: 8px 20px;
+    color: #666;
+    margin: 0 4px 8px 0;
+    transition: all 0.2s;
+}
+
+.nav-pills .nav-link:hover {
+    background: var(--pink-light);
+    color: var(--pink);
+}
+
+.nav-pills .nav-link.active {
+    background: var(--pink) !important;
+    color: #fff !important;
+}
+
+/* ---- 表格优化 ---- */
+.table th {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* ---- 通用 ---- */
+.hover-card {
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s;
+}
+
+.hover-card:hover {
+    transform: translateY(-2px);
+}
+
+.card {
+    border-radius: 16px;
+}
+
+.card-header {
+    border-radius: 16px 16px 0 0 !important;
+}
+
+/* ---- 滚动条 ---- */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--pink-soft);
+    border-radius: 3px;
+}
+
+/* ---- 响应式 ---- */
+@media (max-width: 768px) {
+    .stat-card .card-body {
+        padding: 0.75rem;
+    }
+    .stat-card h3 {
+        font-size: 1.2rem;
+    }
+    .product-img-wrapper {
+        height: 140px;
+    }
+}

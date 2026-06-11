@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}美妆镜 - 首页{% endblock %}
+
+{% block content %}
+<!-- 欢迎区 -->
+<div class="row mb-4">
+    <div class="col">
+        <h2 class="fw-bold"><i class="bi bi-sunrise"></i> 欢迎回来 👋</h2>
+        <p class="text-muted">{{ now.strftime('%Y年%m月%d日') if now else '' }} · 今天也要美美的 ✨</p>
+    </div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card stat-card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="stat-icon text-pink mb-2"><i class="bi bi-collection fs-1"></i></div>
+                <h3 class="fw-bold mb-1">{{ total_products }}</h3>
+                <p class="text-muted small mb-0">产品总数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="stat-icon text-success mb-2"><i class="bi bi-plus-circle fs-1"></i></div>
+                <h3 class="fw-bold mb-1">{{ monthly_products }}</h3>
+                <p class="text-muted small mb-0">本月新增</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="stat-icon text-warning mb-2"><i class="bi bi-journal-bookmark fs-1"></i></div>
+                <h3 class="fw-bold mb-1">{{ total_diary }}</h3>
+                <p class="text-muted small mb-0">日记篇数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card stat-card border-0 shadow-sm">
+            <div class="card-body text-center">
+                <div class="stat-icon text-info mb-2"><i class="bi bi-stars fs-1"></i></div>
+                <h3 class="fw-bold mb-1">{{ recent_products|length }}</h3>
+                <p class="text-muted small mb-0">最近添加</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 快捷操作 -->
+<div class="row mb-4">
+    <div class="col">
+        <a href="{{ url_for('product_manage') }}" class="btn btn-pink me-2">
+            <i class="bi bi-plus-lg"></i> 添加产品
+        </a>
+        <a href="{{ url_for('makeup_diary') }}" class="btn btn-outline-pink" data-bs-toggle="modal" data-bs-target="#diaryModal">
+            <i class="bi bi-pencil"></i> 写日记
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- 最近产品 -->
+    <div class="col-md-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-clock-history"></i> 最近添加的产品</h5>
+                <a href="{{ url_for('my_cosmetics') }}" class="text-pink text-decoration-none small">查看全部 →</a>
+            </div>
+            <div class="card-body">
+                {% if recent_products %}
+                <div class="row g-2">
+                    {% for product in recent_products %}
+                    <div class="col-6 col-md-3">
+                        <a href="{{ url_for('my_cosmetics') }}" class="text-decoration-none">
+                            <div class="card border-0 bg-light hover-card">
+                                {% if product.photo %}
+                                <img src="{{ url_for('static', filename='uploads/products/' + product.photo) }}"
+                                     class="card-img-top product-thumb" alt="{{ product.name }}">
+                                {% else %}
+                                <div class="product-thumb-placeholder d-flex align-items-center justify-content-center bg-secondary bg-opacity-10">
+                                    <i class="bi bi-box-seam fs-2 text-muted"></i>
+                                </div>
+                                {% endif %}
+                                <div class="card-body p-2 text-center">
+                                    <small class="fw-bold text-dark d-block text-truncate">{{ product.name }}</small>
+                                    <small class="text-muted">{{ product.brand or '—' }}</small>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                    <p class="mb-2">还没有产品</p>
+                    <a href="{{ url_for('product_manage') }}" class="btn btn-sm btn-pink">去添加第一个产品</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 最新日记 -->
+    <div class="col-md-5">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold"><i class="bi bi-journal-text"></i> 最新日记</h5>
+                <a href="{{ url_for('makeup_diary') }}" class="text-pink text-decoration-none small">查看全部 →</a>
+            </div>
+            <div class="card-body">
+                {% if latest_diary %}
+                <div class="mb-2">
+                    <span class="fs-4">{{ latest_diary.mood }}</span>
+                    <span class="text-muted small ms-2">{{ latest_diary.created_date }}</span>
+                </div>
+                <h6 class="fw-bold">{{ latest_diary.title }}</h6>
+                <p class="text-muted small">{{ latest_diary.content[:120] }}{% if latest_diary.content|length > 120 %}...{% endif %}</p>
+                {% if latest_diary.photo %}
+                <img src="{{ url_for('static', filename='uploads/diary/' + latest_diary.photo) }}"
+                     class="rounded img-fluid mb-2" style="max-height:150px" alt="日记照片">
+                {% endif %}
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-journal-plus fs-1 d-block mb-2"></i>
+                    <p class="mb-2">还没有日记</p>
+                    <span class="small">点击上方"写日记"开始记录吧</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 快速写日记 Modal -->
+<div class="modal fade" id="diaryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{{ url_for('diary_add') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">✍️ 快速写日记</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">标题</label>
+                        <input type="text" name="title" class="form-control" required placeholder="今天的妆容主题...">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">日期</label>
+                            <input type="date" name="created_date" class="form-control" value="{{ now.strftime('%Y-%m-%d') if now else '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">心情</label>
+                            <div class="btn-group w-100" role="group">
+                                {% for emoji, label in [('😍','超满意'),('😊','开心'),('😐','一般'),('😢','不满意')] %}
+                                <input type="radio" class="btn-check" name="mood" value="{{ emoji }}"
+                                       id="quick-mood-{{ loop.index }}" {% if loop.index == 2 %}checked{% endif %}>
+                                <label class="btn btn-outline-secondary" for="quick-mood-{{ loop.index }}">{{ emoji }} {{ label }}</label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">内容</label>
+                        <textarea name="content" class="form-control" rows="3" placeholder="记录今天的妆容心得..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">妆容照片</label>
+                        <input type="file" name="photo" class="form-control" accept="image/*">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-pink"><i class="bi bi-check-lg"></i> 发布</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
