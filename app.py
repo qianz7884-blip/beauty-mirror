@@ -294,13 +294,14 @@ def diary_delete(did):
 # ============================================================
 
 if __name__ == '__main__':
-    import socket
+    import socket, os
     hostname = socket.gethostname()
     local_ip = socket.gethostbyname(hostname)
+    port = int(os.environ.get('PORT', 5000))
     print('=' * 50)
     print('  Beauty Mirror Started!')
-    print(f'  Local:  http://127.0.0.1:5000')
-    print(f'  Mobile: http://{local_ip}:5000')
+    print(f'  Local:  http://127.0.0.1:{port}')
+    print(f'  Mobile: http://{local_ip}:{port}')
     print('  (Phone and PC must be on same WiFi)')
     print('=' * 50)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=port)
