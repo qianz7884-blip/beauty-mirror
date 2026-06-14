@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchProducts } from '../api'
+import { fetchProducts, getPhotoUrl } from '../api'
 
 const CATEGORIES = ['全部', '口红', '眼影', '粉底', '腮红', '其他']
 
@@ -50,8 +50,8 @@ export default function MyCosmetics() {
                   width: '100%',
                   aspectRatio: '1',
                   background: p.photo
-                    ? `url(/uploads/products/${p.photo}) center/cover`
-                    : 'linear-gradient(135deg, #fce4ec, #f8bbd0)',
+                    ? `url(${getPhotoUrl(p.photo, 'products')}) center/cover`
+                    : 'linear-gradient(135deg, #e8f5e9, #c8e6c9)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

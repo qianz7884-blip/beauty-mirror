@@ -1,3 +1,5 @@
+import { getPhotoUrl } from '../api'
+
 export default function DiaryCard({ diary, productMap, onEdit, onDelete }) {
   const linkedProducts = (diary.product_ids || [])
     .map(id => productMap[id])
@@ -27,7 +29,7 @@ export default function DiaryCard({ diary, productMap, onEdit, onDelete }) {
 
       {diary.photo && (
         <img
-          src={`/uploads/diary/${diary.photo}`}
+          src={getPhotoUrl(diary.photo, 'diary')}
           alt="妆容照片"
           style={{
             width: '100%',

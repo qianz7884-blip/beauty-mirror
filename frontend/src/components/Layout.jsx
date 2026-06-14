@@ -9,10 +9,11 @@ const TABS = [
 
 export default function Layout({ children }) {
   const { pathname } = useLocation()
+  const isHome = pathname === '/'
 
   return (
     <div className="app-container">
-      <header className="app-header">💎 Beauty Mirror</header>
+      {!isHome && <header className="app-header">彩妆管理助手</header>}
       <main className="app-content">{children}</main>
       <nav className="tab-bar">
         {TABS.map(tab => {

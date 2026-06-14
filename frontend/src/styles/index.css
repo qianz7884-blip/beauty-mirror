@@ -4,9 +4,11 @@
    ============================ */
 
 :root {
-  --pink: #e91e63;
-  --pink-light: #fce4ec;
-  --pink-dark: #c2185b;
+  --primary: #c5a7ed;
+  --primary-light: #91ee98;
+  --primary-dark: #abe054;
+  --accent: #f9a825;
+  --accent-light: #fff8e1;
   --bg: #fafafa;
   --card-bg: #fff;
   --text: #333;
@@ -27,8 +29,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-family: 'KaiTi', serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -49,18 +50,19 @@ body {
 
 .app-header {
   position: sticky;
+  font-family: 'KaiTi', serif;
   top: 0;
   z-index: 100;
   height: var(--header-h);
-  background: linear-gradient(135deg, var(--pink), var(--pink-dark));
-  color: #fff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #eceeeb;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 18px;
   font-weight: 600;
   letter-spacing: 1px;
-  box-shadow: 0 2px 8px rgba(233, 30, 99, 0.3);
+  box-shadow: 0 2px 8px rgba(179, 155, 140, 0.3);
 }
 
 .app-content {
@@ -107,7 +109,7 @@ body {
 }
 
 .tab-item.active {
-  color: var(--pink);
+  color: var(--primary);
 }
 
 .tab-item .tab-icon {
@@ -148,22 +150,22 @@ body {
 }
 
 .btn-primary {
-  background: var(--pink);
+  background: var(--primary);
   color: #fff;
 }
 
 .btn-primary:hover {
-  background: var(--pink-dark);
+  background: var(--primary-dark);
 }
 
 .btn-outline {
   background: #fff;
-  color: var(--pink);
-  border: 1.5px solid var(--pink);
+  color: var(--primary);
+  border: 1.5px solid var(--primary);
 }
 
 .btn-outline:hover {
-  background: var(--pink-light);
+  background: var(--primary-light);
 }
 
 .btn-danger {
@@ -206,7 +208,7 @@ body {
 }
 
 .form-input:focus {
-  border-color: var(--pink);
+  border-color: var(--primary);
   background: #fff;
 }
 
@@ -301,8 +303,8 @@ select.form-input {
   border-radius: 12px;
   font-size: 11px;
   font-weight: 500;
-  background: var(--pink-light);
-  color: var(--pink);
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 .tag-outline {
@@ -441,7 +443,7 @@ select.form-input {
 .stat-card .stat-num {
   font-size: 28px;
   font-weight: 700;
-  color: var(--pink);
+  color: var(--accent);
 }
 
 .stat-card .stat-label {
@@ -470,12 +472,12 @@ select.form-input {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: var(--pink);
+  background: var(--accent);
   color: #fff;
   border: none;
   font-size: 28px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(233, 30, 99, 0.4);
+  box-shadow: 0 4px 12px rgba(249, 168, 37, 0.4);
   z-index: 99;
   display: flex;
   align-items: center;
@@ -495,4 +497,183 @@ select.form-input {
   object-fit: cover;
   margin-top: 8px;
   border: 2px solid var(--border);
+}
+
+/* ============================
+   首页 Dashboard 小组件
+   ============================ */
+
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.widget-card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 18px 14px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  font-family: inherit;
+  width: 100%;
+}
+
+.widget-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.widget-card:active {
+  transform: scale(0.97);
+}
+
+.widget-card .widget-icon {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.widget-card .widget-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.widget-card .widget-label {
+  font-size: 13px;
+  color: var(--text-light);
+}
+
+/* 小组件颜色变体 */
+.widget-pink  { background: #fce4ec; }
+.widget-pink .widget-num  { color: #e91e63; }
+.widget-pink .widget-label { color: #c2185b; }
+
+.widget-orange { background: #fff3e0; }
+.widget-orange .widget-num  { color: #ff9800; }
+.widget-orange .widget-label { color: #e65100; }
+
+.widget-yellow { background: #fffde7; }
+.widget-yellow .widget-num  { color: #f9a825; }
+.widget-yellow .widget-label { color: #f57f17; }
+
+.widget-green  { background: #e8f5e9; }
+.widget-green .widget-num  { color: #43a047; }
+.widget-green .widget-label { color: #2e7d32; }
+
+/* ============================
+   首页 快速添加区
+   ============================ */
+
+.quick-add-section {
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+
+.quick-add-row {
+  display: flex;
+  gap: 10px;
+}
+
+.quick-add-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 14px 6px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  border: none;
+  font-family: inherit;
+  color: inherit;
+}
+
+.quick-add-item:hover {
+  transform: translateY(-2px);
+}
+
+.quick-add-item:active {
+  transform: scale(0.96);
+}
+
+.quick-add-item .quick-add-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.quick-add-item .quick-add-label {
+  font-size: 11px;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+
+/* ============================
+   首页近期产品列表项
+   ============================ */
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.recent-item:last-of-type {
+  border-bottom: none;
+}
+
+.recent-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: #f5f5f5 center/cover no-repeat;
+}
+
+.recent-link {
+  font-size: 13px;
+  color: var(--primary);
+  display: block;
+  margin-top: 10px;
+  text-decoration: none;
+}
+
+/* ============================
+   AI 识别面板
+   ============================ */
+
+.recognize-spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto;
+  border: 4px solid #e0e0e0;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

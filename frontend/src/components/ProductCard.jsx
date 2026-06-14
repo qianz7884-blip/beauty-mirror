@@ -1,3 +1,5 @@
+import { getPhotoUrl } from '../api'
+
 export default function ProductCard({ product, onEdit, onDelete }) {
   return (
     <div className="card" style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
@@ -9,8 +11,8 @@ export default function ProductCard({ product, onEdit, onDelete }) {
           borderRadius: 10,
           flexShrink: 0,
           background: product.photo
-            ? `url(/uploads/products/${product.photo}) center/cover`
-            : 'linear-gradient(135deg, #fce4ec, #f8bbd0)',
+            ? `url(${getPhotoUrl(product.photo, 'products')}) center/cover`
+            : 'linear-gradient(135deg, #e8f5e9, #c8e6c9)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -28,7 +30,7 @@ export default function ProductCard({ product, onEdit, onDelete }) {
           {product.brand && product.category && <span> · </span>}
           {product.category && <span>{product.category}</span>}
           {product.price > 0 && (
-            <span style={{ marginLeft: 8, color: 'var(--pink)', fontWeight: 500 }}>
+            <span style={{ marginLeft: 8, color: 'var(--accent)', fontWeight: 500 }}>
               ¥{product.price}
             </span>
           )}

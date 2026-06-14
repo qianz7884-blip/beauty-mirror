@@ -1,5 +1,7 @@
 import os
 import uuid
+import urllib.request
+from io import BytesIO
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -7,6 +9,7 @@ from PIL import Image
 
 from config import Config
 from models import db, Product, Diary
+from recognizer import recognize_product
 
 
 def create_app():
@@ -62,6 +65,42 @@ def save_photo(file, folder):
         img.save(filepath, 'JPEG', quality=85)
         return filename
     return ''
+
+
+def download_photo_from_url(url, folder):
+    """从URL下载图片，保存到文件夹，返回文件名。失败返回空字符串"""
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = resp.read()
+            content_type = resp.headers.get('Content-Type', '')
+
+        # 判断扩展名：优先 Content-Type，其次 URL 后缀
+        ext = '.jpg'
+        if 'png' in content_type:
+            ext = '.png'
+        elif 'webp' in content_type:
+            ext = '.webp'
+        elif 'gif' in content_type:
+            ext = '.gif'
+        else:
+            url_lower = url.lower()
+            for e in ['.png', '.webp', '.gif', '.jpg', '.jpeg']:
+                if e in url_lower:
+                    ext = e if e != '.jpeg' else '.jpg'
+                    break
+
+        filename = f"{uuid.uuid4().hex}{ext}"
+        filepath = os.path.join(folder, filename)
+
+        img = Image.open(BytesIO(data))
+        img.thumbnail((800, 800))
+        if img.mode == 'RGBA':
+            img = img.convert('RGB')
+        img.save(filepath, 'JPEG', quality=85)
+        return filename
+    except Exception:
+        return ''
 
 
 def delete_photo(filename, folder):
@@ -156,8 +195,12 @@ def product_create():
     )
 
     photo_file = request.files.get('photo')
-    if photo_file:
+    if photo_file and photo_file.filename:
         product.photo = save_photo(photo_file, app.config['UPLOAD_FOLDER_PRODUCTS'])
+    elif not product.photo:
+        photo_url = request.form.get('photo_url', '').strip()
+        if photo_url:
+            product.photo = download_photo_from_url(photo_url, app.config['UPLOAD_FOLDER_PRODUCTS'])
 
     db.session.add(product)
     db.session.commit()
@@ -182,6 +225,10 @@ def product_update(pid):
     if photo_file and photo_file.filename:
         delete_photo(product.photo, app.config['UPLOAD_FOLDER_PRODUCTS'])
         product.photo = save_photo(photo_file, app.config['UPLOAD_FOLDER_PRODUCTS'])
+    elif not product.photo:
+        photo_url = request.form.get('photo_url', '').strip()
+        if photo_url:
+            product.photo = download_photo_from_url(photo_url, app.config['UPLOAD_FOLDER_PRODUCTS'])
 
     db.session.commit()
     return jsonify(product.to_dict())
@@ -273,6 +320,23 @@ def diary_delete(did):
     db.session.delete(diary)
     db.session.commit()
     return jsonify({'message': '已删除'})
+
+
+# ============================================================
+# AI 识别
+# ============================================================
+
+@app.route('/api/recognize', methods=['POST'])
+def recognize():
+    """接收彩妆照片，返回 AI 识别结果"""
+    photo_file = request.files.get('photo')
+    if not photo_file or not photo_file.filename:
+        return error('请上传一张照片')
+
+    result = recognize_product(photo_file.read())
+    if result:
+        return jsonify({'recognized': True, **result})
+    return jsonify({'recognized': False, 'message': '未能自动识别，请手动填写'})
 
 
 # ============================================================

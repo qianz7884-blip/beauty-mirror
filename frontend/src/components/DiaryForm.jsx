@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { getPhotoUrl } from '../api'
 
 const MOODS = [
   ['😍', '超满意'],
@@ -15,7 +16,7 @@ export default function DiaryForm({ diary, products, onSubmit, onClose }) {
   const [selectedProductIds, setSelectedProductIds] = useState(diary?.product_ids || [])
   const [photo, setPhoto] = useState(null)
   const [photoPreview, setPhotoPreview] = useState(
-    diary?.photo ? `/uploads/diary/${diary.photo}` : ''
+    getPhotoUrl(diary?.photo, 'diary')
   )
   const fileRef = useRef(null)
   const [submitting, setSubmitting] = useState(false)
@@ -75,8 +76,8 @@ export default function DiaryForm({ diary, products, onSubmit, onClose }) {
                     alignItems: 'center',
                     padding: '8px 12px',
                     borderRadius: 10,
-                    border: mood === emoji ? '2px solid var(--pink)' : '2px solid #eee',
-                    background: mood === emoji ? 'var(--pink-light)' : '#fff',
+                    border: mood === emoji ? '2px solid var(--primary)' : '2px solid #eee',
+                    background: mood === emoji ? 'var(--primary-light)' : '#fff',
                     cursor: 'pointer',
                     fontSize: 24,
                   }}
