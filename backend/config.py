@@ -1,5 +1,8 @@
 import os
 import re
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -30,4 +33,5 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER_PRODUCTS = os.path.join(BASE_DIR, 'uploads', 'products')
     UPLOAD_FOLDER_DIARY = os.path.join(BASE_DIR, 'uploads', 'diary')
+    UPLOAD_FOLDER_SKIN = os.path.join(BASE_DIR, 'uploads', 'skin')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB

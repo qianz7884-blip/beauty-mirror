@@ -30,7 +30,7 @@ export default function DiaryCard({ diary, productMap, onEdit, onDelete }) {
       {diary.photo && (
         <img
           src={getPhotoUrl(diary.photo, 'diary')}
-          alt="妆容照片"
+          alt="护肤照片"
           style={{
             width: '100%',
             maxHeight: 300,

@@ -85,7 +85,7 @@ export default function MakeupDiary() {
       ) : diaries.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">📖</div>
-          <p>还没有日记，记录你的每日妆容吧</p>
+          <p>还没有日记，记录你的每日护肤吧</p>
         </div>
       ) : (
         diaries.map(d => (

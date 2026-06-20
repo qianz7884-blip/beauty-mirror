@@ -8,8 +8,9 @@ from flask_cors import CORS
 from PIL import Image
 
 from config import Config
-from models import db, Product, Diary
+from models import db, Product, Diary, SkinAnalysis
 from recognizer import recognize_product
+from skin_analyzer import analyze_skin
 
 
 def create_app():
@@ -24,6 +25,7 @@ def create_app():
 
     os.makedirs(app.config['UPLOAD_FOLDER_PRODUCTS'], exist_ok=True)
     os.makedirs(app.config['UPLOAD_FOLDER_DIARY'], exist_ok=True)
+    os.makedirs(app.config['UPLOAD_FOLDER_SKIN'], exist_ok=True)
 
     db.init_app(app)
 
@@ -39,7 +41,7 @@ app = create_app()
 # 常量
 # ============================================================
 
-CATEGORIES = ['全部', '口红', '眼影', '粉底', '腮红', '其他']
+CATEGORIES = ['全部', '面霜', '精华', '面膜', '洁面', '防晒', '其他']
 MOODS = [
     ('😍', '超满意'),
     ('😊', '开心'),
@@ -137,12 +139,20 @@ def dashboard():
     latest_diary = Diary.query.order_by(Diary.created_at.desc()).first()
     latest_diary_data = latest_diary.to_dict() if latest_diary else None
 
+    recent_analyses = [a.to_dict() for a in SkinAnalysis.query.order_by(
+        SkinAnalysis.created_at.desc()
+    ).limit(5).all()]
+
+    total_analyses = SkinAnalysis.query.count()
+
     return jsonify({
         'total_products': total_products,
         'total_diary': total_diary,
         'monthly_products': monthly_products,
+        'total_analyses': total_analyses,
         'recent_products': recent_products,
         'latest_diary': latest_diary_data,
+        'recent_analyses': recent_analyses,
     })
 
 
@@ -339,6 +349,88 @@ def recognize():
     return jsonify({'recognized': False, 'message': '未能自动识别，请手动填写'})
 
 
+@app.route('/api/skin-analysis', methods=['POST'])
+def skin_analysis():
+    """接收面部照片，返回肤质分析结果，并自动保存到历史记录"""
+    photo_file = request.files.get('photo')
+    if not photo_file or not photo_file.filename:
+        return error('请上传一张正面面部照片')
+
+    image_bytes = photo_file.read()
+    result = analyze_skin(image_bytes)
+
+    if not result.get('success'):
+        return jsonify(result), 422 if result.get('reason') == 'no_face' else 500
+
+    # 自动保存分析记录
+    try:
+        record = SkinAnalysis(
+            skin_type=result.get('skin_type', ''),
+            overall_score=result.get('overall_score', 0),
+            summary=result.get('summary', ''),
+        )
+        record.set_concerns(result.get('concerns', []))
+        record.set_scores(result.get('scores', {}))
+        record.set_recommendations(result.get('recommendations', []))
+        record.set_region_scores(result.get('region_scores', {}))
+        record.heatmap_image = result.get('heatmap_base64') or ''
+        face_data = result.get('face_data')
+        if face_data and isinstance(face_data, dict):
+            record.set_face_data(face_data)
+
+        # 保存缩略图
+        try:
+            from io import BytesIO as Bio
+            thumb_img = Image.open(Bio(image_bytes))
+            thumb_img.thumbnail((400, 400))
+            if thumb_img.mode == 'RGBA':
+                thumb_img = thumb_img.convert('RGB')
+            thumb_filename = f"skin_{uuid.uuid4().hex}.jpg"
+            thumb_path = os.path.join(app.config['UPLOAD_FOLDER_SKIN'], thumb_filename)
+            thumb_img.save(thumb_path, 'JPEG', quality=80)
+            record.photo = thumb_filename
+        except Exception as e:
+            print(f'[app] 保存肤质照片失败: {e}')
+
+        db.session.add(record)
+        db.session.commit()
+        result['id'] = record.id
+        result['created_at'] = record.created_at.strftime('%Y-%m-%d %H:%M') if record.created_at else ''
+    except Exception as e:
+        print(f'[app] 保存肤质分析记录失败: {e}')
+        # 即使保存失败，也返回分析结果
+
+    return jsonify(result)
+
+
+@app.route('/api/skin-analyses')
+def skin_analyses_list():
+    """肤质分析历史列表"""
+    records = SkinAnalysis.query.order_by(SkinAnalysis.created_at.desc()).all()
+    return jsonify([r.to_dict() for r in records])
+
+
+@app.route('/api/skin-analyses/<int:sid>')
+def skin_analysis_detail(sid):
+    """单条肤质分析详情"""
+    record = db.session.get(SkinAnalysis, sid)
+    if not record:
+        return error('记录不存在', 404)
+    return jsonify(record.to_dict())
+
+
+@app.route('/api/skin-analyses/<int:sid>', methods=['DELETE'])
+def skin_analysis_delete(sid):
+    """删除肤质分析记录"""
+    record = db.session.get(SkinAnalysis, sid)
+    if not record:
+        return error('记录不存在', 404)
+    delete_photo(record.photo, app.config['UPLOAD_FOLDER_SKIN'])
+    db.session.delete(record)
+    db.session.commit()
+    return jsonify({'message': '已删除'})
+
+
 # ============================================================
 # 静态文件服务（上传的图片）
 # ============================================================
@@ -350,6 +442,8 @@ def uploaded_file(folder, filename):
         return send_from_directory(app.config['UPLOAD_FOLDER_PRODUCTS'], filename)
     elif folder == 'diary':
         return send_from_directory(app.config['UPLOAD_FOLDER_DIARY'], filename)
+    elif folder == 'skin':
+        return send_from_directory(app.config['UPLOAD_FOLDER_SKIN'], filename)
     return error('未知文件夹', 404)
 
 

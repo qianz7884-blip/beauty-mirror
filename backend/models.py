@@ -66,3 +66,82 @@ class Diary(db.Model):
             'created_date': self.created_date,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
         }
+
+
+class SkinAnalysis(db.Model):
+    """肤质分析历史记录"""
+    __tablename__ = 'skin_analyses'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    photo = db.Column(db.String(200), default='')
+    skin_type = db.Column(db.String(50), default='')
+    concerns = db.Column(db.Text, default='[]')      # JSON 数组
+    scores = db.Column(db.Text, default='{}')        # JSON 对象
+    overall_score = db.Column(db.Integer, default=0)
+    recommendations = db.Column(db.Text, default='[]')  # JSON 数组
+    summary = db.Column(db.Text, default='')
+    face_data = db.Column(db.Text, default='{}')     # JSON 对象
+    region_scores = db.Column(db.Text, default='{}')  # JSON 对象: 8区域分区评分
+    heatmap_image = db.Column(db.Text, default='')    # base64 热点图
+    created_at = db.Column(db.DateTime, default=datetime.now)
+
+    def get_concerns(self):
+        try:
+            return json.loads(self.concerns)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_concerns(self, lst):
+        self.concerns = json.dumps(lst, ensure_ascii=False)
+
+    def get_scores(self):
+        try:
+            return json.loads(self.scores)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def set_scores(self, d):
+        self.scores = json.dumps(d, ensure_ascii=False)
+
+    def get_recommendations(self):
+        try:
+            return json.loads(self.recommendations)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def set_recommendations(self, lst):
+        self.recommendations = json.dumps(lst, ensure_ascii=False)
+
+    def get_face_data(self):
+        try:
+            return json.loads(self.face_data)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def set_face_data(self, d):
+        self.face_data = json.dumps(d, ensure_ascii=False)
+
+    def get_region_scores(self):
+        try:
+            return json.loads(self.region_scores)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def set_region_scores(self, d):
+        self.region_scores = json.dumps(d, ensure_ascii=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'photo': self.photo,
+            'skin_type': self.skin_type,
+            'concerns': self.get_concerns(),
+            'scores': self.get_scores(),
+            'overall_score': self.overall_score,
+            'region_scores': self.get_region_scores(),
+            'recommendations': self.get_recommendations(),
+            'summary': self.summary,
+            'face_data': self.get_face_data(),
+            'heatmap_image': self.heatmap_image,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
+        }

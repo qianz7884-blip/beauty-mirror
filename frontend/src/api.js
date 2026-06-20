@@ -12,9 +12,9 @@ const _uploadsBase = (() => {
 })()
 
 /**
- * 获取产品/日记图片的完整 URL
+ * 获取产品/日记/肤质分析图片的完整 URL
  * @param {string} filename 数据库中的文件名
- * @param {'products'|'diary'} type
+ * @param {'products'|'diary'|'skin'} type
  * @returns {string}
  */
 export function getPhotoUrl(filename, type = 'products') {
@@ -31,6 +31,12 @@ const api = axios.create({
 
 export function recognizeProduct(formData) {
   return api.post('/recognize', formData).then(r => r.data)
+}
+
+// ==================== 肤质分析 ====================
+
+export function analyzeSkin(formData) {
+  return api.post('/skin-analysis', formData, { timeout: 60000 }).then(r => r.data)
 }
 
 // ==================== Dashboard ====================
@@ -59,6 +65,20 @@ export function updateProduct(id, formData) {
 
 export function deleteProduct(id) {
   return api.delete(`/products/${id}`).then(r => r.data)
+}
+
+// ==================== 肤质分析历史 ====================
+
+export function fetchSkinAnalyses() {
+  return api.get('/skin-analyses').then(r => r.data)
+}
+
+export function fetchSkinAnalysis(id) {
+  return api.get(`/skin-analyses/${id}`).then(r => r.data)
+}
+
+export function deleteSkinAnalysis(id) {
+  return api.delete(`/skin-analyses/${id}`).then(r => r.data)
 }
 
 // ==================== 日记 ====================

@@ -91,7 +91,7 @@ export default function DiaryForm({ diary, products, onSubmit, onClose }) {
 
           <div className="form-group">
             <label className="form-label">标题 *</label>
-            <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="给今天的妆容取个名字" required />
+            <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="给今天的护肤日记取个名字" required />
           </div>
 
           <div className="form-group">
@@ -101,7 +101,7 @@ export default function DiaryForm({ diary, products, onSubmit, onClose }) {
 
           <div className="form-group">
             <label className="form-label">内容</label>
-            <textarea className="form-input" value={content} onChange={e => setContent(e.target.value)} placeholder="记录今天的妆容心得..." rows={4} />
+            <textarea className="form-input" value={content} onChange={e => setContent(e.target.value)} placeholder="记录今天的护肤心得..." rows={4} />
           </div>
 
           {/* 关联产品 */}

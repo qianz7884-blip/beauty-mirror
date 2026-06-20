@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react'
 import { getPhotoUrl } from '../api'
+import ImageViewer from './ImageViewer'
 
-const CATEGORIES = ['口红', '眼影', '粉底', '腮红', '其他']
+const DEFAULT_CATEGORIES = ['面霜', '精华', '面膜', '洁面', '防晒', '其他']
 
-export default function ProductForm({ product, onSubmit, onClose, mode = 'full', initialPhoto = null }) {
+export default function ProductForm({ product, onSubmit, onClose, mode = 'full', initialPhoto = null, categories }) {
+  const CATEGORIES = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES
   const [name, setName] = useState(product?.name || '')
   const [brand, setBrand] = useState(product?.brand || '')
   const [category, setCategory] = useState(product?.category || '其他')
@@ -18,6 +20,7 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
   const [photoUrl, setPhotoUrl] = useState('')
   const fileRef = useRef(null)
   const [submitting, setSubmitting] = useState(false)
+  const [viewImage, setViewImage] = useState(null)
   const isQuick = mode === 'quick'
 
   const handleFileChange = (e) => {
@@ -74,12 +77,12 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">产品名称 *</label>
-            <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="例如：Dior 999" required />
+            <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="例如：La Mer 奇迹面霜" required />
           </div>
 
           <div className="form-group">
             <label className="form-label">品牌</label>
-            <input className="form-input" value={brand} onChange={e => setBrand(e.target.value)} placeholder="例如：Dior" />
+            <input className="form-input" value={brand} onChange={e => setBrand(e.target.value)} placeholder="例如：La Mer" />
           </div>
 
           <div className="form-group">
@@ -120,7 +123,7 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
           {!isQuick && (
             <div className="form-group">
               <label className="form-label">备注</label>
-              <textarea className="form-input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="使用感受、适合场合..." />
+              <textarea className="form-input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="使用感受、适合肤质..." />
             </div>
           )}
 
@@ -140,7 +143,12 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
               </>
             )}
             {photoPreview && (
-              <img src={photoPreview} alt="预览" className="photo-preview" />
+              <img
+                src={photoPreview}
+                alt="预览"
+                className="photo-preview clickable-thumb"
+                onClick={() => setViewImage(photoPreview)}
+              />
             )}
           </div>
 
@@ -149,6 +157,11 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
           </button>
         </form>
       </div>
+
+      {/* 图片查看器 */}
+      {viewImage && (
+        <ImageViewer src={viewImage} onClose={() => setViewImage(null)} />
+      )}
     </div>
   )
 }

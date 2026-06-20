@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { fetchProducts, getPhotoUrl } from '../api'
 
-const CATEGORIES = ['全部', '口红', '眼影', '粉底', '腮红', '其他']
+const CATEGORIES = ['全部', '面霜', '精华', '面膜', '洁面', '防晒', '其他']
 
 export default function MyCosmetics() {
   const [products, setProducts] = useState([])
@@ -37,8 +37,8 @@ export default function MyCosmetics() {
         <div className="empty-state"><p>加载中...</p></div>
       ) : products.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">🎨</div>
-          <p>该分类下还没有产品</p>
+          <div className="empty-icon">🫧</div>
+          <p>该分类下还没有护肤品</p>
         </div>
       ) : (
         <div className="product-grid">
@@ -51,14 +51,14 @@ export default function MyCosmetics() {
                   aspectRatio: '1',
                   background: p.photo
                     ? `url(${getPhotoUrl(p.photo, 'products')}) center/cover`
-                    : 'linear-gradient(135deg, #e8f5e9, #c8e6c9)',
+                    : 'linear-gradient(135deg, #e3ece0, #d5e0d0)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 40,
                 }}
               >
-                {!p.photo && '💄'}
+                {!p.photo && '🫧'}
               </div>
               <div style={{ padding: '10px 12px' }}>
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{p.name}</div>

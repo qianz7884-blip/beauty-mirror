@@ -1,8 +1,13 @@
+.env
 instance/
 __pycache__/
 *.pyc
 frontend/dist/
 frontend/node_modules/
+.venv/
+*.log
+backend/test_*.png
+backend/knowledge_base/chroma_data/
 static/uploads/products/*
 static/uploads/diary/*
 !static/uploads/products/.gitkeep

@@ -1,19 +1,23 @@
 import { useState } from 'react'
 import { recognizeProduct, createProduct } from '../api'
 
-const CATEGORIES = ['口红', '眼影', '粉底', '腮红', '其他']
+const DEFAULT_CATEGORIES = ['面霜', '精华', '面膜', '洁面', '防晒', '其他']
 
-export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved }) {
+export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved, categories }) {
+  const CATEGORIES = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES
   const [step, setStep] = useState('preview') // preview | loading | result
   const [brand, setBrand] = useState('')
   const [name, setName] = useState('')
   const [category, setCategory] = useState('其他')
   const [color, setColor] = useState('')
   const [saving, setSaving] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+  const [saveError, setSaveError] = useState('')
 
   // 调用后端识别 API
   const handleRecognize = async () => {
     setStep('loading')
+    setErrorMsg('')
     try {
       const formData = new FormData()
       formData.append('photo', photoFile)
@@ -23,9 +27,21 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
         setName(result.name || '')
         setCategory(result.category || '其他')
         setColor(result.color || '')
+      } else {
+        // 显示后端返回的失败原因
+        setErrorMsg(result.message || '未能自动识别，请手动填写')
       }
-    } catch {
-      // 识别失败，进入手动填写
+    } catch (e) {
+      // 网络错误 / 超时 / 服务端异常
+      if (e.code === 'ECONNABORTED') {
+        setErrorMsg('识别超时，请检查网络后重试')
+      } else if (e.response) {
+        setErrorMsg(`服务器错误 (${e.response.status})，请稍后重试`)
+      } else if (e.request) {
+        setErrorMsg('无法连接服务器，请检查后端是否启动')
+      } else {
+        setErrorMsg('识别失败，请手动填写')
+      }
     }
     setStep('result')
   }
@@ -40,6 +56,7 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
   const handleSave = async () => {
     if (!name.trim()) return
     setSaving(true)
+    setSaveError('')
     try {
       const formData = new FormData()
       formData.append('name', name.trim())
@@ -50,7 +67,7 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
       await createProduct(formData)
       onSaved()
     } catch {
-      // handled by parent toast
+      setSaveError('保存失败，请重试')
     } finally {
       setSaving(false)
     }
@@ -87,7 +104,7 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <div className="recognize-spinner" />
             <p style={{ marginTop: 20, color: '#888', fontSize: 14 }}>
-              AI 正在分析彩妆信息...
+              AI 正在识别物品...
             </p>
           </div>
         )}
@@ -101,14 +118,20 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
               style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 12, marginBottom: 16 }}
             />
 
+            {errorMsg && (
+              <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 12, border: '1px solid #fecaca' }}>
+                {errorMsg}
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label">品牌</label>
-              <input className="form-input" value={brand} onChange={e => setBrand(e.target.value)} placeholder="例如：Dior" />
+              <input className="form-input" value={brand} onChange={e => setBrand(e.target.value)} placeholder="例如：La Mer" />
             </div>
 
             <div className="form-group">
               <label className="form-label">产品名称 *</label>
-              <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="例如：999 丝绒唇膏" required />
+              <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="例如：奇迹面霜 60ml" required />
             </div>
 
             <div className="form-group">
@@ -132,6 +155,12 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
             >
               🌐 搜索官网宣传图
             </button>
+
+            {saveError && (
+              <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 12, border: '1px solid #fecaca' }}>
+                {saveError}
+              </div>
+            )}
 
             {/* 确认添加 */}
             <button

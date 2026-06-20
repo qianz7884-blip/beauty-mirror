@@ -1,10 +1,10 @@
 import { NavLink, useLocation } from 'react-router-dom'
 
 const TABS = [
-  { path: '/', icon: '📊', label: '首页' },
-  { path: '/products', icon: '💄', label: '产品' },
-  { path: '/gallery', icon: '🎨', label: '画廊' },
+  { path: '/', icon: '🫧', label: '首页' },
+  { path: '/products', icon: '✨', label: '产品' },
   { path: '/diary', icon: '📖', label: '日记' },
+  { path: '/profile', icon: '👤', label: '我的' },
 ]
 
 export default function Layout({ children }) {
@@ -13,7 +13,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="app-container">
-      {!isHome && <header className="app-header">彩妆管理助手</header>}
+      {!isHome && <header className="app-header">护肤管理</header>}
       <main className="app-content">{children}</main>
       <nav className="tab-bar">
         {TABS.map(tab => {

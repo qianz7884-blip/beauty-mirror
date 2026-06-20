@@ -3,8 +3,9 @@ import { fetchDashboard, createProduct, getPhotoUrl } from '../api'
 import { Link, useNavigate } from 'react-router-dom'
 import ProductForm from '../components/ProductForm'
 import RecognizePanel from '../components/RecognizePanel'
-
-const CATEGORIES = ['全部', '口红', '眼影', '粉底', '腮红', '其他']
+import SkinAnalysisPanel from '../components/SkinAnalysisPanel'
+import ImageViewer from '../components/ImageViewer'
+import { getAllCategories } from '../categories'
 
 export default function Dashboard() {
   const [data, setData] = useState(null)
@@ -14,6 +15,9 @@ export default function Dashboard() {
   const [recognizePhoto, setRecognizePhoto] = useState(null) // { file, previewUrl }
   const [showManualForm, setShowManualForm] = useState(false)
   const [toast, setToast] = useState(null)
+  const [viewImage, setViewImage] = useState(null)
+  const [showSkinMenu, setShowSkinMenu] = useState(false)
+  const [skinPanelProps, setSkinPanelProps] = useState(null) // null | { photoFile, previewUrl, ... }
   const cameraInputRef = useRef(null)
   const uploadInputRef = useRef(null)
   const navigate = useNavigate()
@@ -56,8 +60,25 @@ export default function Dashboard() {
 
   const handleRecognizeSaved = () => {
     setRecognizePhoto(null)
-    showToast('彩妆添加成功！')
+    showToast('护肤品添加成功！')
     load()
+  }
+
+  // ==================== 肤质分析入口 ====================
+
+  const openSkinCamera = () => {
+    setShowSkinMenu(false)
+    setSkinPanelProps({ autoOpenCamera: true })
+  }
+
+  const openSkinHistory = () => {
+    setShowSkinMenu(false)
+    setSkinPanelProps({ forceHistoryMode: true })
+  }
+
+  const handleSkinClose = () => {
+    setSkinPanelProps(null)
+    load() // 刷新 Dashboard（可能有新的历史记录）
   }
 
   // ==================== 手动录入 → 快速表单 ====================
@@ -66,18 +87,12 @@ export default function Dashboard() {
     try {
       await createProduct(formData)
       setShowManualForm(false)
-      showToast('彩妆添加成功！')
+      showToast('护肤品添加成功！')
       load()
     } catch (err) {
       showToast(err.response?.data?.error || '添加失败，请重试', 'error')
     }
   }
-
-  // ==================== 计算小组件数据 ====================
-
-  const categoryCount = data
-    ? new Set(data.recent_products.map(p => p.category).filter(Boolean)).size
-    : 0
 
   // ==================== 渲染 ====================
 
@@ -97,7 +112,7 @@ export default function Dashboard() {
       <form className="search-bar" onSubmit={handleSearch}>
         <input
           className="form-input"
-          placeholder="🔍 搜索彩妆名称或品牌..."
+          placeholder="🔍 搜索护肤品名称或品牌..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -107,7 +122,7 @@ export default function Dashboard() {
           onChange={e => setCategory(e.target.value)}
           style={{ width: 90 }}
         >
-          {CATEGORIES.map(c => (
+          {['全部', ...getAllCategories()].map(c => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
@@ -115,34 +130,62 @@ export default function Dashboard() {
 
       {/* ====== 2x2 小组件 ====== */}
       <div className="widget-grid">
-        <button className="widget-card widget-pink" onClick={() => navigate('/gallery')}>
-          <span className="widget-icon">📦</span>
+        <button className="widget-card widget-blush" onClick={() => navigate('/products')}>
+          <span className="widget-icon">🫧</span>
           <span className="widget-num">{data.total_products}</span>
-          <span className="widget-label">彩妆仓库</span>
+          <span className="widget-label">护肤仓库</span>
         </button>
 
-        <button className="widget-card widget-orange" onClick={() => navigate('/products')}>
-          <span className="widget-icon">🆕</span>
+        <button className="widget-card widget-warm" onClick={() => navigate('/products')}>
+          <span className="widget-icon">🌱</span>
           <span className="widget-num">{data.monthly_products}</span>
           <span className="widget-label">本月新增</span>
         </button>
 
-        <button className="widget-card widget-yellow" onClick={() => navigate('/diary')}>
+        <button className="widget-card widget-cream" onClick={() => navigate('/diary')}>
           <span className="widget-icon">📖</span>
           <span className="widget-num">{data.total_diary}</span>
-          <span className="widget-label">妆容日记</span>
+          <span className="widget-label">护肤日记</span>
         </button>
 
-        <button className="widget-card widget-green" onClick={() => navigate('/products')}>
-          <span className="widget-icon">📋</span>
-          <span className="widget-num">{categoryCount}</span>
-          <span className="widget-label">物品管理</span>
+        <button className="widget-card widget-sage" onClick={() => setShowSkinMenu(true)}>
+          <span className="widget-icon">🔬</span>
+          <span className="widget-num">{data.total_analyses || 0}</span>
+          <span className="widget-label">肤质分析</span>
         </button>
       </div>
 
+      {/* ====== 肤质分析菜单 ====== */}
+      {showSkinMenu && (
+        <div className="modal-overlay" onClick={() => setShowSkinMenu(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>🔬 肤质分析</h3>
+              <button className="modal-close" onClick={() => setShowSkinMenu(false)}>✕</button>
+            </div>
+            <div style={{ padding: '10px 0' }}>
+              <button
+                className="btn btn-primary btn-block"
+                style={{ marginBottom: 10, padding: '14px', fontSize: 15 }}
+                onClick={openSkinCamera}
+              >
+                📸 拍照分析
+              </button>
+              <button
+                className="btn btn-outline btn-block"
+                style={{ padding: '14px', fontSize: 15 }}
+                onClick={openSkinHistory}
+              >
+                📋 查看历史报告
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ====== 快速添加区 ====== */}
       <div className="quick-add-section">
-        <div className="section-title">📷 快速添加彩妆</div>
+        <div className="section-title">📷 快速添加护肤品</div>
         <div className="quick-add-row">
           <button className="quick-add-item" onClick={() => cameraInputRef.current?.click()}>
             <span className="quick-add-icon">📸</span>
@@ -180,17 +223,20 @@ export default function Dashboard() {
       <div className="card">
         <div className="card-title">🆕 最近存入</div>
         {data.recent_products.length === 0 ? (
-          <p style={{ color: '#aaa', fontSize: 14 }}>还没有产品，快去添加吧~</p>
+          <p style={{ color: '#aaa', fontSize: 14 }}>还没有护肤品，快去添加吧~</p>
         ) : (
           <div>
-            {data.recent_products.map(p => (
+            {data.recent_products.map(p => {
+              const photoUrl = p.photo ? getPhotoUrl(p.photo, 'products') : null
+              return (
               <div key={p.id} className="recent-item">
                 <div
-                  className="recent-thumb"
+                  className={`recent-thumb${photoUrl ? ' clickable-thumb' : ''}`}
+                  onClick={() => photoUrl && setViewImage(photoUrl)}
                   style={{
-                    backgroundImage: p.photo
-                      ? `url(${getPhotoUrl(p.photo, 'products')})`
-                      : 'linear-gradient(135deg, #e8f5e9, #c8e6c9)',
+                    backgroundImage: photoUrl
+                      ? `url(${photoUrl})`
+                      : 'linear-gradient(135deg, #e3ece0, #d5e0d0)',
                   }}
                 />
                 <div style={{ flex: 1 }}>
@@ -200,7 +246,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
             <Link to="/products" className="recent-link">
               查看全部 →
             </Link>
@@ -208,13 +255,62 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* ====== 肤质分析历史卡片 ====== */}
+      {data.recent_analyses && data.recent_analyses.length > 0 && (
+        <div className="card">
+          <div className="card-title">🔬 近期肤质分析</div>
+          <div>
+            {data.recent_analyses.map(a => (
+              <div
+                key={a.id}
+                className="skin-dashboard-item"
+                onClick={() => {
+                  setSkinPanelProps({ viewHistoryId: a.id })
+                }}
+              >
+                <div className="skin-dashboard-thumb">
+                  {a.photo ? (
+                    <img src={getPhotoUrl(a.photo, 'skin')} alt="" />
+                  ) : (
+                    <div className="skin-dashboard-placeholder">🔬</div>
+                  )}
+                </div>
+                <div className="skin-dashboard-info">
+                  <div className="skin-dashboard-type">{a.skin_type}</div>
+                  <div className="skin-dashboard-score">综合 {a.overall_score} 分</div>
+                </div>
+                <div className="skin-dashboard-time">{a.created_at}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ====== 识别面板（拍照/相册后） ====== */}
       {recognizePhoto && (
         <RecognizePanel
           photoFile={recognizePhoto.file}
           previewUrl={recognizePhoto.previewUrl}
+          categories={getAllCategories()}
           onSaved={handleRecognizeSaved}
           onClose={() => setRecognizePhoto(null)}
+        />
+      )}
+
+      {/* 图片查看器 */}
+      {viewImage && (
+        <ImageViewer src={viewImage} onClose={() => setViewImage(null)} />
+      )}
+
+      {/* 肤质分析面板（统一入口） */}
+      {skinPanelProps && (
+        <SkinAnalysisPanel
+          photoFile={skinPanelProps.photoFile}
+          previewUrl={skinPanelProps.previewUrl}
+          viewHistoryId={skinPanelProps.viewHistoryId}
+          forceHistoryMode={skinPanelProps.forceHistoryMode}
+          autoOpenCamera={skinPanelProps.autoOpenCamera}
+          onClose={handleSkinClose}
         />
       )}
 
@@ -222,6 +318,7 @@ export default function Dashboard() {
       {showManualForm && (
         <ProductForm
           mode="quick"
+          categories={getAllCategories()}
           onSubmit={handleManualSubmit}
           onClose={() => setShowManualForm(false)}
         />
