@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ArrowLeft, CalendarDays, ChevronRight, Edit3, Grid2X2, MapPin, Pencil, Plus, PlusCircle, Search, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { fetchProducts, createProduct, updateProduct, deleteProduct, getPhotoUrl } from '../api'
 import ProductAddSheet from '../components/ProductAddSheet'
@@ -25,10 +25,62 @@ import {
 import { getRequestErrorMessage } from '../utils/productEntry'
 import { usePageBackground } from '../utils/backgroundSettings'
 
+const PRODUCT_CACHE_KEY = 'beauty_mirror_products_cache_v1'
+let productMemoryCache = null
+
+function normalizeProductList(data) {
+  return Array.isArray(data) ? data : []
+}
+
+function readProductCache() {
+  if (productMemoryCache) return productMemoryCache
+  if (typeof window === 'undefined') return []
+
+  try {
+    const cached = JSON.parse(window.sessionStorage.getItem(PRODUCT_CACHE_KEY) || '[]')
+    productMemoryCache = normalizeProductList(cached)
+    return productMemoryCache
+  } catch {
+    return []
+  }
+}
+
+function writeProductCache(products) {
+  const nextProducts = normalizeProductList(products)
+  productMemoryCache = nextProducts
+
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(nextProducts))
+  } catch {
+    // Cache is only for smoother navigation; ignore storage failures.
+  }
+}
+
+function ProductListSkeleton() {
+  return (
+    <section className="bm-product-skeleton" aria-label="正在加载产品">
+      <div className="bm-skeleton-category" />
+      {[0, 1, 2].map(item => (
+        <div className="bm-skeleton-card" key={item}>
+          <div className="bm-skeleton-photo" />
+          <div className="bm-skeleton-copy">
+            <span />
+            <strong />
+            <em />
+            <i />
+          </div>
+          <div className="bm-skeleton-actions" />
+        </div>
+      ))}
+    </section>
+  )
+}
+
 export default function ProductManage() {
   const pageBackground = usePageBackground('products')
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [products, setProducts] = useState(() => readProductCache())
+  const [loading, setLoading] = useState(() => readProductCache().length === 0)
   const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('全部')
@@ -56,17 +108,17 @@ export default function ProductManage() {
   const load = useCallback(() => {
     setLoading(true)
     setLoadError('')
-    const params = {}
-    if (search) params.search = search
-    if (category && category !== '全部') params.category = category
-    fetchProducts(params)
-      .then(setProducts)
+    fetchProducts()
+      .then((data) => {
+        const nextProducts = normalizeProductList(data)
+        setProducts(nextProducts)
+        writeProductCache(nextProducts)
+      })
       .catch((err) => {
-        setProducts([])
         setLoadError(getRequestErrorMessage(err, '无法加载产品，请检查后端是否启动'))
       })
       .finally(() => setLoading(false))
-  }, [search, category])
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -218,9 +270,29 @@ export default function ProductManage() {
     )
   }
 
-  const visibleProducts = products
-  const grouped = !search && category === '全部' ? groupByCategory(visibleProducts) : null
-  const isEmpty = !loading && visibleProducts.length === 0
+  const normalizedSearch = search.trim().toLowerCase()
+  const visibleProducts = useMemo(() => (
+    products.filter(product => {
+      const matchesCategory = category === '全部' || product.category === category
+      if (!matchesCategory) return false
+      if (!normalizedSearch) return true
+
+      return [
+        product.name,
+        product.brand,
+        product.category,
+        product.volume,
+        product.color,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedSearch)
+    })
+  ), [products, category, normalizedSearch])
+  const grouped = !normalizedSearch && category === '全部' ? groupByCategory(visibleProducts) : null
+  const isInitialLoading = loading && products.length === 0
+  const isEmpty = !isInitialLoading && visibleProducts.length === 0
 
   if (selectedProduct) {
     const photoUrl = selectedProduct.photo ? getPhotoUrl(selectedProduct.photo, 'products') : ''
@@ -464,9 +536,9 @@ export default function ProductManage() {
 
       </section>
 
-      {loading ? (
-        <div className="bm-empty">加载中...</div>
-      ) : loadError ? (
+      {isInitialLoading ? (
+        <ProductListSkeleton />
+      ) : loadError && products.length === 0 ? (
         <section className="bm-product-empty">
           <h2>产品加载失败</h2>
           <p>{loadError}</p>
