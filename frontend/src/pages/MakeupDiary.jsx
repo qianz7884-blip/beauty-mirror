@@ -410,77 +410,39 @@ export default function MakeupDiary() {
         onMonthChange={handleMonthChange}
       />
 
-      {/* ══ Empty state ══ */}
-      {diaries.length === 0 ? (
-        <div className="dv-empty">
-          <div className="dv-empty-icon-wrap">
-            <BookOpen size={32} strokeWidth={1.4} />
+      {/* ══ Feed ══ */}
+      <section className="dv-day-feed" ref={selectedDayRef}>
+        <div className="dv-day-feed-head">
+          <div>
+            <span>选中日期</span>
+            <h2>{selectedDateLabel}{selectedDiaries.length ? ` · ${selectedDiaries.length}篇记录` : ''}</h2>
           </div>
-          <h2 className="dv-empty-title">开始记录你的美妆成长日记</h2>
-          <p className="dv-empty-sub">
-            记录每日护肤心得<br />
-            关联使用产品和镜前状态
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280, marginTop: 8 }}>
-            <button
-              className="dv-form-photo-btn"
-              style={{ padding: 14, fontSize: 14 }}
-              onClick={handleCreateCamera}
-            >
-              <Camera size={18} strokeWidth={1.6} /> 拍照创建
-            </button>
-            <button
-              className="dv-form-photo-btn"
-              style={{ padding: 14, fontSize: 14 }}
-              onClick={handleCreateAlbum}
-            >
-              <Image size={18} strokeWidth={1.6} /> 从相册选择
-            </button>
-            <button
-              className="dv-form-photo-btn"
-              style={{ padding: 14, fontSize: 14 }}
-              onClick={() => handleCreateText(selectedDate)}
-            >
-              <Pencil size={18} strokeWidth={1.6} /> 纯文字记录
-            </button>
-          </div>
+          <button type="button" onClick={() => handleCreateText(selectedDate)}>
+            写一篇
+          </button>
         </div>
-      ) : (
-        /* ══ Feed ══ */
-        <section className="dv-day-feed" ref={selectedDayRef}>
-          <div className="dv-day-feed-head">
-            <div>
-              <span>选中日期</span>
-              <h2>{selectedDateLabel}{selectedDiaries.length ? ` · ${selectedDiaries.length}篇记录` : ''}</h2>
-            </div>
-            <button type="button" onClick={() => handleCreateText(selectedDate)}>
-              写一篇
-            </button>
-          </div>
 
-          {selectedDiaries.length > 0 ? (
-            <div className="dv-feed">
-              {selectedDiaries.map(d => (
-                <DiaryCard
-                  key={d.id}
-                  diary={d}
-                  onClick={() => navigate(`/diary/${d.id}`)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="dv-day-empty">
-              <BookOpen size={22} strokeWidth={1.5} />
-              <strong>这一天还没有记录</strong>
-              <span>可以补一篇当天的妆容、护肤或产品使用感。</span>
-            </div>
-          )}
-        </section>
-      )}
+        {selectedDiaries.length > 0 ? (
+          <div className="dv-feed">
+            {selectedDiaries.map(d => (
+              <DiaryCard
+                key={d.id}
+                diary={d}
+                onClick={() => navigate(`/diary/${d.id}`)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="dv-day-empty">
+            <BookOpen size={22} strokeWidth={1.5} />
+            <strong>这一天还没有记录</strong>
+            <span>可以补一篇当天的妆容、护肤或产品使用感。</span>
+          </div>
+        )}
+      </section>
 
       {/* ══ Create FAB ══ */}
-      {!showForm && diaries.length > 0 && (
+      {!showForm && (
         <>
           {showCreateActions ? (
             <div className="dv-form-overlay" onClick={() => setShowCreateActions(false)} style={{ background: 'rgba(0,0,0,0.25)' }}>

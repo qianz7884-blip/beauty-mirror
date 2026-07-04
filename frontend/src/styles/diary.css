@@ -696,54 +696,6 @@
   background: rgba(74, 112, 143, 0.08);
 }
 
-/* 空态 */
-.dv-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 54vh;
-  gap: 12px;
-  padding: 34px 20px 40px;
-  text-align: center;
-}
-
-.dv-empty-icon-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 60px;
-  height: 60px;
-  border-radius: 20px;
-  border: 1px solid var(--bm-line);
-  background: var(--bm-glass);
-  color: var(--bm-blue-deep);
-  box-shadow: 0 10px 24px rgba(74, 112, 143, 0.08);
-}
-
-.dv-empty-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--bm-ink);
-  margin: 0;
-}
-
-.dv-empty-sub {
-  font-size: 13px;
-  color: var(--bm-soft);
-  margin: 0;
-  line-height: 1.6;
-}
-
-.dv-empty .dv-form-photo-btn {
-  justify-content: center;
-  border-color: var(--bm-line);
-  background: var(--bm-glass);
-  box-shadow: 0 8px 20px rgba(74, 112, 143, 0.06);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-
 /* 创建按钮弹窗 */
 .dv-create-actions {
   background: rgba(247, 252, 255, 0.76);
