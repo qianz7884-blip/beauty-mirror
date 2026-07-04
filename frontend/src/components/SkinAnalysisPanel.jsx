@@ -1,105 +1,42 @@
 import { useState, useEffect, useRef } from 'react'
 import { analyzeSkin, fetchSkinAnalyses, fetchSkinAnalysis, deleteSkinAnalysis, getPhotoUrl } from '../api'
+import {
+  CalendarDays,
+  Camera,
+  ClipboardList,
+  Clock3,
+  ChevronRight,
+  History,
+  Moon,
+  RotateCcw,
+  ScanFace,
+  Sun,
+} from 'lucide-react'
+import { SkinHistoryGallery, SkinHistoryList } from './SkinHistoryViews'
+import { buildMirrorAdviceCards, buildStatusSummary, compressPhoto } from '../utils/skinAnalysisView'
 
-const SCORE_LABELS = {
-  hydration: '水润度',
-  smoothness: '光滑度',
-  brightness: '光泽度',
-  pores: '毛孔',
-  evenness: '均匀度',
-}
-
-const REGION_LABELS = {
-  '前额': '前额',
-  '左脸颊': '左脸颊',
-  '右脸颊': '右脸颊',
-  '鼻子': '鼻子',
-  '下巴': '下巴',
-  '左眼周': '左眼周',
-  '右眼周': '右眼周',
-  '唇周': '唇周',
-}
-
-const REGION_ICONS = {
-  '前额': '🔲',
-  '左脸颊': '😊',
-  '右脸颊': '😊',
-  '鼻子': '👃',
-  '下巴': '👇',
-  '左眼周': '👁',
-  '右眼周': '👁',
-  '唇周': '👄',
-}
-
-function scoreLevel(v) {
-  if (v >= 80) return 'high'
-  if (v >= 60) return 'mid'
-  return 'low'
-}
-
-/**
- * 前端压缩照片 — canvas resize，大幅减少上传时间
- * 将长边缩放到 maxSize，输出 JPEG quality≈0.75
- * 移动端 5MB 照片 → ~80-150KB
- */
-function compressPhoto(file, maxSize = 1024) {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      const { width, height } = img
-      if (Math.max(width, height) <= maxSize) {
-        // 原图已经够小，直接返回
-        resolve(file)
-        return
-      }
-      const ratio = maxSize / Math.max(width, height)
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.round(width * ratio)
-      canvas.height = Math.round(height * ratio)
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            const compressed = new File([blob], file.name || 'photo.jpg', { type: 'image/jpeg' })
-            resolve(compressed)
-          } else {
-            resolve(file) // 降级：返回原图
-          }
-        },
-        'image/jpeg',
-        0.75,
-      )
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      resolve(file) // 降级：返回原图
-    }
-    img.src = url
-  })
-}
-
-export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, viewHistoryId, forceHistoryMode, autoOpenCamera }) {
+export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, viewHistoryId, forceHistoryMode, autoOpenCamera, onAnalysisComplete }) {
   const [step, setStep] = useState(viewHistoryId || forceHistoryMode ? 'loading' : (photoFile ? 'preview' : 'history'))
   const [result, setResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
   const [history, setHistory] = useState([])
   const [showHistory, setShowHistory] = useState(false)
   const [selectedHistory, setSelectedHistory] = useState(null)
+  const [historyView, setHistoryView] = useState(false)
+  const [historySelectMode, setHistorySelectMode] = useState(false)
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [currentPhotoFile, setCurrentPhotoFile] = useState(photoFile)
   const [currentPreviewUrl, setCurrentPreviewUrl] = useState(previewUrl)
   const [loadingText, setLoadingText] = useState('正在处理照片...')
-  const [viewerImage, setViewerImage] = useState(null)  // 点击放大的图片 src
+  const [viewerImage, setViewerImage] = useState(null)
+  const [adviceChoice, setAdviceChoice] = useState('')
   const cameraRef = useRef(null)
-  const [cameraKey, setCameraKey] = useState(0)  // 用于强制重建 input
+  const [cameraKey, setCameraKey] = useState(0)
 
   // 自动打开相机
   useEffect(() => {
     if (autoOpenCamera) {
-      // 延迟一下确保 modal 已 render
       const timer = setTimeout(() => {
         cameraRef.current?.click()
       }, 300)
@@ -138,9 +75,8 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     try {
       const data = await fetchSkinAnalyses()
       setHistory(data)
-      if (data.length > 0) {
-        setSelectedHistory(data[0])
-      }
+      setSelectedHistory(null)
+      setHistoryView(true)
     } catch (e) {
       // ignore
     }
@@ -149,7 +85,6 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     setStep('result')
   }
 
-  // 加载历史记录
   const loadHistory = async () => {
     try {
       const data = await fetchSkinAnalyses()
@@ -165,11 +100,9 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     }
   }, [step, result])
 
-  // 拍照（从内部相机）
   const handleInternalPhoto = (e) => {
     const file = e.target.files[0]
     if (!file) return
-    // 释放旧 URL
     if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl)
     setCurrentPhotoFile(file)
     setCurrentPreviewUrl(URL.createObjectURL(file))
@@ -177,7 +110,6 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     setResult(null)
     setErrorMsg('')
     e.target.value = ''
-    // 强制重建 input（避免移动端第二次点击同一 input 不触发相机）
     setCameraKey(k => k + 1)
   }
 
@@ -190,14 +122,12 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     setErrorMsg('')
 
     try {
-      // 阶段1：压缩照片（减少上传时间）
       setLoadingText('正在压缩照片...')
       const compressed = await compressPhoto(currentPhotoFile, 1024)
       console.log(
         `[SkinAnalysis] 照片压缩: ${(currentPhotoFile.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`
       )
 
-      // 阶段2：上传并分析
       setLoadingText('正在上传并分析肤质...')
       const formData = new FormData()
       formData.append('photo', compressed)
@@ -205,6 +135,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
 
       if (data.success) {
         setResult(data)
+        onAnalysisComplete?.(data)
       } else {
         setErrorMsg(data.message || '分析失败，请重试')
       }
@@ -229,6 +160,9 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     setErrorMsg('')
     setShowHistory(false)
     setSelectedHistory(null)
+    setHistoryView(false)
+    setHistorySelectMode(false)
+    setSelectedHistoryIds([])
   }
 
   const handleDeleteHistory = async (id, e) => {
@@ -237,29 +171,75 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     try {
       await deleteSkinAnalysis(id)
       setHistory(prev => prev.filter(h => h.id !== id))
+      setSelectedHistoryIds(prev => prev.filter(item => item !== id))
       if (selectedHistory?.id === id) setSelectedHistory(null)
     } catch (e) {
       // ignore
     }
   }
 
+  const toggleHistorySelection = (id) => {
+    setSelectedHistoryIds(prev => (
+      prev.includes(id) ? prev.filter(item => item !== id) : prev.concat(id)
+    ))
+  }
+
+  const handleBatchDeleteHistory = async () => {
+    if (selectedHistoryIds.length === 0) return
+    if (!window.confirm(`确定删除选中的 ${selectedHistoryIds.length} 条记录吗？`)) return
+    const ids = selectedHistoryIds
+    try {
+      await Promise.all(ids.map(id => deleteSkinAnalysis(id)))
+      setHistory(prev => prev.filter(record => !ids.includes(record.id)))
+      if (selectedHistory && ids.includes(selectedHistory.id)) setSelectedHistory(null)
+      setSelectedHistoryIds([])
+      setHistorySelectMode(false)
+    } catch (e) {
+      // ignore
+    }
+  }
+
   const handleViewHistory = (record) => {
+    if (historySelectMode) {
+      toggleHistorySelection(record.id)
+      return
+    }
     setSelectedHistory(record)
+    setHistoryView(false)
     setShowHistory(false)
   }
 
-  // 用于展示的分析数据（当前结果 或 选中的历史记录）
+  const handleBackToHistory = () => {
+    setSelectedHistory(null)
+    setHistoryView(true)
+    setShowHistory(true)
+    setHistorySelectMode(false)
+    setSelectedHistoryIds([])
+  }
+
   const displayData = selectedHistory || result
+  const mirrorAdvice = buildMirrorAdviceCards(displayData)
+  const statusSummary = buildStatusSummary(displayData)
+  const faceReferenceImage = displayData?.heatmap_image || result?.heatmap_base64
+  const routineData = displayData?.today_routine || result?.today_routine
+  const hasLongTermCare = Boolean(
+    displayData?.summary
+    || (displayData?.recommendations || []).length
+    || (displayData?.observations || []).length
+    || (displayData?.concerns || []).length
+    || routineData
+    || ((displayData?.trend || result?.trend)?.has_history)
+  )
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+      <div className="modal-sheet skin-analysis-sheet" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
             {step === 'preview' && '确认照片'}
-            {step === 'loading' && (loadingHistory ? '加载中...' : '正在分析肤质...')}
-            {step === 'history' && '肤质分析'}
-            {step === 'result' && (selectedHistory ? '📋 历史分析报告' : (result?.success ? '肤质分析报告' : '分析结果'))}
+            {step === 'loading' && (loadingHistory ? '加载中...' : '正在生成镜前建议...')}
+            {step === 'history' && '镜前建议'}
+            {step === 'result' && (selectedHistory || historyView ? '历史镜前记录' : (result?.success ? '镜前建议' : '分析结果'))}
           </h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
@@ -274,25 +254,24 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                 style={{ width: '100%', maxHeight: 300, objectFit: 'cover', borderRadius: 12, marginBottom: 20 }}
               />
             ) : (
-              <div style={{
-                width: '100%', height: 200, borderRadius: 12, marginBottom: 20,
-                background: 'linear-gradient(135deg, #f0f4ed, #e3ece0)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexDirection: 'column', color: '#999',
-              }}>
-                <span style={{ fontSize: 40 }}>📷</span>
+              <div className="skin-photo-placeholder">
+                <Camera size={34} strokeWidth={1.35} />
                 <span style={{ fontSize: 13, marginTop: 8 }}>请先拍照</span>
               </div>
             )}
             <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>
-              📷 请拍摄清晰的面部正面照，确保光线充足
+              请拍摄清晰的面部正面照，确保光线充足
             </p>
+            <div className="privacy-hint">
+              面部图像默认本地处理，建议仅用于当前妆容辅助。
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => cameraRef.current?.click()}>
-                📸 重新拍照
+                <RotateCcw size={16} strokeWidth={1.7} />
+                重新拍照
               </button>
               <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleAnalyze}>
-                🔬 开始分析
+                生成建议
               </button>
             </div>
             <button
@@ -300,30 +279,40 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
               style={{ marginTop: 8 }}
               onClick={loadHistoryAndShow}
             >
-              📋 查看历史报告
+              <ClipboardList size={16} strokeWidth={1.7} />
+              查看历史记录
             </button>
           </div>
         )}
 
-        {/* 步骤1b：历史入口（直接进入时） */}
+        {/* 步骤1b：历史入口 */}
         {step === 'history' && (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <span style={{ fontSize: 48 }}>🔬</span>
-            <p style={{ fontSize: 14, color: '#666', margin: '12px 0' }}>选择操作</p>
-            <button className="btn btn-primary btn-block" onClick={() => cameraRef.current?.click()}>
-              📸 拍照分析
-            </button>
-            <button
-              className="btn btn-outline btn-block"
-              style={{ marginTop: 8 }}
-              onClick={loadHistoryAndShow}
-            >
-              📋 查看历史报告
-            </button>
+          <div className="skin-entry-panel">
+            <p className="skin-entry-copy">选择镜前辅助方式，拍照生成当前建议，或回看之前的镜前状态。</p>
+            <div className="skin-entry-actions">
+              <button className="skin-entry-action primary" type="button" onClick={() => cameraRef.current?.click()}>
+                <span className="skin-entry-action-icon">
+                  <ScanFace size={22} strokeWidth={1.7} />
+                </span>
+                <span>
+                  <strong>拍照生成建议</strong>
+                  <small>根据当前状态给出镜前提醒</small>
+                </span>
+              </button>
+              <button className="skin-entry-action" type="button" onClick={loadHistoryAndShow}>
+                <span className="skin-entry-action-icon">
+                  <History size={22} strokeWidth={1.7} />
+                </span>
+                <span>
+                  <strong>查看历史记录</strong>
+                  <small>回看之前的镜前状态</small>
+                </span>
+              </button>
+            </div>
           </div>
         )}
 
-        {/* 隐藏相机 input（key 用于强制重建，确保移动端每次都能触发相机） */}
+        {/* 隐藏相机 input */}
         <input
           key={cameraKey}
           ref={cameraRef}
@@ -342,43 +331,59 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
               {loadingHistory ? '正在加载历史记录...' : loadingText}
             </p>
             <p style={{ color: '#bbb', fontSize: 12, marginTop: 4 }}>
-              {loadingHistory ? '' : '首次分析约需 8-15 秒，请耐心等待'}
+              {loadingHistory ? '' : '仅用于当前妆容辅助，稍等片刻就好'}
             </p>
           </div>
         )}
 
-        {/* 步骤3：结果报告 */}
+        {/* 步骤3：结果报告 — 陪伴助手风格 */}
         {step === 'result' && (
           <div className="skin-result">
-            {/* 错误提示 */}
             {errorMsg && (
-              <div style={{ background: '#fef2f2', color: '#dc2626', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16, border: '1px solid #fecaca' }}>
+              <div className="soft-error">
                 {errorMsg}
               </div>
             )}
 
-            {/* 选中历史记录时的返回按钮（仅在非历史查看模式下显示） */}
-            {selectedHistory && !viewHistoryId && !forceHistoryMode && (
+            {selectedHistory && !viewHistoryId && (
               <button
                 className="btn btn-outline btn-sm"
                 style={{ marginBottom: 12, fontSize: 12 }}
-                onClick={() => setSelectedHistory(null)}
+                onClick={handleBackToHistory}
               >
-                ← 回到当前报告
+                ← 返回历史记录
               </button>
             )}
 
-            {displayData && displayData.skin_type && (
+            {historyView && !selectedHistory && !viewHistoryId && (
+              <SkinHistoryGallery
+                history={history}
+                historySelectMode={historySelectMode}
+                selectedHistoryIds={selectedHistoryIds}
+                canReturnToCurrent={!forceHistoryMode && Boolean(result?.skin_type)}
+                onToggleSelectMode={() => {
+                  setHistorySelectMode(prev => !prev)
+                  setSelectedHistoryIds([])
+                }}
+                onBatchDelete={handleBatchDeleteHistory}
+                onReturnToCurrent={() => {
+                  setHistoryView(false)
+                  setShowHistory(false)
+                }}
+                onViewRecord={handleViewHistory}
+                onDeleteRecord={handleDeleteHistory}
+              />
+            )}
+
+            {!historyView && displayData && displayData.skin_type && (
               <>
                 {/* 分析时间 */}
                 {(displayData.created_at || result?.created_at) && (
                   <div style={{
-                    textAlign: 'center',
-                    fontSize: 12,
-                    color: '#aaa',
-                    marginBottom: 12,
+                    textAlign: 'center', fontSize: 12, color: '#aaa', marginBottom: 16,
                   }}>
-                    🕐 分析时间：{displayData.created_at || result?.created_at}
+                    <Clock3 size={13} strokeWidth={1.6} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+                    {displayData.created_at || result?.created_at}
                   </div>
                 )}
 
@@ -405,130 +410,181 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                     <span className="skin-type-badge">{displayData.skin_type}</span>
                     {(displayData.face_data && displayData.face_data.landmark_count) ? (
                       <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>
-                        已检测 {displayData.face_data.landmark_count} 个面部特征点
+                        已完成面部分区定位
                       </div>
                     ) : null}
                   </div>
                 </div>
 
-                {/* 热点图 */}
-                {(displayData.heatmap_image || result?.heatmap_base64) && (
-                  <div className="skin-heatmap-container">
-                    <div className="section-label">🗺 面部分区热点图（点击放大）</div>
-                    <img
-                      src={displayData.heatmap_image || result?.heatmap_base64}
-                      alt="面部分区热点图"
-                      className="skin-heatmap-img clickable-thumb"
-                      onClick={() => setViewerImage(displayData.heatmap_image || result?.heatmap_base64)}
-                    />
-                    <div className="heatmap-legend">
-                      <span className="heatmap-legend-item"><span className="heatmap-dot heatmap-low" /> 需改善</span>
-                      <span className="heatmap-legend-item"><span className="heatmap-dot heatmap-mid" /> 一般</span>
-                      <span className="heatmap-legend-item"><span className="heatmap-dot heatmap-high" /> 良好</span>
+                <p className="mirror-result-subtitle">只给 1-3 条当前可执行建议。</p>
+
+                <div className="companion-status-card">
+                  <div className="companion-status-icon">
+                    <ScanFace size={20} strokeWidth={1.5} />
+                  </div>
+                  <p className="companion-status-text">{statusSummary}</p>
+                </div>
+
+                {mirrorAdvice.length > 0 && (
+                  <div className="companion-section">
+                    <div className="companion-section-title">可轻微优化</div>
+                    <div className="mirror-advice-list">
+                      {mirrorAdvice.map((advice, i) => (
+                        <div key={i} className="mirror-advice-card">
+                          <p><span>位置</span>{advice.area}</p>
+                          <p><span>产品</span>{advice.product}</p>
+                          <p><span>动作</span>{advice.action}</p>
+                          <p><span>原因</span>{advice.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mirror-advice-actions">
+                      {['采纳', '忽略', '我喜欢现在这样'].map(label => (
+                        <button
+                          key={label}
+                          className={adviceChoice === label ? 'active' : ''}
+                          onClick={() => setAdviceChoice(label)}
+                        >
+                          {label}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 )}
 
-                {/* 综合评分 */}
-                <div className="skin-overall-score">
-                  <div className="score-number">{displayData.overall_score}</div>
-                  <div className="score-label">综合肤质评分</div>
-                </div>
-
-                {/* 各项指标（全脸） */}
-                <div className="section-label" style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>📊 全脸综合指标</div>
-                <div className="skin-scores">
-                  {Object.entries(displayData.scores || {}).map(([key, val]) => (
-                    <div key={key} className="skin-score-item">
-                      <div className="skin-score-header">
-                        <span className="score-name">{SCORE_LABELS[key] || key}</span>
-                        <span className="score-value">{val}分</span>
+                {faceReferenceImage && (
+                  <details className="mirror-detail-panel">
+                    <summary>
+                      查看面部分区参考
+                      <ChevronRight size={16} strokeWidth={1.7} />
+                    </summary>
+                    <div className="skin-heatmap-container">
+                      <div className="face-region-tags">
+                        {['T 区', '鼻翼', '眼下', '唇周', '下颌边缘'].map(region => (
+                          <span key={region}>{region}</span>
+                        ))}
                       </div>
-                      <div className="skin-score-bar">
-                        <div
-                          className={`skin-score-fill ${scoreLevel(val)}`}
-                          style={{ width: `${val}%` }}
-                        />
-                      </div>
+                      <img
+                        src={faceReferenceImage}
+                        alt="面部分区参考图"
+                        className="skin-heatmap-img clickable-thumb"
+                        onClick={() => setViewerImage(faceReferenceImage)}
+                      />
+                      <p className="face-reference-note">分区图仅用于解释建议来源，不代表医学诊断。</p>
                     </div>
-                  ))}
-                </div>
+                  </details>
+                )}
 
-                {/* 分区评分 */}
-                {(displayData.region_scores || result?.region_scores) && Object.keys(displayData.region_scores || result?.region_scores || {}).length > 0 && (
-                  <div className="skin-region-scores">
-                    <div className="section-label" style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>📍 分区详细评分</div>
-                    {Object.entries(displayData.region_scores || result?.region_scores || {}).map(([region, scores]) => (
-                      <div key={region} className="region-card">
-                        <div className="region-card-header">
-                          <span className="region-icon">{REGION_ICONS[region] || '📍'}</span>
-                          <span className="region-name">{REGION_LABELS[region] || region}</span>
-                          <span className={`region-overall ${scoreLevel(scores.overall)}`}>{scores.overall}分</span>
+                {hasLongTermCare && (
+                  <details className="mirror-detail-panel">
+                    <summary>
+                      长期护理提醒
+                      <ChevronRight size={16} strokeWidth={1.7} />
+                    </summary>
+                    <div className="companion-routine">
+                      {routineData?.weekly?.length > 0 && (
+                        <div className="companion-routine-block">
+                          <div className="companion-routine-time">
+                            <CalendarDays size={14} strokeWidth={1.6} />
+                            每周
+                          </div>
+                          <ul className="companion-routine-list">
+                            {routineData.weekly.slice(0, 3).map((step, i) => (
+                              <li key={i}>{step}</li>
+                            ))}
+                          </ul>
                         </div>
-                        <div className="region-bars">
-                          {Object.entries(scores).filter(([k]) => k !== 'overall').map(([key, val]) => (
-                            <div key={key} className="region-bar-item">
-                              <span className="region-bar-label">{SCORE_LABELS[key] || key}</span>
-                              <div className="skin-score-bar region-bar">
-                                <div
-                                  className={`skin-score-fill ${scoreLevel(val)}`}
-                                  style={{ width: `${val}%` }}
-                                />
-                              </div>
-                              <span className="region-bar-val">{val}</span>
+                      )}
+                      {routineData?.evening?.length > 0 && (
+                        <div className="companion-routine-block">
+                          <div className="companion-routine-time">
+                            <Moon size={14} strokeWidth={1.6} />
+                            晚间
+                          </div>
+                          <ul className="companion-routine-list">
+                            {routineData.evening.slice(0, 3).map((step, i) => (
+                              <li key={i}>{step}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {routineData?.morning?.length > 0 && (
+                        <div className="companion-routine-block">
+                          <div className="companion-routine-time">
+                            <Sun size={14} strokeWidth={1.6} />
+                            日间
+                          </div>
+                          <ul className="companion-routine-list">
+                            {routineData.morning.slice(0, 3).map((step, i) => (
+                              <li key={i}>{step}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {(displayData.recommendations || []).length > 0 && (
+                        <div className="skin-recommendations">
+                          {(displayData.recommendations || []).slice(0, 4).map((rec, i) => (
+                            <div key={i} className="skin-rec-item">
+                              <span className="rec-num">{i + 1}</span>
+                              <span>{rec}</span>
                             </div>
                           ))}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* 主要问题 */}
-                {(displayData.concerns || []).length > 0 && (
-                  <div className="skin-concerns">
-                    {(displayData.concerns || []).map((c, i) => (
-                      <span key={i} className="skin-concern-tag">{c}</span>
-                    ))}
-                  </div>
-                )}
-
-                {/* AI 评估 */}
-                {displayData.summary && (
-                  <div className="skin-summary">{displayData.summary}</div>
-                )}
-
-                {/* 护理建议 */}
-                {(displayData.recommendations || []).length > 0 && (
-                  <div className="skin-recommendations">
-                    <div className="section-label">💡 护理建议</div>
-                    {(displayData.recommendations || []).map((rec, i) => (
-                      <div key={i} className="skin-rec-item">
-                        <span className="rec-num">{i + 1}</span>
-                        <span>{rec}</span>
-                      </div>
-                    ))}
-                  </div>
+                      )}
+                      {(displayData.observations || []).length > 0 && (
+                        <div className="companion-observations">
+                          {(displayData.observations || []).slice(0, 3).map((obs, i) => (
+                            <div key={i} className="companion-obs-item">
+                              <span className="companion-obs-dot" />
+                              <span>{obs}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {(displayData.concerns || []).length > 0 && (
+                        <div className="skin-concerns">
+                          {(displayData.concerns || []).slice(0, 4).map((c, i) => (
+                            <span key={i} className="skin-concern-tag">{c}</span>
+                          ))}
+                        </div>
+                      )}
+                      {(displayData.trend || result?.trend)?.has_history && (
+                        <div className="companion-trend">
+                          <p className="companion-trend-summary">
+                            {(displayData.trend || result?.trend).summary}
+                          </p>
+                          {(displayData.trend || result?.trend).detail && (
+                            <p className="companion-trend-detail">
+                              {(displayData.trend || result?.trend).detail}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {displayData.summary && (
+                        <div className="skin-summary">{displayData.summary}</div>
+                      )}
+                    </div>
+                  </details>
                 )}
               </>
             )}
 
-            {/* 无数据时（纯历史浏览模式） */}
-            {!displayData?.skin_type && !errorMsg && (
+            {/* 无数据时 */}
+            {!historyView && !displayData?.skin_type && !errorMsg && (
               <div style={{ textAlign: 'center', padding: '20px 0', color: '#aaa' }}>
-                暂无分析记录，请先拍照分析
+                  暂无分析记录，请先拍照分析
               </div>
             )}
 
             {/* 操作按钮 */}
-            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+            {!historyView && <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
               {!viewHistoryId && !forceHistoryMode && (
                 <button
                   className="btn btn-outline"
                   style={{ flex: 1 }}
                   onClick={handleRetry}
                 >
-                  🔄 重新分析
+                  重新生成
                 </button>
               )}
               <button
@@ -536,18 +592,18 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                 style={{ flex: viewHistoryId || forceHistoryMode ? 2 : 1 }}
                 onClick={onClose}
               >
-                ✓ {viewHistoryId || forceHistoryMode ? '关闭' : '完成'}
+                {viewHistoryId || forceHistoryMode ? '关闭' : '完成'}
               </button>
-            </div>
+            </div>}
 
             {/* 历史记录列表 */}
-            {!selectedHistory && !viewHistoryId && (
+            {!historyView && !selectedHistory && !viewHistoryId && (
               <div className="skin-history-section">
                 <button
                   className="skin-history-toggle"
                   onClick={() => { setShowHistory(!showHistory); loadHistory() }}
                 >
-                  📋 历史分析报告
+                  历史镜前记录
                   <span style={{ fontSize: 12, color: '#aaa', marginLeft: 8 }}>
                     {history.length > 0 ? `${history.length} 条记录` : ''}
                   </span>
@@ -555,46 +611,11 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                 </button>
 
                 {showHistory && (
-                  <div className="skin-history-list">
-                    {history.length === 0 ? (
-                      <p style={{ color: '#aaa', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
-                        暂无历史记录，完成分析后自动保存
-                      </p>
-                    ) : (
-                      history.map(record => (
-                        <div
-                          key={record.id}
-                          className="skin-history-item"
-                          onClick={() => handleViewHistory(record)}
-                        >
-                          <div className="skin-history-thumb">
-                            {record.photo ? (
-                              <img src={getPhotoUrl(record.photo, 'skin')} alt="" />
-                            ) : (
-                              <div className="skin-history-placeholder">🔬</div>
-                            )}
-                          </div>
-                          <div className="skin-history-info">
-                            <div className="skin-history-type">{record.skin_type}</div>
-                            <div className="skin-history-meta">
-                              <span className="skin-history-score">综合 {record.overall_score} 分</span>
-                              <span className="skin-history-time">{record.created_at}</span>
-                            </div>
-                            {record.summary && (
-                              <div className="skin-history-summary">{record.summary}</div>
-                            )}
-                          </div>
-                          <button
-                            className="skin-history-delete"
-                            onClick={(e) => handleDeleteHistory(record.id, e)}
-                            title="删除"
-                          >
-                            🗑
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <SkinHistoryList
+                    history={history}
+                    onViewRecord={handleViewHistory}
+                    onDeleteRecord={handleDeleteHistory}
+                  />
                 )}
               </div>
             )}
@@ -602,7 +623,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
         )}
       </div>
 
-      {/* 图片查看器（点击放大） */}
+      {/* 图片查看器 */}
       {viewerImage && (
         <div className="image-viewer-overlay" onClick={() => setViewerImage(null)}>
           <button className="image-viewer-close" onClick={() => setViewerImage(null)}>

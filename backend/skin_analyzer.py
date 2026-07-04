@@ -18,10 +18,23 @@ import json
 import re
 import base64
 import traceback
+import time
 from io import BytesIO
 
-from PIL import Image
+from PIL import Image, ImageOps
 import numpy as np
+
+
+def _load_image(image_bytes):
+    """
+    加载图片并自动校正 EXIF 旋转方向。
+    手机拍照常带有 90°/180°/270° 的 EXIF Orientation 元数据，
+    浏览器会自动根据 EXIF 旋转显示，但 PIL 不会。
+    此函数确保后端处理的图片与前端预览方向一致。
+    """
+    img = Image.open(BytesIO(image_bytes))
+    img = ImageOps.exif_transpose(img)
+    return img
 
 
 # ============================================================
@@ -33,6 +46,8 @@ _MODEL_DIR = os.path.join(os.path.expanduser('~'), '.mediapipe')
 _MODEL_PATH = os.path.join(_MODEL_DIR, 'face_landmarker.task')
 
 _FaceLandmarker = None  # 单例缓存
+ROI_FEATURE_BUDGET_MS = int(os.environ.get('ROI_FEATURE_BUDGET_MS', '500'))
+ROI_FEATURE_MAX_SIDE = int(os.environ.get('ROI_FEATURE_MAX_SIDE', '180'))
 
 
 def _get_detector():
@@ -98,7 +113,7 @@ def detect_face(image_bytes):
         import mediapipe as mp
 
         # 将 bytes 转为 numpy 数组，再构造 MediaPipe Image
-        img = Image.open(BytesIO(image_bytes))
+        img = _load_image(image_bytes)
         img = img.convert('RGB')
         img_np = np.array(img).copy()  # 独立拷贝，避免内存共享问题
 
@@ -166,7 +181,7 @@ def extract_face_roi(image_bytes, landmarks, image_size, padding_ratio=0.2):
         roi_bytes: 裁剪后面部 ROI 的 JPEG 字节
     """
     try:
-        img = Image.open(BytesIO(image_bytes))
+        img = _load_image(image_bytes)
         img = img.convert('RGB')
         w, h = image_size
 
@@ -230,54 +245,78 @@ def extract_face_roi(image_bytes, landmarks, image_size, padding_ratio=0.2):
 # RAG 知识检索
 # ============================================================
 
-def _get_rag_context(face_data, region_count=8):
+def _get_rag_context(face_data, region_count=8, query_text=None):
     """
-    基于面部检测结果，从 ChromaDB 知识库检索相关皮肤科知识。
+    基于本地知识 JSON 做轻量 RAG 检索。
+
+    这里刻意不调用 ChromaDB/query_knowledge，避免每次分析为了 embedding
+    额外调用一次 Gemini。当前请求只保留后面的 generate_content 作为唯一
+    Gemini 调用。
+
+    Args:
+        face_data: 面部检测数据（保留兼容）
+        region_count: 区域数量
+        query_text: 自定义查询文本，为 None 时使用默认查询
 
     返回:
         str: 注入 prompt 的知识文本，如果知识库不可用则返回空字符串
     """
     try:
-        from knowledge_base import query_knowledge, get_kb_stats
+        if query_text is None:
+            query_parts = ['面部肤质分析', f'{region_count}个区域分区评估']
+            query_text = ' '.join(query_parts)
 
-        stats = get_kb_stats()
-        if stats['count'] == 0:
-            print('[skin_analyzer] 知识库为空，跳过 RAG 检索')
-            return ''
+        kb_path = os.path.join(os.path.dirname(__file__), 'knowledge_base', 'skin_knowledge.json')
+        with open(kb_path, 'r', encoding='utf-8') as f:
+            documents = json.load(f)
 
-        # 构建查询文本：结合面部分区信息
-        query_parts = ['面部肤质分析', f'{region_count}个区域分区评估']
-        query_text = ' '.join(query_parts)
+        query_terms = [term for term in re.split(r'[\s、，,]+', query_text) if term]
+        scored = []
+        for doc in documents:
+            content = f"{doc.get('category', '')} {doc.get('topic', '')} {doc.get('content', '')}"
+            score = 0
+            for term in query_terms:
+                if term and term in content:
+                    score += 3 if term in doc.get('topic', '') else 1
+            if score:
+                scored.append((score, doc))
 
-        results = query_knowledge(query_text, top_k=5)
+        if not scored:
+            scored = [(1, doc) for doc in documents[:3]]
 
-        if not results:
-            return ''
+        scored.sort(key=lambda item: item[0], reverse=True)
+        results = [doc for _, doc in scored[:5]]
 
-        # 拼接为 prompt 可用的参考文本
         lines = ['【皮肤科参考知识】']
         for r in results:
-            lines.append(f"- [{r['category']}] {r['topic']}: {r['content']}")
+            content = r.get('content', '')
+            snippet = content[:220] + ('...' if len(content) > 220 else '')
+            lines.append(f"- [{r.get('category', '')}] {r.get('topic', '')}: {snippet}")
 
         rag_text = '\n'.join(lines)
-        print(f'[skin_analyzer] RAG 检索完成: {len(results)} 条知识')
+        print(f'[skin_analyzer] 本地 RAG 检索完成: {len(results)} 条知识')
         return rag_text
 
-    except ImportError:
-        print('[skin_analyzer] 知识库模块未安装，跳过 RAG')
-        return ''
     except Exception as e:
-        print(f'[skin_analyzer] RAG 检索异常: {e}')
+        print(f'[skin_analyzer] 本地 RAG 检索异常: {e}')
         return ''
 
 
 # ============================================================
-# 面部热点图生成
+# 面部热力图生成（委托给 heatmap_generator 模块）
 # ============================================================
 
 def generate_heatmap(image_bytes, landmarks, image_size, region_scores):
     """
-    使用 matplotlib 在面部照片上生成肤质热点图。
+    生成 Apple Health 风格的面部热力图。
+
+    委托给 heatmap_generator.generate_skin_heatmap 模块，
+    该模块实现：
+        - 区域中心热源 → 高斯扩散 → 连续热场
+        - RdYlGn_r 科学配色映射（绿→黄→橙→红）
+        - MediaPipe 人脸轮廓 Mask 裁切背景
+        - 原图 + 热力图透明叠加（alpha=0.5）
+        - 区域评分标签 + 颜色标尺 + 综合评分
 
     参数:
         image_bytes: 原始图片字节
@@ -289,150 +328,21 @@ def generate_heatmap(image_bytes, landmarks, image_size, region_scores):
         str: base64 编码的 PNG 图片，"data:image/png;base64,..." 格式
     """
     try:
-        import matplotlib
-        matplotlib.use('Agg')  # 非交互后端
-        import matplotlib.pyplot as plt
-        from scipy.interpolate import griddata
-
-        from face_regions import get_region_centers, REGION_DEFINITIONS
-
-        w, h = image_size
-
-        # 加载原图作为底图
-        img = Image.open(BytesIO(image_bytes))
-        img = img.convert('RGB')
-
-        # 创建图形
-        dpi = 72
-        fig_w = w / dpi
-        fig_h = h / dpi
-        fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)
-        ax.imshow(img, extent=[0, w, h, 0])  # y 轴翻转以匹配图像坐标
-
-        # 获取各区域中心坐标和得分
-        centers = get_region_centers(landmarks, image_size)
-
-        points = []
-        values = []
-        for name, (cx, cy) in centers.items():
-            if name in region_scores:
-                score = region_scores[name].get('overall', 50)
-            else:
-                score = 50  # 默认中性
-            points.append([cx, h - cy])  # 翻转 y 到 matplotlib 坐标
-            values.append(score)
-
-        if len(points) < 3:
-            plt.close(fig)
-            return None
-
-        points = np.array(points)
-        values = np.array(values)
-
-        # 用面部椭圆地标创建遮罩路径
-        face_oval_indices = [
-            10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
-            397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
-            172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
-        ]
-        mask_pts = []
-        for idx in face_oval_indices:
-            lm = landmarks[idx]
-            mask_pts.append([lm.x * w, h - lm.y * h])
-        mask_pts = np.array(mask_pts)
-
-        # ---- 添加面部边缘锚点，帮助线性插值覆盖整个面部 ----
-        # 沿面部椭圆均匀采样边缘点，赋予中性分(50)
-        n_edge = 16
-        edge_indices = np.linspace(0, len(mask_pts) - 1, n_edge, dtype=int)
-        for ei in edge_indices:
-            ex, ey = mask_pts[ei]
-            # 稍微内缩，避免插值外推
-            cx_avg = np.mean(points[:, 0])
-            cy_avg = np.mean(points[:, 1])
-            ex_inner = ex * 0.85 + cx_avg * 0.15
-            ey_inner = ey * 0.85 + cy_avg * 0.15
-            points = np.vstack([points, [ex_inner, ey_inner]])
-            values = np.append(values, 50)
-
-        # 生成插值网格（更细的分辨率）
-        grid_res_x, grid_res_y = 120, 160
-        grid_x, grid_y = np.meshgrid(
-            np.linspace(0, w, grid_res_x),
-            np.linspace(0, h, grid_res_y),
+        from heatmap_generator import generate_skin_heatmap
+        return generate_skin_heatmap(
+            image_bytes=image_bytes,
+            landmarks=landmarks,
+            image_size=image_size,
+            region_scores=region_scores,
+            alpha=0.5,
+            colormap_name='RdYlGn_r',
         )
-        # 用 linear 插值（8 个区域中心 + 边缘锚点足够覆盖）
-        grid_z = griddata(points, values, (grid_x, grid_y), method='linear', fill_value=np.nan)
-
-        # 向量化遮罩：只保留面部椭圆内的像素
-        from matplotlib.path import Path as MplPath
-        mask_path = MplPath(mask_pts)
-        flat_coords = np.column_stack([grid_x.ravel(), grid_y.ravel()])
-        inside = mask_path.contains_points(flat_coords)
-        inside = inside.reshape(grid_z.shape)
-        grid_z[~inside] = np.nan
-
-        # 绘制热点图（半透明叠加在原图上）
-        heatmap = ax.imshow(
-            grid_z,
-            extent=[0, w, 0, h],
-            cmap='RdYlGn',       # 红=差, 黄=中, 绿=好
-            alpha=0.50,          # 半透明，让底图透出
-            vmin=0,
-            vmax=100,
-            origin='lower',
-            aspect='auto',
-            interpolation='bilinear',  # 平滑渲染
-        )
-
-        # 颜色条
-        cbar = plt.colorbar(heatmap, ax=ax, fraction=0.04, pad=0.02)
-        cbar.set_label('肤质评分', fontsize=8)
-        cbar.ax.tick_params(labelsize=7)
-
-        # 标记区域中心圆点 + 分数
-        for name, (cx, cy) in centers.items():
-            score = region_scores.get(name, {}).get('overall', 50) if region_scores else 50
-            if score >= 70:
-                color = '#2d5016'
-            elif score >= 50:
-                color = '#8b6914'
-            else:
-                color = '#8b2500'
-            ax.plot(cx, h - cy, 'o', color=color, markersize=9,
-                    markeredgecolor='white', markeredgewidth=2, zorder=5)
-            ax.annotate(
-                str(score),
-                (cx, h - cy),
-                textcoords='offset points',
-                xytext=(0, -15),
-                fontsize=8,
-                fontweight='bold',
-                color=color,
-                ha='center',
-                zorder=6,
-            )
-
-        ax.set_xlim(0, w)
-        ax.set_ylim(0, h)
-        ax.axis('off')
-        fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
-
-        # 输出为 base64 PNG
-        buf = BytesIO()
-        fig.savefig(buf, format='png', dpi=dpi, bbox_inches='tight', pad_inches=0.1)
-        plt.close(fig)
-        buf.seek(0)
-
-        b64 = base64.b64encode(buf.read()).decode('utf-8')
-        print(f'[skin_analyzer] 热点图生成完成: {len(b64)} 字符')
-        return f'data:image/png;base64,{b64}'
-
     except ImportError as e:
-        print(f'[skin_analyzer] 热点图依赖缺失: {e}')
+        print(f'[skin_analyzer] heatmap_generator 模块不可用: {e}')
+        traceback.print_exc()
         return None
     except Exception as e:
-        print(f'[skin_analyzer] 热点图生成失败: {e}')
+        print(f'[skin_analyzer] 热力图生成失败: {e}')
         traceback.print_exc()
         return None
 
@@ -475,7 +385,7 @@ def _resize_for_analysis(image_bytes, max_size=600):
     将长边缩放到 max_size，保持比例，JPEG 压缩。
     """
     try:
-        img = Image.open(BytesIO(image_bytes))
+        img = _load_image(image_bytes)
         img = img.convert('RGB')
         w, h = img.size
         if max(w, h) > max_size:
@@ -490,21 +400,29 @@ def _resize_for_analysis(image_bytes, max_size=600):
         return image_bytes
 
 
-def analyze_skin(image_bytes):
+def analyze_skin(image_bytes, db_session=None):
     """
-    分析面部照片的肤质（含 RAG 增强 + 8 区域分区评分 + 热点图）。
+    分析面部照片的肤质 — Mirror Mate「AI 护肤陪伴助手」风格。
+
+    不输出任何数字分数、等级、评分。只提供温和的观察和建议。
+
+    Args:
+        image_bytes: 照片二进制数据
+        db_session: SQLAlchemy session，传入则启用 Recommendation Engine
 
     返回：
         {
             'success': True,
-            'skin_type': ...,
-            'overall_score': ...,
-            'scores': {...},           # 全脸 5 项评分（兼容旧版）
-            'region_scores': {...},    # 8 区域分区评分（新增）
+            'skin_type': str,
             'concerns': [...],
+            'today_status': str,          # 今日状态一句话
+            'observations': [str, ...],   # 今日观察 2-4 条
+            'today_routine': {...},       # 今日建议 AM/PM/周
+            'trend': {...},               # 趋势记录（无历史则为 has_history=False）
+            'summary': str,               # Gemini 生成的自然语言总结
             'recommendations': [...],
-            'summary': ...,
-            'heatmap_base64': ...,     # 热点图 base64（新增）
+            'heatmap_base64': str,
+            'feature_json': {...},        # 内部特征数据
             'face_data': {...},
         }
     """
@@ -519,29 +437,67 @@ def analyze_skin(image_bytes):
     landmarks = face_info['landmarks']
     img_size = face_info['image_size']
 
-    # Step 1.5a: 裁剪面部 ROI（全脸）
-    face_roi_bytes = None
-    try:
-        face_roi_bytes = extract_face_roi(image_bytes, landmarks, img_size, padding_ratio=0.2)
-    except Exception as e:
-        print(f'[skin_analyzer] 全脸 ROI 裁剪异常: {e}')
-
-    if face_roi_bytes is None:
-        print('[skin_analyzer] 全脸 ROI 裁剪失败，使用原图')
-        face_roi_bytes = image_bytes
-
-    # Step 1.5b: 提取 8 个分区 ROI
+    # Step 1.5: ROI 本地分析（只执行一次；超出预算则不注入 Gemini prompt）
+    from feature_extractor import FeatureExtractor
+    extractor = FeatureExtractor()
+    roi_analysis_started = time.perf_counter()
+    roi_analysis_elapsed_ms = 0.0
+    roi_prompt_enabled = False
     region_rois = {}
+    roi_prompt_context = ''
+
     try:
         from face_regions import extract_all_regions
-        region_rois = extract_all_regions(image_bytes, landmarks, img_size)
-    except ImportError:
-        print('[skin_analyzer] face_regions 模块不可用，跳过分区提取')
-    except Exception as e:
-        print(f'[skin_analyzer] 分区提取异常: {e}')
+        region_rois = extract_all_regions(
+            image_bytes,
+            landmarks,
+            img_size,
+            max_side=ROI_FEATURE_MAX_SIDE,
+        )
+        roi_analysis_elapsed_ms = (time.perf_counter() - roi_analysis_started) * 1000
 
-    # Step 1.5c: RAG 知识检索
-    rag_context = _get_rag_context(face_data)
+        if roi_analysis_elapsed_ms > ROI_FEATURE_BUDGET_MS:
+            print(
+                f'[skin_analyzer] ROI 提取超时 {roi_analysis_elapsed_ms:.0f}ms '
+                f'> {ROI_FEATURE_BUDGET_MS}ms，降级为原 prompt'
+            )
+            feature_json = extractor._make_default_result()
+        else:
+            feature_json = extractor.extract_all_features(region_rois, landmarks, img_size)
+            roi_analysis_elapsed_ms = (time.perf_counter() - roi_analysis_started) * 1000
+            print(f'[skin_analyzer] 特征提取完成 — 肤质: {feature_json["skin_type"]}，耗时 {roi_analysis_elapsed_ms:.0f}ms')
+
+            if roi_analysis_elapsed_ms <= ROI_FEATURE_BUDGET_MS:
+                from skin_roi_prompt import build_roi_prompt_context
+                roi_prompt_context = build_roi_prompt_context(feature_json)
+                roi_prompt_enabled = bool(roi_prompt_context)
+                if roi_prompt_enabled:
+                    print('[skin_analyzer] ROI prompt 上下文已生成')
+            else:
+                print(
+                    f'[skin_analyzer] ROI 特征分析超时 {roi_analysis_elapsed_ms:.0f}ms '
+                    f'> {ROI_FEATURE_BUDGET_MS}ms，降级为原 prompt'
+                )
+    except ImportError:
+        print('[skin_analyzer] ROI 分析模块不可用，降级为原 prompt')
+        feature_json = extractor._make_default_result()
+    except Exception as e:
+        print(f'[skin_analyzer] ROI 分析失败，降级为原 prompt: {e}')
+        feature_json = extractor._make_default_result()
+
+    if not roi_prompt_enabled:
+        roi_prompt_context = ''
+
+    # 注意：Gemini 仍只在后续 NLG 阶段调用一次，不会按 ROI 分区调用。
+    if not feature_json.get('skin_type'):
+        feature_json = extractor._make_default_result()
+
+    # Step 1.6: RAG 知识检索
+    rag_query_parts = [f'{feature_json["skin_type"]}肌肤']
+    if feature_json.get('concerns'):
+        rag_query_parts.extend(feature_json['concerns'][:3])
+    rag_query = ' '.join(rag_query_parts)
+    rag_context = _get_rag_context(face_data, query_text=rag_query)
 
     # Step 2: 检查 API Key
     api_key = os.environ.get('GEMINI_API_KEY')
@@ -556,134 +512,428 @@ def analyze_skin(image_bytes):
         print('[skin_analyzer] 未安装 google-genai')
         return {'success': False, 'reason': 'no_lib', 'message': 'AI 库未安装，请执行: pip install google-genai'}
 
-    # Step 4: 构建多图 + RAG 增强的 Prompt
     model_name = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
 
-    # 压缩全脸 ROI
-    compressed_face = _resize_for_analysis(face_roi_bytes, max_size=600)
+    # ── Step 4: Mirror Mate 推荐引擎 ──
+    engine = None
+    rec_context = None
+    ui_modules = None
+    if db_session is not None:
+        try:
+            from recommendation_engine import RecommendationEngine
+            engine = RecommendationEngine(db_session)
+            rec_context = engine.generate_context(feature_json)
+            ui_modules = engine.generate_ui_modules(feature_json)
+            print('[skin_analyzer] Recommendation Engine 完成 — 4 模块已生成')
+        except Exception as e:
+            print(f'[skin_analyzer] Recommendation Engine 失败，降级为纯特征模式: {e}')
+            traceback.print_exc()
 
-    # 构建 prompt 中的分区说明
-    region_names = list(region_rois.keys()) if region_rois else []
-    region_desc_lines = []
-    for name in region_names:
-        region_desc_lines.append(f"- {name}")
+    # ── Step 5: 构建 Gemini NLG prompt（纯自然语言生成，无分数无评级）──
+    if rec_context:
+        ctx_json = json.dumps(rec_context, ensure_ascii=False, indent=2)
+        prompt = f"""你是一位温柔、专业的护肤陪伴顾问，叫 Mirror Mate。
 
-    region_desc = '\n'.join(region_desc_lines) if region_desc_lines else '（未启用分区分析）'
+你的用户刚刚拍了一张面部照片，我们通过计算机视觉分析得到了一些数据。你的任务是用温暖、自然、亲切的中文，把数据转化成一段贴心的护肤对话。
 
-    # 构建知识库参考部分
-    kb_section = ''
-    if rag_context:
-        kb_section = f'\n\n请参考以下皮肤科专业知识进行评估：\n{rag_context}'
+{roi_prompt_context}
 
-    prompt = f"""你是一位资深的皮肤科医生。请分析这张面部照片及其{len(region_names)}个分区特写，给出专业肤质评估。
+【重要原则】
+- 绝对不要输出任何数字分数、百分制、星级或等级
+- 不要评价"好/坏"、"优秀/差"，改用温和的描述
+- 不要拿用户和他人比较
+- 语气像朋友在聊天，不是医生在诊断
+- 肯定用户已经做对的地方，温和地指出可以关注的地方
+- 用「你」来拉近距离
+- 建议要具体、可执行
+- 如果【分析数据】里的 product_guidance.owned_products 或 suitable 有可用产品，recommendations 和 mirror_advice 要优先自然写入这些已有产品名；没有匹配产品时再使用泛化品类名
+- 不要推荐购买新产品，缺失品类只能温和提醒
 
-【分区域说明】
-以下面部区域的特写照片已提供：
-{region_desc}
+【分析数据】
+{ctx_json}
 
-请针对全脸和每个区域分别评分。{kb_section}
+请严格只返回一行 JSON（不要 markdown 标记）：
+{{"summary":"一段温暖的护肤总结（60-100字），像朋友聊天一样，包含今天的皮肤整体印象+核心护理方向，不使用任何数字","recommendations":["温和具体的建议1（自然融入产品名或成分，不编号）","建议2","建议3","建议4","建议5"],"mirror_advice":[{{"area":"鼻翼两侧","product":"优先使用用户已有产品名；没有合适产品时写已有保湿或舒缓产品","action":"镜前马上能做的动作，不超过20字","reason":"基于 ROI 观察、RAG 知识和产品库的简短原因"}}]}}
 
-请按以下格式严格返回一行JSON（不要markdown标记或额外文字）：
-{{"skin_type":"肤质类型(油性/干性/混合性/中性/敏感性肌肤)","concerns":["问题1","问题2","问题3"],"scores":{{"hydration":全脸水润度0-100,"smoothness":全脸光滑度0-100,"brightness":全脸光泽度0-100,"pores":全脸毛孔细腻度0-100,"evenness":全脸均匀度0-100}},"overall_score":全脸综合分0-100,"region_scores":{{"""
+mirror_advice 要求：
+- 只返回 1-3 条，必须来自分析数据、分区 ROI、产品库和知识参考，不要凭空添加严重结论
+- 每条固定包含 area / product / action / reason
+- 优先使用用户已有产品，不引导购买，不做医学诊断
+- 文案克制，避免“问题、缺陷、严重、必须、警告、扣分”
 
-    # 动态生成 region_scores 模板
-    region_templates = []
-    for name in region_names:
-        region_templates.append(
-            f'"{name}":{{"overall":0-100,"hydration":0-100,"smoothness":0-100,"brightness":0-100,"pores":0-100,"evenness":0-100}}'
-        )
-    prompt += ','.join(region_templates)
+注意：recommendations 中的每条建议都应该是一句完整、自然的话，像朋友分享护肤心得一样。"""
+        print('[skin_analyzer] 发送 Companion 风格 prompt 给 Gemini 做 NLG...')
+    else:
+        # 降级：无引擎时的简化 prompt（仍然遵循无分数原则）
+        feature_summary_parts = [f'肤质类型：{feature_json["skin_type"]}']
 
-    prompt += """},"recommendations":["建议1","建议2","建议3"],"summary":"一句话总结"}"""
+        # 定性描述各维度（不输出分数）
+        fscores = feature_json['scores']
+        dim_descriptions = []
+        for dim, label in [('hydration', '水润度'), ('smoothness', '光滑度'),
+                           ('brightness', '光泽度'), ('pores', '毛孔细腻度'), ('evenness', '均匀度')]:
+            s = fscores.get(dim, 50)
+            if s >= 70:
+                dim_descriptions.append(f'{label}状态良好')
+            elif s >= 45:
+                dim_descriptions.append(f'{label}处于一般水平')
+            else:
+                dim_descriptions.append(f'{label}需要更多关注')
+        feature_summary_parts.append('各维度：' + '，'.join(dim_descriptions))
 
-    print(f'[skin_analyzer] 准备发送 {1 + len(region_rois)} 张图片给 Gemini...')
+        if feature_json.get('concerns'):
+            feature_summary_parts.append(f'观察到的现象：{"、".join(feature_json["concerns"])}')
 
+        kb_section = ''
+        if rag_context:
+            kb_section = f'\n\n【专业知识参考】\n{rag_context}'
+
+        prompt = f"""你是一位温柔、专业的护肤陪伴顾问，叫 Mirror Mate。
+
+{roi_prompt_context}
+
+以下是通过计算机视觉分析得到的用户皮肤数据：
+
+{chr(10).join(feature_summary_parts)}{kb_section}
+
+请用温暖自然的语言生成护肤指导。绝对不要使用任何数字分数。
+严格只返回一行 JSON：
+{{"summary":"温暖的护肤总结（50-80字），像朋友聊天","recommendations":["温和具体的建议1","建议2","建议3","建议4","建议5"]}}"""
+        print('[skin_analyzer] 发送纯特征 prompt（无推荐引擎）...')
+
+    # ── Step 6: 调用 Gemini 做 NLG ──
     try:
         client = _get_genai_client(api_key)
 
-        # 构建多图内容：全脸 + 各分区
-        contents = [prompt]
-
-        # 全脸图
-        contents.append(
-            genai_mod.types.Part.from_bytes(
-                data=compressed_face,
-                mime_type='image/jpeg',
-            )
-        )
-
-        # 各分区图
-        for name in region_names:
-            roi = region_rois.get(name)
-            if roi:
-                compressed = _resize_for_analysis(roi, max_size=400)
-                contents.append(
-                    genai_mod.types.Part.from_bytes(
-                        data=compressed,
-                        mime_type='image/jpeg',
-                    )
-                )
-                print(f'[skin_analyzer]   + {name}: {len(compressed)/1024:.1f}KB')
-
         response = client.models.generate_content(
             model=model_name,
-            contents=contents,
+            contents=[prompt],
         )
 
         text = response.text.strip()
 
-        # 尝试直接解析 JSON
+        # 解析 JSON
         try:
-            result = json.loads(text)
+            gemini_result = json.loads(text)
         except json.JSONDecodeError:
-            # 兜底：用正则从文本中提取 JSON 对象
-            match = re.search(r'\{[^{}]*"skin_type"[^{}]*\}', text)
+            match = re.search(r'\{[^{}]*"summary"[^{}]*\}', text)
             if not match:
-                # 更宽松的匹配：找最外层大括号
                 match = re.search(r'\{.*\}', text, re.DOTALL)
             if match:
                 try:
-                    result = json.loads(match.group(0))
+                    gemini_result = json.loads(match.group(0))
                 except json.JSONDecodeError:
-                    print(f'[skin_analyzer] 无法解析 JSON: {text[:300]}')
-                    return {'success': False, 'reason': 'parse_error', 'message': 'AI 返回格式异常，请重试'}
+                    print(f'[skin_analyzer] 无法解析 JSON: {text[:300]}，降级使用本地结果')
+                    raise ValueError('JSON parse failed')
             else:
-                print(f'[skin_analyzer] 响应中无 JSON: {text[:300]}')
-                return {'success': False, 'reason': 'parse_error', 'message': 'AI 返回格式异常，请重试'}
+                print(f'[skin_analyzer] 响应中无 JSON: {text[:300]}，降级使用本地结果')
+                raise ValueError('No JSON in response')
 
-        # 验证必填字段
-        scores = result.get('scores', {})
-        region_scores = result.get('region_scores', {})
-
-        # Step 5: 生成热点图
+        # ── Step 7: 生成热点图 ──
         heatmap_b64 = None
-        if region_scores:
+        if feature_json.get('region_scores'):
             try:
-                heatmap_b64 = generate_heatmap(image_bytes, landmarks, img_size, region_scores)
+                heatmap_b64 = generate_heatmap(image_bytes, landmarks, img_size, feature_json['region_scores'])
             except Exception as e:
                 print(f'[skin_analyzer] 热点图生成异常: {e}')
 
-        return {
-            'success': True,
-            'skin_type': result.get('skin_type', '未知'),
-            'concerns': result.get('concerns', []),
-            'scores': {
-                'hydration': scores.get('hydration', 0),
-                'smoothness': scores.get('smoothness', 0),
-                'brightness': scores.get('brightness', 0),
-                'pores': scores.get('pores', 0),
-                'evenness': scores.get('evenness', 0),
-            },
-            'overall_score': result.get('overall_score', 0),
-            'region_scores': region_scores,
-            'recommendations': result.get('recommendations', []),
-            'summary': result.get('summary', ''),
-            'heatmap_base64': heatmap_b64,
-            # 面部检测数据
-            'face_data': face_data if isinstance(face_data, dict) else None,
-        }
+        # ── Step 8: 组装返回结果 ──
+        result = _build_response(
+            feature_json=feature_json,
+            gemini_result=gemini_result,
+            ui_modules=ui_modules,
+            heatmap_b64=heatmap_b64,
+            face_data=face_data,
+            ai_degraded=False,
+        )
+        return result
 
     except Exception as e:
-        print(f'[skin_analyzer] 分析失败: {e}')
+        print(f'[skin_analyzer] Gemini 调用失败，降级使用 Engine 本地结果: {e}')
         traceback.print_exc()
-        return {'success': False, 'reason': 'api_error', 'message': f'AI 分析失败，请稍后重试'}
+
+        # 生成热点图
+        heatmap_b64 = None
+        if feature_json.get('region_scores'):
+            try:
+                heatmap_b64 = generate_heatmap(image_bytes, landmarks, img_size, feature_json['region_scores'])
+            except Exception as he:
+                print(f'[skin_analyzer] 热点图生成异常: {he}')
+
+        # 使用 Engine 的规则模块（或纯特征降级）
+        return _build_fallback_response(
+            feature_json=feature_json,
+            ui_modules=ui_modules,
+            heatmap_b64=heatmap_b64,
+            face_data=face_data,
+        )
+
+
+# ============================================================
+# 响应构建辅助函数
+# ============================================================
+def _normalize_mirror_advice(cards, fallback_cards=None):
+    """清洗 Gemini 返回的镜前建议，保证前端拿到稳定的 1-3 张卡。"""
+    fallback_cards = fallback_cards or []
+    if not isinstance(cards, list):
+        return fallback_cards
+
+    cleaned = []
+    seen = set()
+    forbidden = ['问题', '缺陷', '严重', '必须', '警告', '扣分', '诊断', '治疗']
+    for item in cards:
+        if not isinstance(item, dict):
+            continue
+        area = str(item.get('area') or item.get('position') or item.get('region') or '').strip()
+        product = str(item.get('product') or item.get('recommended_product') or '').strip()
+        action = str(item.get('action') or item.get('suggestion') or '').strip()
+        reason = str(item.get('reason') or '').strip()
+        text = area + product + action + reason
+        if not area or not product or not action or not reason:
+            continue
+        if any(word in text for word in forbidden):
+            continue
+        if area in seen:
+            continue
+        seen.add(area)
+        cleaned.append({
+            'area': area[:20],
+            'product': product[:40],
+            'action': action[:36],
+            'reason': reason[:60],
+        })
+        if len(cleaned) >= 3:
+            break
+
+    return cleaned or fallback_cards
+
+
+def _build_response(feature_json, gemini_result, ui_modules, heatmap_b64, face_data, ai_degraded=False):
+    """构建完整的 API 响应（Gemini 成功时）"""
+    result = {
+        'success': True,
+        'skin_type': feature_json['skin_type'],
+        'concerns': feature_json['concerns'],
+        'summary': gemini_result.get('summary', ''),
+        'recommendations': gemini_result.get('recommendations', []),
+        'heatmap_base64': heatmap_b64,
+        'face_data': face_data if isinstance(face_data, dict) else None,
+        'feature_json': feature_json,
+        # 保留旧字段以兼容数据库存储，但前端不再使用
+        'overall_score': feature_json['overall_score'],
+        'scores': feature_json['scores'],
+        'region_scores': feature_json['region_scores'],
+    }
+    if ai_degraded:
+        result['ai_degraded'] = True
+
+    # ── 注入 4 个陪伴模块 ──
+    if ui_modules:
+        result['today_status'] = ui_modules.get('today_status', '')
+        result['observations'] = ui_modules.get('observations', [])
+        result['mirror_advice'] = _normalize_mirror_advice(
+            gemini_result.get('mirror_advice'),
+            ui_modules.get('mirror_advice', []),
+        )
+        result['today_routine'] = ui_modules.get('today_routine', {})
+        result['trend'] = ui_modules.get('trend', {'has_history': False})
+    else:
+        # 无引擎时的降级模块
+        result['today_status'] = _fallback_status(feature_json)
+        result['observations'] = _fallback_observations(feature_json)
+        result['mirror_advice'] = _fallback_mirror_advice(feature_json)
+        result['today_routine'] = _fallback_routine(feature_json)
+        result['trend'] = {'has_history': False}
+
+    return result
+
+
+def _build_fallback_response(feature_json, ui_modules, heatmap_b64, face_data):
+    """构建降级响应（Gemini 不可用时，使用 Engine 规则生成）"""
+    if ui_modules:
+        today_status = ui_modules.get('today_status', '')
+        observations = ui_modules.get('observations', [])
+        mirror_advice = ui_modules.get('mirror_advice', [])
+        today_routine = ui_modules.get('today_routine', {})
+        trend = ui_modules.get('trend', {'has_history': False})
+
+        # 从 observations 和 routine 生成自然语言 summary
+        obs_text = '；'.join(observations[:2]) if observations else '皮肤状态稳定'
+        routine_morning = today_routine.get('morning', [])
+        summary = f"今天{obs_text}。建议早晨{'，'.join(routine_morning[:2]) if routine_morning else '保持日常护理'}。"
+        recommendations = _routine_to_recommendations(today_routine, observations)
+    else:
+        today_status = _fallback_status(feature_json)
+        observations = _fallback_observations(feature_json)
+        mirror_advice = _fallback_mirror_advice(feature_json)
+        today_routine = _fallback_routine(feature_json)
+        trend = {'has_history': False}
+        summary = today_status
+        recommendations = [
+            '早晚做好温和清洁和保湿，这是护肤的基础',
+            '出门记得涂防晒，帮助皮肤抵御紫外线',
+            '每周敷1-2次保湿面膜，给皮肤补充水分',
+            '如果皮肤感到不适，减少功能性产品，先做好基础护理',
+            '保持良好的作息和饮水习惯，皮肤会越来越好',
+        ]
+
+    return {
+        'success': True,
+        'skin_type': feature_json['skin_type'],
+        'concerns': feature_json['concerns'],
+        'today_status': today_status,
+        'observations': observations,
+        'mirror_advice': mirror_advice,
+        'today_routine': today_routine,
+        'trend': trend,
+        'summary': summary,
+        'recommendations': recommendations,
+        'heatmap_base64': heatmap_b64,
+        'face_data': face_data if isinstance(face_data, dict) else None,
+        'feature_json': feature_json,
+        'overall_score': feature_json['overall_score'],
+        'scores': feature_json['scores'],
+        'region_scores': feature_json['region_scores'],
+        'ai_degraded': True,
+    }
+
+
+def _routine_to_recommendations(routine, observations):
+    """将 routine 转为自然语言建议列表"""
+    recs = []
+    morning = routine.get('morning', [])
+    evening = routine.get('evening', [])
+    weekly = routine.get('weekly', [])
+
+    if morning:
+        recs.append('早晨：' + '，'.join(morning[:3]))
+    if evening:
+        recs.append('晚上：' + '，'.join(evening[:3]))
+    if weekly:
+        recs.append('每周：' + '，'.join(weekly[:2]))
+
+    # 补齐到 5 条
+    defaults = [
+        '坚持每日防晒，这是保护皮肤很有效的习惯',
+        '保持规律作息和充足饮水，皮肤会感受到的',
+    ]
+    while len(recs) < 5:
+        recs.append(defaults[len(recs) - len(recs) if len(recs) >= 3 else 0] if len(recs) < 5 else defaults[-1])
+        if len(recs) >= 5:
+            break
+        if len(defaults) > len(recs) - (3 if len(recs) >= 3 else 0):
+            recs.append(defaults[min(len(recs) - (3 if len(recs) >= 3 else 0), len(defaults) - 1)])
+
+    return recs[:5]
+
+
+def _fallback_status(feature_json):
+    """无引擎时的降级状态文案"""
+    skin_type = feature_json.get('skin_type', '')
+    concerns = feature_json.get('concerns', [])
+    status_map = {
+        '油性': '今天皮肤油脂分泌偏旺盛，注意温和清洁和控油',
+        '干性': '今天皮肤偏干燥，记得多给皮肤补充水分和油分',
+        '混合性': '今天皮肤呈现混合性特征，分区护理会更有效',
+        '中性': '今天皮肤状态比较均衡，保持日常护理节奏就好',
+        '敏感性': '今天皮肤需要温和对待，精简护理、避免刺激',
+    }
+    base = status_map.get(skin_type, '今天皮肤状态基本稳定，适合保持日常护理')
+    if concerns:
+        base += f'，注意到{"、".join(concerns[:2])}'
+    return base + '。'
+
+
+def _fallback_observations(feature_json):
+    """无引擎时的降级观察"""
+    obs = []
+    concerns = feature_json.get('concerns', [])
+    skin_type = feature_json.get('skin_type', '')
+
+    concern_obs = {
+        'T区出油': 'T区（前额和鼻子）油脂分泌较活跃，属于常见状态',
+        '毛孔粗大': 'T区毛孔比较明显，定期清洁护理可以帮助改善',
+        '肤色不均': '面部肤色存在局部差异，坚持防晒和护理会慢慢改善',
+        '黑眼圈': '眼周肤色偏暗，充足的睡眠和眼霜护理很重要',
+        '干燥脱皮': '皮肤有些干燥起皮，需要加强保湿和修护',
+        '面部泛红': '面部有轻微泛红，温和精简的护理更适合当前状态',
+        '肤色暗沉': '整体肤色略显暗沉，防晒和规律作息会有所帮助',
+        '痘印色斑': '面部有一些色素沉淀，代谢需要时间和耐心',
+        '水油失衡': 'T区和面颊状态差异较大，建议试试分区护理',
+    }
+
+    for c in concerns[:3]:
+        if c in concern_obs:
+            obs.append(concern_obs[c])
+
+    if not obs:
+        obs.append('今天各区域皮肤状态都比较稳定')
+    if len(obs) < 2:
+        obs.append('保持日常护理习惯，皮肤会越来越好')
+
+    return obs[:4]
+
+
+def _fallback_mirror_advice(feature_json):
+    """无推荐引擎时的镜前建议兜底。"""
+    concerns = feature_json.get('concerns', [])
+    cards = []
+
+    if any(c in concerns for c in ['干燥脱皮', '水油失衡', '面部泛红']):
+        cards.append({
+            'area': '鼻翼两侧',
+            'product': '已有保湿或舒缓产品',
+            'action': '少量按压，等待 10 秒后再上底妆',
+            'reason': '鼻翼区域更容易干燥，提前按压能让底妆更服帖',
+        })
+
+    if '黑眼圈' in concerns:
+        cards.append({
+            'area': '眼下区域',
+            'product': '已有底妆 / 定妆产品',
+            'action': '薄薄补一层，轻拍提亮',
+            'reason': '眼周肤色略偏暗时，轻薄叠加更自然',
+        })
+
+    if '肤色不均' in concerns:
+        cards.append({
+            'area': '唇周边缘',
+            'product': '已有底妆 / 定妆产品',
+            'action': '轻薄修饰边缘，让整体更干净',
+            'reason': '局部肤色不够均匀，会影响整体清爽感',
+        })
+
+    if not cards:
+        cards.append({
+            'area': '鼻翼两侧',
+            'product': '已有保湿或舒缓产品',
+            'action': '少量按压，等待 10 秒后再上底妆',
+            'reason': '局部先做轻微保湿，后续底妆更容易贴合',
+        })
+
+    return cards[:3]
+
+
+def _fallback_routine(feature_json):
+    """无引擎时的降级护理建议"""
+    skin_type = feature_json.get('skin_type', '')
+    concerns = feature_json.get('concerns', [])
+
+    morning = ['温和洁面', '爽肤水补水', '保湿精华']
+    evening = ['卸妆（如有化妆或防晒）', '温和洁面', '爽肤水', '精华', '面霜锁水']
+
+    if skin_type in ('干性', '敏感性'):
+        morning = ['清水或极温和洁面', '保湿精华', '面霜锁水']
+    elif skin_type == '油性':
+        morning = ['温和控油洁面', '清爽爽肤水', '轻薄保湿']
+
+    if any(c in concerns for c in ['T区出油', '毛孔粗大']):
+        evening.insert(2, '控油棉片轻擦T区')
+
+    morning.append('防晒（护肤中很重要的一步 ✨）')
+
+    weekly = ['保湿面膜 1-2次']
+    if any(c in concerns for c in ['T区出油', '毛孔粗大']):
+        weekly = ['清洁泥膜 1次（T区重点）', '保湿面膜 1-2次']
+
+    return {'morning': morning, 'evening': evening, 'weekly': weekly}

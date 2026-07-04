@@ -1,12 +1,18 @@
 import axios from 'axios'
 
-const apiBaseURL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+function normalizeApiBaseURL(value) {
+  const raw = (value || '/api').replace(/\/$/, '')
+  if (raw === '/api' || raw.endsWith('/api')) return raw
+  return `${raw}/api`
+}
+
+const apiBaseURL = normalizeApiBaseURL(import.meta.env.VITE_API_BASE_URL)
 
 // 上传文件的基础地址：／/api → 去掉 /api → 拼接 /uploads
 const _uploadsBase = (() => {
-  if (import.meta.env.VITE_API_BASE_URL) {
+  if (apiBaseURL.startsWith('http')) {
     // 生产环境：https://xxx.onrender.com/api → https://xxx.onrender.com
-    return import.meta.env.VITE_API_BASE_URL.replace(/\/api\/?$/, '')
+    return apiBaseURL.replace(/\/api\/?$/, '')
   }
   return '' // 开发环境：空字符串，使用相对路径走 Vite 代理
 })()
@@ -30,7 +36,11 @@ const api = axios.create({
 // ==================== AI 识别 ====================
 
 export function recognizeProduct(formData) {
-  return api.post('/recognize', formData).then(r => r.data)
+  return api.post('/recognize', formData, { timeout: 45000 }).then(r => r.data)
+}
+
+export function recognizeProductVoice(formData) {
+  return api.post('/recognize-voice', formData, { timeout: 60000 }).then(r => r.data)
 }
 
 // ==================== 肤质分析 ====================
@@ -101,4 +111,8 @@ export function updateDiary(id, formData) {
 
 export function deleteDiary(id) {
   return api.delete(`/diary/${id}`).then(r => r.data)
+}
+
+export function fetchMoods() {
+  return api.get('/moods').then(r => r.data)
 }

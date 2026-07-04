@@ -1,0 +1,920 @@
+﻿.skin-result {
+  padding: 4px 0;
+}
+
+.skin-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.skin-photo-placeholder {
+  width: 100%;
+  height: 200px;
+  border-radius: 18px;
+  margin-bottom: 20px;
+  background:
+    radial-gradient(circle at 24% 18%, rgba(255, 255, 255, 0.86), transparent 28%),
+    radial-gradient(circle at 78% 70%, rgba(212, 146, 154, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(224, 239, 249, 0.92), rgba(237, 246, 251, 0.76));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: #557489;
+  border: 1px solid rgba(185, 135, 145, 0.18);
+  overflow: hidden;
+}
+
+.skin-entry-visual {
+  width: 148px;
+  height: 148px;
+  border-radius: 34px;
+  overflow: hidden;
+  margin: 0 auto 16px;
+  box-shadow: 0 18px 42px rgba(97, 74, 68, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+}
+
+.skin-entry-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.skin-analysis-sheet {
+  background:
+    linear-gradient(180deg, rgba(248, 252, 255, 0.98), rgba(239, 247, 252, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  box-shadow: 0 -18px 48px rgba(40, 67, 86, 0.18);
+}
+
+.skin-analysis-sheet .modal-header h3 {
+  margin: 0;
+  color: #132d44;
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 780;
+}
+
+.skin-analysis-sheet .modal-close {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.56);
+  color: #708295;
+  box-shadow: 0 8px 20px rgba(74, 112, 143, 0.08);
+}
+
+.skin-entry-panel {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 2px 0;
+  text-align: center;
+}
+
+.skin-entry-copy {
+  margin: 0;
+  color: #657585;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.skin-entry-actions {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.skin-entry-action {
+  width: 100%;
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 153, 174, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+  color: #24445e;
+  font: inherit;
+  text-align: left;
+  box-shadow: 0 10px 22px rgba(74, 112, 143, 0.06);
+  cursor: pointer;
+}
+
+.skin-entry-action.primary {
+  border-color: rgba(93, 143, 183, 0.20);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.skin-entry-action-icon {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: #dcecf8;
+  color: #4f7fd7;
+}
+
+.skin-entry-action:not(.primary) .skin-entry-action-icon {
+  background: rgba(255, 255, 255, 0.72);
+  color: #7fa18a;
+}
+
+.skin-entry-action strong {
+  display: block;
+  color: #24445e;
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 780;
+}
+
+.skin-entry-action small {
+  display: block;
+  margin-top: 4px;
+  color: #7d8c98;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.skin-type-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 14px;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 问题标签 */
+.skin-concerns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.skin-concern-tag {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #fdf5f5;
+  color: #647b8e;
+  border: 1px solid rgba(111, 151, 180, 0.2);
+}
+
+/* AI 评估总结 */
+.skin-summary {
+  background: var(--accent-light);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--accent);
+  line-height: 1.7;
+  margin-bottom: 18px;
+}
+
+/* 护理建议 */
+.skin-recommendations {
+  margin-bottom: 20px;
+}
+
+.skin-recommendations .section-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.skin-rec-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+.skin-rec-item .rec-num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ====== 肤质分析历史记录 ====== */
+.skin-history-section {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.skin-history-toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.skin-history-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.skin-history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 4px;
+}
+
+.skin-history-item:hover {
+  background: #f9fafb;
+}
+
+.skin-history-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #f0f0f0;
+}
+
+.skin-history-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.skin-history-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.82), transparent 28%),
+    linear-gradient(135deg, #eaf1f6, #e3ece0);
+}
+
+.skin-history-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.skin-history-type {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.skin-history-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.skin-history-score {
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.skin-history-time {
+  font-size: 11px;
+  color: #bbb;
+}
+
+.skin-history-summary {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.skin-history-delete {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
+.skin-history-delete:hover {
+  opacity: 1;
+  background: #fef2f2;
+}
+
+.skin-history-gallery {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 14px;
+}
+
+.skin-history-gallery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.skin-history-gallery-head > div:first-child {
+  display: grid;
+  gap: 3px;
+  text-align: left;
+}
+
+.skin-history-gallery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.skin-history-gallery-head strong {
+  color: #132d44;
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.skin-history-gallery-head span {
+  color: #7d8c98;
+  font-size: 12px;
+}
+
+.skin-history-gallery-actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: rgba(220, 236, 248, 0.78);
+  color: #4f7fa4;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.skin-history-gallery-actions button.danger {
+  background: rgba(254, 226, 226, 0.88);
+  color: #b85b68;
+}
+
+.skin-history-gallery-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.skin-history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-height: min(58vh, 520px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.skin-history-tile {
+  position: relative;
+  min-height: 198px;
+  display: grid;
+  grid-template-rows: 132px auto auto;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(126, 153, 174, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 10px 24px rgba(74, 112, 143, 0.07);
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.skin-history-tile.selected {
+  border-color: rgba(79, 127, 215, 0.46);
+  background: rgba(240, 247, 255, 0.82);
+  box-shadow:
+    0 0 0 2px rgba(79, 127, 215, 0.10),
+    0 10px 24px rgba(74, 112, 143, 0.08);
+}
+
+.skin-history-tile img {
+  width: 100%;
+  height: 132px;
+  display: block;
+  border-radius: 14px;
+  object-fit: cover;
+  background: rgba(220, 236, 248, 0.62);
+}
+
+.skin-history-tile-placeholder {
+  width: 100%;
+  height: 132px;
+  display: block;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.88), transparent 26%),
+    radial-gradient(circle at 72% 74%, rgba(212, 146, 154, 0.18), transparent 32%),
+    linear-gradient(135deg, rgba(224, 239, 249, 0.88), rgba(237, 246, 251, 0.72));
+}
+
+.skin-history-tile-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.skin-history-tile-meta strong {
+  color: #24445e;
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 780;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skin-history-tile-meta small {
+  color: #8a99a6;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.skin-history-tile-copy {
+  color: #657585;
+  font-size: 11px;
+  line-height: 1.35;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.skin-history-tile-delete {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.76);
+  color: #8a99a6;
+  box-shadow: 0 8px 18px rgba(74, 112, 143, 0.12);
+}
+
+.skin-history-check {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(79, 127, 215, 0.42);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.82);
+  color: #2f78ad;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(74, 112, 143, 0.12);
+}
+
+.skin-history-tile.selected .skin-history-check {
+  background: #dcecf8;
+  border-color: #5d8fb7;
+}
+
+.skin-history-empty {
+  padding: 28px 16px;
+  border: 1px dashed rgba(126, 153, 174, 0.20);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.46);
+  color: #8a99a6;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ============================================================
+   陪伴助手模块 — Mirror Mate Companion
+   不显示分数/评级，只提供温和的观察和建议
+   ============================================================ */
+
+/* ① 今日状态卡片 */
+.companion-status-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  background: linear-gradient(135deg, #f4f8fb, #e8f0f5);
+  border-radius: var(--radius);
+  border: 1px solid #d8e6ef;
+}
+
+.companion-status-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.companion-status-text {
+  font-size: 14px;
+  color: #3d5660;
+  line-height: 1.7;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* ② 今日观察 */
+.companion-section {
+  margin-bottom: 18px;
+}
+
+.companion-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #647b89;
+  margin-bottom: 10px;
+  letter-spacing: 0.02em;
+}
+
+.companion-observations {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.companion-obs-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(237, 246, 251, 0.7);
+  border-radius: 10px;
+  border: 1px solid rgba(111, 151, 180, 0.18);
+  font-size: 13px;
+  color: #555;
+  line-height: 1.6;
+}
+
+.companion-obs-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8aabbf;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* ③ 今日护肤建议 */
+.companion-routine {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.companion-routine-block {
+  background: rgba(237, 246, 251, 0.7);
+  border-radius: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(111, 151, 180, 0.18);
+}
+
+.companion-routine-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #557089;
+  margin-bottom: 8px;
+}
+
+.companion-routine-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.companion-routine-list li {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  padding-left: 0;
+  position: relative;
+}
+
+.companion-routine-list li::before {
+  display: none;
+  content: none;
+}
+
+/* ④ 趋势记录 */
+.companion-trend {
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #f4f8fb, #eaf1f6);
+  border-radius: 10px;
+  border: 1px solid #d8e6ef;
+}
+
+.companion-trend-summary {
+  font-size: 13px;
+  color: #3d5660;
+  line-height: 1.6;
+  margin: 0 0 4px 0;
+  font-weight: 500;
+}
+
+.companion-trend-detail {
+  font-size: 12px;
+  color: #6e8596;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ============================================================
+   热点图（保留 — 去除评分图例文字）
+   ============================================================ */
+.skin-heatmap-container {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.skin-heatmap-img {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: 12px;
+  margin: 8px 0;
+  border: 1px solid #d8e2ea;
+}
+
+.heatmap-legend {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 11px;
+  color: #888;
+}
+
+.heatmap-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.heatmap-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.heatmap-low {
+  background: #d44;
+}
+
+.heatmap-mid {
+  background: #da2;
+}
+
+.heatmap-high {
+  background: #5a2;
+}
+
+.region-card {
+  background: rgba(237, 246, 251, 0.7);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid #d8e2ea;
+}
+
+.region-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.region-icon {
+  font-size: 18px;
+}
+
+.region-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #444;
+  flex: 1;
+}
+
+.region-overall {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: #eaf1f6;
+}
+
+.region-overall.high {
+  color: #3f72a0;
+  background: #ddeaf2;
+}
+
+.region-overall.mid {
+  color: #557b9a;
+  background: #e5f0f7;
+}
+
+.region-overall.low {
+  color: #a33;
+  background: #fef2f2;
+}
+
+.region-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.region-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.region-bar-label {
+  width: 44px;
+  color: #888;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.region-bar {
+  flex: 1;
+  height: 6px;
+}
+
+.region-bar-val {
+  width: 28px;
+  font-weight: 600;
+  color: #666;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Dashboard 肤质历史卡片 */
+.skin-dashboard-card {
+  margin-top: 16px;
+}
+
+.skin-dashboard-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+}
+
+.skin-dashboard-item:last-child {
+  border-bottom: none;
+}
+
+.skin-dashboard-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #eaf1f6;
+}
+
+.skin-dashboard-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.skin-dashboard-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.skin-dashboard-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.skin-dashboard-type {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.skin-dashboard-time {
+  font-size: 11px;
+  color: #ccc;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   DASHBOARD  v2  —  App Store 级别设计
+   奶油白 · 鼠尾草绿 · 大留白 · 24px 圆角 · Apple 轻阴影
+   ============================================================ */
+
+.d-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2.5px solid rgba(126, 153, 174, 0.18);
+  border-top-color: #5d8fb7;
+  border-radius: 50%;
+  animation: d-spin 0.7s linear infinite;
+}
+@keyframes d-spin { to { transform: rotate(360deg); } }
+
+.d-toast-container {
+  position: fixed;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+.d-toast {
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--d-shadow-md);
+  animation: d-toast-in 0.3s ease;
+}
+@keyframes d-toast-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.d-toast-success {
+  background: rgba(124, 148, 115, 0.92);
+  color: #fff;
+}
+.d-toast-error {
+  background: rgba(201, 122, 122, 0.92);
+  color: #fff;
+}
+

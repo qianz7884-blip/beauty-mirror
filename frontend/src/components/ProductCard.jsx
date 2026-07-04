@@ -1,74 +1,58 @@
 import { useState } from 'react'
 import { getPhotoUrl } from '../api'
 import ImageViewer from './ImageViewer'
+import { Edit3, Trash2 } from 'lucide-react'
+import { getProductStatus } from '../utils/productCatalog'
 
 export default function ProductCard({ product, onEdit, onDelete }) {
   const [viewImage, setViewImage] = useState(null)
 
   const photoUrl = product.photo ? getPhotoUrl(product.photo, 'products') : null
+  const status = getProductStatus(product)
 
   return (
     <>
-      <div className="card" style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-        {/* 缩略图 */}
+      <div className="vault-product-card">
         <div
-          className={photoUrl ? 'clickable-thumb' : ''}
+          className={`vault-product-photo${photoUrl ? ' clickable-thumb' : ' is-placeholder'}`}
           onClick={() => photoUrl && setViewImage(photoUrl)}
-          style={{
-            width: 72,
-            height: 72,
-            borderRadius: 10,
-            flexShrink: 0,
-            background: photoUrl
-              ? `url(${photoUrl}) center/cover`
-              : 'linear-gradient(135deg, #e3ece0, #d5e0d0)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 30,
-          }}
+          style={photoUrl ? { backgroundImage: `url(${photoUrl})` } : undefined}
         >
-          {!product.photo && '🫧'}
         </div>
 
-        {/* 信息 */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>{product.name}</div>
-          <div style={{ fontSize: 13, color: '#888', marginBottom: 6 }}>
-            {product.brand && <span>{product.brand}</span>}
-            {product.brand && product.category && <span> · </span>}
-            {product.category && <span>{product.category}</span>}
-            {product.price > 0 && (
-              <span style={{ marginLeft: 8, color: 'var(--accent)', fontWeight: 500 }}>
-                ¥{product.price}
-              </span>
-            )}
+        <div className="vault-product-info">
+          <div className="vault-product-topline">
+            <span>{product.category || '未分类'}</span>
+            <em>{status}</em>
           </div>
+          <h3>{product.name}</h3>
+          <p className="vault-product-brand">{product.brand || '未记录品牌'}</p>
+
+          <div className="vault-product-meta">
+            {product.color && <span>色号 {product.color}</span>}
+            {product.purchase_date && <span>开封/购入 {product.purchase_date}</span>}
+            {product.volume && <span>容量 {product.volume}</span>}
+            {product.price > 0 && <span>¥{product.price}</span>}
+          </div>
+
           {product.color && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <div
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: '50%',
-                  background: product.color,
-                  border: '1px solid #ddd',
-                }}
-              />
-              <span style={{ fontSize: 11, color: '#999' }}>{product.color}</span>
-            </div>
+            <span className="vault-swatch" style={{ background: product.color }} />
           )}
+
           {product.notes && (
-            <p style={{ fontSize: 12, color: '#aaa', marginTop: 4, lineHeight: 1.5 }}>
+            <p className="vault-product-note">
               {product.notes.slice(0, 60)}{product.notes.length > 60 ? '...' : ''}
             </p>
           )}
         </div>
 
-        {/* 操作按钮 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-          <button className="btn btn-outline btn-sm" onClick={onEdit}>编辑</button>
-          <button className="btn btn-danger btn-sm" onClick={onDelete}>删除</button>
+        <div className="vault-product-actions">
+          <button onClick={onEdit} title="编辑">
+            <Edit3 size={15} strokeWidth={1.7} />
+          </button>
+          <button onClick={onDelete} title="删除">
+            <Trash2 size={15} strokeWidth={1.7} />
+          </button>
         </div>
       </div>
 

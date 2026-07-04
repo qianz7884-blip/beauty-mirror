@@ -1,215 +1,326 @@
 # Beauty Mirror
 
-Beauty Mirror 是一个 AI 美妆与形象管理全栈小项目，前端使用 React + Vite，后端使用 Flask + SQLAlchemy，支持化妆品管理、妆容日记记录、图片上传、AI 拍照识别（可插拔框架）和首页统计概览。
+AI 美妆与形象管理全栈应用。前端 React + Vite，后端 Flask + SQLAlchemy，集成 **Google Gemini**、**MediaPipe Face Mesh**、**ChromaDB RAG 皮肤科知识库**和**本地产品知识库**。
 
 ## 功能
 
-- **首页统计**：展示化妆品总数、日记总数、本月新增数量、最近添加的产品和最新日记，快速添加入口（📸拍照识别 / 🖼️相册识别）
-- **化妆品管理**：支持新增、编辑、删除、搜索和分类筛选，支持图片上传
-- **妆容日记**：支持新增、编辑、删除，可关联已添加的化妆品，记录妆容和心情
-- **我的化妆品**：网格卡片浏览已保存的化妆品图片，按分类浏览
-- **AI 识别框架**：拍照或相册选图后进行 AI 识别（当前为可插拔占位，后续接入 Claude Vision / GPT-4V 只需修改 `backend/recognizer.py` 一个文件），识别面板支持结果编辑 + 搜索官网宣传图
+### 产品管理
+- 新增、编辑、删除、搜索和分类筛选
+- 列表 / 网格双视图切换，自定义分类
+- 图片上传（文件 + URL）
 
-## 页面效果
+### AI 产品识别
+- 拍照或相册选图 → **Gemini 读取包装文字**（品牌 / 名称 / 分类 / 规格 / 关键文字）
+- **Product Knowledge Base** 自动去重、匹配、富化——10 款种子产品知识（成分 / 功效 / 适合肤质 / 使用方法）
+- 识别结果可编辑，确认后一键入库
 
-项目整体是移动端优先的卡片式界面，主色调偏粉色（粉绿主题），底部固定 Tab 导航，适合在手机浏览器里直接使用。
+### AI 肤质分析
+- 拍照上传面部照片，完整分析管线：
+  1. **MediaPipe Face Landmarker** — 478 个面部特征点检测
+  2. **ROI 提取** — 前额 / 左脸颊 / 右脸颊 / 鼻子 / 下巴 / 左眼周 / 右眼周 / 唇周，共 8 区
+  3. **Feature Extraction** — 纯 numpy/scipy 数值计算，从每区提取颜色 / 纹理 / 毛孔 / 斑点 / 光泽特征，Sigmoid 映射为 0-100 评分
+  4. **RAG 知识增强** — ChromaDB 向量库检索皮肤科专业知识
+  5. **Gemini 自然语言生成** — 只基于 Feature JSON 生成总结和建议，**不看图不评分**
+  6. **热力图** — matplotlib 高斯扩散渲染面部热力图
+- 分析历史自动保存
 
-- **首页** `/`：统计卡片 + 最近产品 + 最新日记 + 拍照/相册快速入口
-- **产品管理** `/products`：搜索 + 分类筛选 + 弹层表单，集中管理化妆品条目
-- **我的化妆品** `/gallery`：网格卡片展示产品图片，浏览体验直观
-- **妆容日记** `/diary`：记录每日妆容、心情和搭配产品，可回看历史
+### 妆容日记
+- 心情选择器 + 关联产品 + 图片上传
+- 详情页查看完整记录
 
-```mermaid
-flowchart TD
-    A[首页 Dashboard] --> B[产品管理 /products]
-    A --> C[我的化妆品 /gallery]
-    A --> D[妆容日记 /diary]
-    A --> E[AI 识别面板]
-    B --> D
-    B --> E
-    C --> E
-    D --> B
+### 首页 Dashboard
+- 统计卡片（产品 / 本月新增 / 日记 / 分析次数）
+- 快速入口，最近产品 + 近期肤质分析
+
+### 个人设置
+- 肤质偏好、每日提醒开关
+
+## 页面
+
+| Tab | 路由 | 说明 |
+|-----|------|------|
+| 首页 | `/` | 统计 + 快速入口 + 最近数据 |
+| 产品 | `/products` | 搜索 / 筛选 / 双视图 / CRUD |
+| 日记 | `/diary` | 日记列表 + 心情 + 关联产品 |
+| 我的 | `/profile` | 肤质偏好 + 提醒 + 关于 |
+
+## 快速开始
+
+### 环境要求
+
+- **Python** 3.10+
+- **Node.js** 18+
+- **npm**
+
+### 1. 配置 API Key
+
+在项目根目录创建 `.env`：
+
+```env
+GEMINI_API_KEY=你的_Gemini_API_Key
 ```
 
-## 技术栈
+> 免费申请：[Google AI Studio](https://aistudio.google.com/apikey)
 
-| 层级 | 技术 |
-|------|------|
-| 前端框架 | React 18 + Vite |
-| 路由 | React Router v6 |
-| HTTP | Axios |
-| 后端框架 | Flask |
-| ORM | Flask-SQLAlchemy |
-| 数据库 | SQLite（默认），支持切换 MySQL / PostgreSQL |
-| 图片处理 | Pillow |
-| AI 识别 | 可插拔框架（`backend/recognizer.py`） |
-| 部署 | 后端 Render / 前端 Vercel（已配置） |
+### 2. 启动后端
+
+```bash
+# 安装依赖
+pip install -r backend/requirements.txt
+
+# 启动后端
+python backend/app.py
+```
+
+后端运行在 `http://127.0.0.1:5000`。首次启动自动创建数据库、上传目录，并初始化皮肤科 RAG 知识库和产品种子知识库。
+
+### 3. 启动前端
+
+```bash
+cd frontend
+
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm run dev
+```
+
+前端运行在 `http://127.0.0.1:3000`。Vite 已配置代理——`/api` 和 `/uploads` 请求自动转发到后端 `5000` 端口。
+
+### 打开浏览器
+
+访问 **http://127.0.0.1:3000** 即可使用。
+
+---
 
 ## 项目结构
 
 ```text
 beauty_mirror/
-├── backend/
-│   ├── app.py              # Flask 应用，所有 API 路由
-│   ├── models.py           # Product & Diary 数据模型
-│   ├── config.py           # 数据库配置（支持多数据库）
-│   ├── recognizer.py       # AI 识别模块（可插拔，当前返回空结果）
-│   ├── requirements.txt    # Python 依赖
-│   └── Procfile            # Render/云平台部署入口
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx         # 路由定义（4 个页面 + 404 兜底）
-│   │   ├── api.js          # API 封装 + getPhotoUrl 图片地址工具
-│   │   ├── pages/
-│   │   │   ├── Dashboard.jsx       # 首页统计 + 快速入口
-│   │   │   ├── ProductManage.jsx   # 产品管理（搜索/筛选/增删改）
-│   │   │   ├── MyCosmetics.jsx     # 画廊浏览（网格卡片）
-│   │   │   └── MakeupDiary.jsx     # 妆容日记（记录/关联产品）
-│   │   ├── components/
-│   │   │   ├── Layout.jsx          # 布局 + 底部 Tab 导航
-│   │   │   ├── ProductForm.jsx     # 产品表单弹层
-│   │   │   ├── DiaryForm.jsx       # 日记表单弹层
-│   │   │   ├── ProductCard.jsx     # 产品卡片组件
-│   │   │   ├── DiaryCard.jsx       # 日记卡片组件
-│   │   │   └── RecognizePanel.jsx  # AI 识别面板（拍照/识别/确认）
-│   │   └── styles/
-│   │       └── index.css           # 全局样式
-│   ├── index.html
-│   ├── vite.config.js
-│   └── vercel.json         # Vercel 部署配置
-├── render.yaml             # Render 部署配置
+├── .env
 ├── README.md
-└── WEEKLY_REPORT.md        # 项目周报
+├── render.yaml
+│
+├── backend/
+│   ├── app.py                    # Flask 入口 + 应用工厂 + 路由注册
+│   ├── models.py                 # Product / Diary / SkinAnalysis 模型
+│   ├── config.py                 # 数据库配置
+│   ├── constants.py              # 共享分类 / 心情常量
+│   ├── upload_utils.py           # 上传图片保存 / 下载 / 删除工具
+│   ├── routes/                   # API Blueprint 路由
+│   │   ├── dashboard.py
+│   │   ├── products.py
+│   │   ├── diary.py
+│   │   ├── skin.py
+│   │   └── uploads.py
+│   │
+│   ├── recognizer.py             # AI 产品识别（Gemini → 包装文字 OCR）
+│   ├── product_knowledge.py      # 产品知识层（去重 / 匹配 / 富化 / 种子库）
+│   │
+│   ├── skin_analyzer.py          # 肤质分析管线（编排层）
+│   ├── feature_extractor.py      # 皮肤特征提取（numpy/scipy 数值计算）
+│   ├── face_regions.py           # MediaPipe → 8 区域定义 + ROI 裁剪
+│   ├── heatmap_generator.py      # 面部热力图渲染（matplotlib 高斯扩散）
+│   │
+│   ├── knowledge_base/
+│   │   ├── __init__.py
+│   │   ├── vector_store.py       # ChromaDB + Gemini Embeddings (768d)
+│   │   ├── skin_knowledge.json   # 皮肤科种子知识
+│   │   └── chroma_data/          # 向量持久化
+│   │
+│   ├── requirements.txt
+│   ├── Procfile
+│   ├── test_heatmap.py           # 热力图独立测试
+│   ├── models/
+│   │   └── face_landmarker.task  # MediaPipe 模型 (3.7MB)
+│   └── uploads/
+│       ├── products/
+│       ├── diary/
+│       └── skin/
+│
+└── frontend/
+    ├── index.html
+    ├── package.json
+    ├── vite.config.js            # 端口 3000，代理 → 5000
+    ├── vercel.json
+    └── src/
+        ├── main.jsx
+        ├── App.jsx               # 路由定义
+        ├── api.js                # Axios 封装
+        ├── categories.js         # 自定义分类管理
+        ├── pages/
+        │   ├── Dashboard.jsx
+        │   ├── ProductManage.jsx
+        │   ├── MakeupDiary.jsx
+        │   ├── DiaryDetail.jsx
+        │   ├── Tutorial.jsx
+        │   └── Profile.jsx
+        ├── components/
+        │   ├── Layout.jsx
+        │   ├── ProductAddSheet.jsx
+        │   ├── ProductCard.jsx
+        │   ├── ProductCategoryManager.jsx
+        │   ├── ProductForm.jsx
+        │   ├── ProductRecordActions.jsx
+        │   ├── DiaryCard.jsx
+        │   ├── DiaryForm.jsx
+        │   ├── RecognizePanel.jsx
+        │   ├── SkinAnalysisPanel.jsx
+        │   ├── SkinHistoryViews.jsx
+        │   └── ImageViewer.jsx
+        ├── utils/
+        │   ├── productCatalog.js
+        │   ├── productEntry.js
+        │   └── skinAnalysisView.js
+        └── styles/
+            ├── index.css          # 样式入口，仅维护导入顺序
+            ├── foundation.css     # 基础变量 / 通用布局 / 通用组件
+            ├── skin.css           # 肤质分析与历史记录样式
+            ├── diary.css          # 日记列表 / 详情 / 表单样式
+            ├── mirror-refresh.css # 镜前助手视觉刷新覆盖层
+            ├── app-shell.css      # Aqua 主题壳层 / 首页 / 教程 / 我的
+            └── product-vault.css  # 产品库 / 产品详情样式
 ```
 
-## 运行环境
+## 技术栈
 
-- Python 3.10+
-- Node.js 18+
-- npm
+| 层级 | 技术 | 说明 |
+|------|------|------|
+| 前端 | React 18 + Vite 5 + React Router v6 | SPA，移动端优先 |
+| HTTP | Axios | API 调用 |
+| 后端 | Flask 3 | RESTful API |
+| ORM | Flask-SQLAlchemy | 3 个数据模型 |
+| 数据库 | SQLite（默认，支持 MySQL / PostgreSQL） | |
+| AI 视觉 | Google Gemini (`gemini-2.5-flash`) | 产品包装文字识别 + 肤质自然语言生成 |
+| 面部检测 | MediaPipe Face Landmarker | 478 点 |
+| 特征提取 | numpy + scipy + Pillow | GLCM 纹理 / Lab & HSV 颜色 / 毛孔 / 斑点 / 光泽 |
+| 向量数据库 | ChromaDB | 皮肤科 RAG |
+| Embedding | Gemini `text-embedding-004` | 768 维 |
+| 热力图 | matplotlib + scipy | 高斯扩散面部热力图 |
+| 部署 | Render + Vercel | 前后端分离 |
 
-## 本地运行
+## 架构
 
-项目需要同时启动后端和前端。
-
-### 1. 启动后端
-
-在项目根目录执行：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
-python backend\app.py
-```
-
-后端默认运行在：
-
-- http://127.0.0.1:5000
-
-首次启动时会自动创建数据库文件和上传目录。
-
-### 2. 启动前端
-
-另开一个终端，在项目根目录执行：
-
-```powershell
+### 肤质分析管线
 
 ```
+拍照 → MediaPipe Face Mesh (478点)
+     → ROI 提取 (8区域)
+     → Feature Extraction (numpy/scipy 数值特征)
+     → Feature JSON (每区域5维0-100评分 + 肤质分类 + 问题检测)
+     → RAG 知识检索 (ChromaDB, 特征驱动查询)
+     → Gemini 纯文本生成 (只看 Feature JSON, 不看图, 不评分)
+     → 热力图渲染
+     → 返回完整结果
+```
 
-前端默认运行在：
+### 产品识别管线
 
-- http://127.0.0.1:3000
+```
+拍照 → Gemini 读取包装文字 (品牌/名称/分类/规格/关键文字)
+     → Product JSON
+     → Product Knowledge Base 去重 + 匹配 + 富化
+     → 返回含知识的产品信息
+     → 用户确认 → 入库
+```
 
-前端已经配置了代理，`/api` 和 `/uploads` 会转发到后端，本地开发时不用手动改接口地址。
+## API
 
-## 部署
+### 产品
 
-### 后端部署到 Render
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/products` | 列表 (`?search=&category=`) |
+| GET | `/api/products/<id>` | 详情 |
+| POST | `/api/products` | 新增（multipart） |
+| PUT | `/api/products/<id>` | 编辑 |
+| DELETE | `/api/products/<id>` | 删除 |
 
-后端已配置 `render.yaml`，可直接在 Render 中导入此仓库：
+### AI 识别
 
-- **Root Directory**: `backend`
-- **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120`
-- **Python Version**: 3.11.9
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/recognize` | Gemini 识别 → 知识库富化 |
 
-### 前端部署到 Vercel
+### 产品知识库
 
-1. 在 Vercel 中导入此仓库，Root Directory 选择 `frontend`
-2. Build Command 填 `npm run build`，Output Directory 填 `dist`
-3. 在 Vercel 的 Environment Variables 中添加：
-   - `VITE_API_BASE_URL = https://你的后端地址/api`
-4. 部署完成后，前端会通过该地址访问后端接口
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/product-knowledge` | 查询 (`?category=&skin_type=&keyword=`) |
+| POST | `/api/product-knowledge/seed` | 手动写入种子知识 |
 
-> 当前前端已通过 `getPhotoUrl()` 工具函数处理图片地址，生产和开发环境自动切换。
+### 肤质分析
 
-## API 接口
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/skin-analysis` | 提交照片进行分析 |
+| GET | `/api/skin-analyses` | 分析历史列表 |
+| GET | `/api/skin-analyses/<id>` | 单次分析详情 |
+| DELETE | `/api/skin-analyses/<id>` | 删除 |
+
+### 日记
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/diary` | 列表 |
+| POST | `/api/diary` | 新增 |
+| PUT | `/api/diary/<id>` | 编辑 |
+| DELETE | `/api/diary/<id>` | 删除 |
+
+### 其他
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/dashboard` | 首页统计数据 |
-| GET | `/api/products` | 获取产品列表 |
-| POST | `/api/products` | 新增产品 |
-| PUT | `/api/products/<id>` | 编辑产品 |
-| DELETE | `/api/products/<id>` | 删除产品 |
-| GET | `/api/diary` | 获取日记列表 |
-| POST | `/api/diary` | 新增日记 |
-| PUT | `/api/diary/<id>` | 编辑日记 |
-| DELETE | `/api/diary/<id>` | 删除日记 |
-| POST | `/api/recognize` | AI 识别产品（可插拔） |
+| GET | `/uploads/<folder>/<filename>` | 静态资源 |
 
-图片访问地址以 `/uploads/<type>/<filename>` 形式提供。
+## 部署
 
-## 配置说明
+### 展示版最快路径
 
-后端配置位于 [backend/config.py](backend/config.py)。
+展示版建议先用 **Render 部署后端 + Vercel 部署前端**：
 
-- 默认使用 SQLite，数据库文件保存在 `backend/instance/beauty.db`
-- 如果设置了 `DATABASE_URL`，会优先使用该地址
-- 如果设置了 MySQL 相关环境变量，则会切换到 MySQL
+1. 先把当前仓库推到 GitHub。
+2. 在 Render 新建 Blueprint，选择本仓库，使用根目录的 `render.yaml`。
+3. Render 后台填写 `GEMINI_API_KEY`，部署完成后记下后端地址，例如 `https://beauty-mirror-api.onrender.com`。
+4. 在 Vercel 导入同一个仓库，Root Directory 选择 `frontend`。
+5. Vercel 环境变量填写 `VITE_API_BASE_URL = https://你的后端.onrender.com`。
+6. Vercel 部署完成后，用前端域名打开展示版。
 
-可用环境变量：
+展示版默认使用 SQLite，适合快速演示。正式长期使用建议再接 `DATABASE_URL` 和持久化文件存储，否则云服务重启或重新部署后，本地上传文件不适合作为长期数据保存方案。
 
-| 变量 | 说明 |
-|------|------|
-| `DATABASE_URL` | 完整数据库连接地址 |
-| `MYSQL_HOST` | MySQL 主机 |
-| `MYSQL_PORT` | MySQL 端口 |
-| `MYSQL_USER` | MySQL 用户名 |
-| `MYSQL_PASSWORD` | MySQL 密码 |
-| `MYSQL_DB` | MySQL 数据库名 |
-| `SECRET_KEY` | Flask 密钥 |
-| `PORT` | 后端端口（云部署用） |
+### 后端 → Render
 
-## AI 识别扩展
+`render.yaml` 已配置：
 
-AI 识别采用可插拔设计。当前 `backend/recognizer.py` 返回空结果，识别面板引导用户手动填写。后续接入 AI 只需修改一个函数：
+- **Root Directory**: `backend`
+- **Build**: `pip install -r requirements.txt`
+- **Start**: `gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120`
+- **Python**: 3.11.9
+- **Health Check**: `/api/dashboard`
 
-```python
-# backend/recognizer.py
-def recognize_product(image_bytes):
-    # 接入 Claude Vision / GPT-4V / 其他 AI
-    return {
-        "brand": "识别品牌",
-        "name": "产品名称",
-        "category": "分类",
-        "color": "色号",
-        "confidence": 0.95,
-    }
-```
+Render 需要配置：
 
-前端 `RecognizePanel` 会自动展示识别结果，用户可编辑确认后保存。
+- `GEMINI_API_KEY`：必填，用于产品识别、语音识别和镜前检测建议
+- `SECRET_KEY`：`render.yaml` 会自动生成
+- `GEMINI_MODEL`：默认 `gemini-2.5-flash`
 
-## 版本标签
+### 前端 → Vercel
 
-- `v1-green-pink`：粉绿版 Beauty Mirror（commit `78e1435`），完整可用
+1. 导入仓库，Root Directory 选 `frontend`
+2. Build: `npm run build`，Output: `dist`
+3. 环境变量 `VITE_API_BASE_URL = https://你的后端.onrender.com`
 
-## 说明
+前端会自动把后端地址转换为 `/api` 请求，所以 `VITE_API_BASE_URL` 填 `https://你的后端.onrender.com` 或 `https://你的后端.onrender.com/api` 都可以。
 
-- 前端页面路由由 [frontend/src/App.jsx](frontend/src/App.jsx) 定义
-- 数据模型定义在 [backend/models.py](backend/models.py)，产品和日记都支持图片字段
-- 建议保留 `.gitignore` 中对 `frontend/node_modules/`、`frontend/dist/`、`backend/__pycache__/` 和 `instance/` 的忽略规则
-cd frontend
-npm install
-npm run dev
+## 环境变量
+
+| 变量 | 说明 | 必需 |
+|------|------|------|
+| `GEMINI_API_KEY` | Google Gemini API Key | ✅ |
+| `GEMINI_MODEL` | 模型名（默认 `gemini-2.5-flash`） | |
+| `GEMINI_TIMEOUT` | API 超时秒数（默认 60） | |
+| `DATABASE_URL` | 数据库连接地址（默认 SQLite） | |
+| `SECRET_KEY` | Flask 密钥 | |
+| `PORT` | 后端端口（云部署自动注入） | |

@@ -1,292 +1,167 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { fetchDashboard, createProduct, getPhotoUrl } from '../api'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { ChevronRight, ShieldCheck, Sparkles, Wand2, PackagePlus } from 'lucide-react'
+import { createProduct } from '../api'
+import ProductAddSheet from '../components/ProductAddSheet'
 import ProductForm from '../components/ProductForm'
+import ProductVoiceSheet from '../components/ProductVoiceSheet'
 import RecognizePanel from '../components/RecognizePanel'
 import SkinAnalysisPanel from '../components/SkinAnalysisPanel'
-import ImageViewer from '../components/ImageViewer'
 import { getAllCategories } from '../categories'
+import { usePageBackground } from '../utils/backgroundSettings'
+
+function TodayAction({ icon: Icon, title, desc, onClick, variant = 'secondary' }) {
+  return (
+    <button className={`bm-home-card bm-home-card-text bm-home-card-${variant}`} type="button" onClick={onClick}>
+      <span className="bm-card-fallback-icon">
+        <Icon size={21} strokeWidth={1.7} />
+      </span>
+      <span className="bm-card-copy">
+        <strong>{title}</strong>
+        <span>{desc}</span>
+      </span>
+      <span className="bm-card-arrow">
+        <ChevronRight size={18} strokeWidth={1.8} />
+      </span>
+    </button>
+  )
+}
 
 export default function Dashboard() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('全部')
-  const [recognizePhoto, setRecognizePhoto] = useState(null) // { file, previewUrl }
+  const pageBackground = usePageBackground('home')
+  const [recognizePhoto, setRecognizePhoto] = useState(null)
   const [showManualForm, setShowManualForm] = useState(false)
+  const [showProductActions, setShowProductActions] = useState(false)
+  const [showVoiceEntry, setShowVoiceEntry] = useState(false)
+  const [initialValues, setInitialValues] = useState({})
   const [toast, setToast] = useState(null)
-  const [viewImage, setViewImage] = useState(null)
-  const [showSkinMenu, setShowSkinMenu] = useState(false)
-  const [skinPanelProps, setSkinPanelProps] = useState(null) // null | { photoFile, previewUrl, ... }
+  const [skinPanelProps, setSkinPanelProps] = useState(null)
   const cameraInputRef = useRef(null)
-  const uploadInputRef = useRef(null)
   const navigate = useNavigate()
+  const location = useLocation()
 
-  const load = useCallback(() => {
-    setLoading(true)
-    fetchDashboard()
-      .then(setData)
-      .finally(() => setLoading(false))
+  useEffect(() => {
+    if (location.state?.openSkinAnalysis) {
+      setSkinPanelProps({})
+      navigate('.', { replace: true, state: {} })
+    }
+  }, [location.state])
+
+  useEffect(() => {
+    const openHistory = () => setSkinPanelProps({ forceHistoryMode: true })
+    window.addEventListener('open-skin-history', openHistory)
+    return () => window.removeEventListener('open-skin-history', openHistory)
   }, [])
-
-  useEffect(() => { load() }, [load])
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
-    setTimeout(() => setToast(null), 2000)
+    window.setTimeout(() => setToast(null), 2000)
   }
-
-  // ==================== 搜索 ====================
-
-  const handleSearch = (e) => {
-    e.preventDefault()
-    const params = new URLSearchParams()
-    if (search.trim()) params.set('search', search.trim())
-    if (category && category !== '全部') params.set('category', category)
-    navigate(`/products?${params.toString()}`)
-  }
-
-  // ==================== 拍照 / 相册 → 识别面板 ====================
 
   const handlePhotoCapture = (e) => {
     const file = e.target.files[0]
     if (!file) return
-    setRecognizePhoto({
-      file,
-      previewUrl: URL.createObjectURL(file),
-    })
+    setRecognizePhoto({ file, previewUrl: URL.createObjectURL(file) })
+    setShowProductActions(false)
     e.target.value = ''
   }
 
   const handleRecognizeSaved = () => {
     setRecognizePhoto(null)
-    showToast('护肤品添加成功！')
-    load()
+    showToast('已收进美妆柜')
   }
 
-  // ==================== 肤质分析入口 ====================
-
-  const openSkinCamera = () => {
-    setShowSkinMenu(false)
-    setSkinPanelProps({ autoOpenCamera: true })
+  const openManualForm = (values = {}) => {
+    setInitialValues(values)
+    setShowProductActions(false)
+    setShowManualForm(true)
   }
 
-  const openSkinHistory = () => {
-    setShowSkinMenu(false)
-    setSkinPanelProps({ forceHistoryMode: true })
+  const startVoiceEntry = () => {
+    setShowProductActions(false)
+    setShowVoiceEntry(true)
   }
 
-  const handleSkinClose = () => {
-    setSkinPanelProps(null)
-    load() // 刷新 Dashboard（可能有新的历史记录）
+  const handleVoiceResult = (values) => {
+    setShowVoiceEntry(false)
+    openManualForm(values)
   }
-
-  // ==================== 手动录入 → 快速表单 ====================
 
   const handleManualSubmit = async (formData) => {
     try {
       await createProduct(formData)
       setShowManualForm(false)
-      showToast('护肤品添加成功！')
-      load()
+      setShowProductActions(false)
+      setInitialValues({})
+      showToast('产品已记录')
     } catch (err) {
-      showToast(err.response?.data?.error || '添加失败，请重试', 'error')
+      showToast(err.response?.data?.error || '暂时没有记录成功', 'error')
     }
   }
 
-  // ==================== 渲染 ====================
-
-  if (loading) return <div className="empty-state"><p>加载中...</p></div>
-  if (!data) return <div className="empty-state"><p>加载失败</p></div>
+  const today = new Date()
+  const todayLabel = `${today.getMonth() + 1}月${today.getDate()}日 ${today.toLocaleDateString('zh-CN', { weekday: 'short' })}`
 
   return (
-    <div>
-      {/* Toast */}
+    <div className="bm-screen bm-home" style={pageBackground.style}>
       {toast && (
-        <div className="toast-container">
-          <div className={`toast toast-${toast.type}`}>{toast.msg}</div>
+        <div className="d-toast-container">
+          <div className={`d-toast d-toast-${toast.type}`}>{toast.msg}</div>
         </div>
       )}
 
-      {/* ====== 搜索栏 ====== */}
-      <form className="search-bar" onSubmit={handleSearch}>
-        <input
-          className="form-input"
-          placeholder="🔍 搜索护肤品名称或品牌..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
+      <section className="bm-hero bm-home-hero">
+        <p className="bm-date">{todayLabel}</p>
+        <h1>今天要去哪？</h1>
+        <div className="bm-privacy">
+          <ShieldCheck size={15} strokeWidth={1.8} />
+          <span>面部图像默认本地处理</span>
+        </div>
+      </section>
+
+      <section className="bm-home-list" aria-label="今日核心入口">
+        <TodayAction
+          icon={Sparkles}
+          title="开始镜前建议"
+          desc="拍当前状态，给 1-3 条建议。"
+          variant="primary"
+          onClick={() => setSkinPanelProps({})}
         />
-        <select
-          className="form-input"
-          value={category}
-          onChange={e => setCategory(e.target.value)}
-          style={{ width: 90 }}
-        >
-          {['全部', ...getAllCategories()].map(c => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-      </form>
-
-      {/* ====== 2x2 小组件 ====== */}
-      <div className="widget-grid">
-        <button className="widget-card widget-blush" onClick={() => navigate('/products')}>
-          <span className="widget-icon">🫧</span>
-          <span className="widget-num">{data.total_products}</span>
-          <span className="widget-label">护肤仓库</span>
-        </button>
-
-        <button className="widget-card widget-warm" onClick={() => navigate('/products')}>
-          <span className="widget-icon">🌱</span>
-          <span className="widget-num">{data.monthly_products}</span>
-          <span className="widget-label">本月新增</span>
-        </button>
-
-        <button className="widget-card widget-cream" onClick={() => navigate('/diary')}>
-          <span className="widget-icon">📖</span>
-          <span className="widget-num">{data.total_diary}</span>
-          <span className="widget-label">护肤日记</span>
-        </button>
-
-        <button className="widget-card widget-sage" onClick={() => setShowSkinMenu(true)}>
-          <span className="widget-icon">🔬</span>
-          <span className="widget-num">{data.total_analyses || 0}</span>
-          <span className="widget-label">肤质分析</span>
-        </button>
-      </div>
-
-      {/* ====== 肤质分析菜单 ====== */}
-      {showSkinMenu && (
-        <div className="modal-overlay" onClick={() => setShowSkinMenu(false)}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>🔬 肤质分析</h3>
-              <button className="modal-close" onClick={() => setShowSkinMenu(false)}>✕</button>
-            </div>
-            <div style={{ padding: '10px 0' }}>
-              <button
-                className="btn btn-primary btn-block"
-                style={{ marginBottom: 10, padding: '14px', fontSize: 15 }}
-                onClick={openSkinCamera}
-              >
-                📸 拍照分析
-              </button>
-              <button
-                className="btn btn-outline btn-block"
-                style={{ padding: '14px', fontSize: 15 }}
-                onClick={openSkinHistory}
-              >
-                📋 查看历史报告
-              </button>
-            </div>
-          </div>
+        <div className="bm-home-secondary-grid">
+          <TodayAction
+            icon={Wand2}
+            title="生成今天流程"
+            desc="按场景、时间生成步骤。"
+            onClick={() => navigate('/tutorial')}
+          />
+          <TodayAction
+            icon={PackagePlus}
+            title="快速记录产品"
+            desc="拍照、语音或手动录入。"
+            onClick={() => setShowProductActions(true)}
+          />
         </div>
+      </section>
+
+      <input ref={cameraInputRef} type="file" accept="image/*" hidden onChange={handlePhotoCapture} />
+
+      {showProductActions && (
+        <ProductAddSheet
+          title="快速记录产品"
+          onClose={() => setShowProductActions(false)}
+          onCamera={() => cameraInputRef.current?.click()}
+          onVoice={startVoiceEntry}
+          onManual={() => openManualForm()}
+        />
       )}
 
-      {/* ====== 快速添加区 ====== */}
-      <div className="quick-add-section">
-        <div className="section-title">📷 快速添加护肤品</div>
-        <div className="quick-add-row">
-          <button className="quick-add-item" onClick={() => cameraInputRef.current?.click()}>
-            <span className="quick-add-icon">📸</span>
-            <span className="quick-add-label">拍照识别</span>
-          </button>
-          <button className="quick-add-item" onClick={() => uploadInputRef.current?.click()}>
-            <span className="quick-add-icon">🖼️</span>
-            <span className="quick-add-label">相册识别</span>
-          </button>
-          <button className="quick-add-item" onClick={() => setShowManualForm(true)}>
-            <span className="quick-add-icon">✏️</span>
-            <span className="quick-add-label">手动录入</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 隐藏的拍照 / 相册 input */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        style={{ display: 'none' }}
-        onChange={handlePhotoCapture}
-      />
-      <input
-        ref={uploadInputRef}
-        type="file"
-        accept="image/*"
-        style={{ display: 'none' }}
-        onChange={handlePhotoCapture}
-      />
-
-      {/* ====== 最近存入 ====== */}
-      <div className="card">
-        <div className="card-title">🆕 最近存入</div>
-        {data.recent_products.length === 0 ? (
-          <p style={{ color: '#aaa', fontSize: 14 }}>还没有护肤品，快去添加吧~</p>
-        ) : (
-          <div>
-            {data.recent_products.map(p => {
-              const photoUrl = p.photo ? getPhotoUrl(p.photo, 'products') : null
-              return (
-              <div key={p.id} className="recent-item">
-                <div
-                  className={`recent-thumb${photoUrl ? ' clickable-thumb' : ''}`}
-                  onClick={() => photoUrl && setViewImage(photoUrl)}
-                  style={{
-                    backgroundImage: photoUrl
-                      ? `url(${photoUrl})`
-                      : 'linear-gradient(135deg, #e3ece0, #d5e0d0)',
-                  }}
-                />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: '#999' }}>
-                    {p.brand || '未标记品牌'}{p.category ? ` · ${p.category}` : ''}
-                  </div>
-                </div>
-              </div>
-              )
-            })}
-            <Link to="/products" className="recent-link">
-              查看全部 →
-            </Link>
-          </div>
-        )}
-      </div>
-
-      {/* ====== 肤质分析历史卡片 ====== */}
-      {data.recent_analyses && data.recent_analyses.length > 0 && (
-        <div className="card">
-          <div className="card-title">🔬 近期肤质分析</div>
-          <div>
-            {data.recent_analyses.map(a => (
-              <div
-                key={a.id}
-                className="skin-dashboard-item"
-                onClick={() => {
-                  setSkinPanelProps({ viewHistoryId: a.id })
-                }}
-              >
-                <div className="skin-dashboard-thumb">
-                  {a.photo ? (
-                    <img src={getPhotoUrl(a.photo, 'skin')} alt="" />
-                  ) : (
-                    <div className="skin-dashboard-placeholder">🔬</div>
-                  )}
-                </div>
-                <div className="skin-dashboard-info">
-                  <div className="skin-dashboard-type">{a.skin_type}</div>
-                  <div className="skin-dashboard-score">综合 {a.overall_score} 分</div>
-                </div>
-                <div className="skin-dashboard-time">{a.created_at}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {showVoiceEntry && (
+        <ProductVoiceSheet
+          onClose={() => setShowVoiceEntry(false)}
+          onResult={handleVoiceResult}
+        />
       )}
 
-      {/* ====== 识别面板（拍照/相册后） ====== */}
       {recognizePhoto && (
         <RecognizePanel
           photoFile={recognizePhoto.file}
@@ -297,12 +172,6 @@ export default function Dashboard() {
         />
       )}
 
-      {/* 图片查看器 */}
-      {viewImage && (
-        <ImageViewer src={viewImage} onClose={() => setViewImage(null)} />
-      )}
-
-      {/* 肤质分析面板（统一入口） */}
       {skinPanelProps && (
         <SkinAnalysisPanel
           photoFile={skinPanelProps.photoFile}
@@ -310,17 +179,22 @@ export default function Dashboard() {
           viewHistoryId={skinPanelProps.viewHistoryId}
           forceHistoryMode={skinPanelProps.forceHistoryMode}
           autoOpenCamera={skinPanelProps.autoOpenCamera}
-          onClose={handleSkinClose}
+          onClose={() => {
+            setSkinPanelProps(null)
+          }}
         />
       )}
 
-      {/* ====== 手动录入表单 ====== */}
       {showManualForm && (
         <ProductForm
           mode="quick"
           categories={getAllCategories()}
+          initialValues={initialValues}
           onSubmit={handleManualSubmit}
-          onClose={() => setShowManualForm(false)}
+          onClose={() => {
+            setShowManualForm(false)
+            setInitialValues({})
+          }}
         />
       )}
     </div>

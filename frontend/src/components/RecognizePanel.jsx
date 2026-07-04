@@ -1,7 +1,39 @@
 import { useState } from 'react'
 import { recognizeProduct, createProduct } from '../api'
+import { Check, Globe2, Search } from 'lucide-react'
 
-const DEFAULT_CATEGORIES = ['面霜', '精华', '面膜', '洁面', '防晒', '其他']
+const DEFAULT_CATEGORIES = [
+  '洁面',
+  '爽肤水',
+  '精华',
+  '乳液',
+  '面霜',
+  '眼霜',
+  '防晒',
+  '面膜',
+  '底妆',
+  '遮瑕',
+  '定妆',
+  '眉眼',
+  '唇妆',
+  '腮红修容',
+  '工具',
+  '香氛',
+  '小样',
+  '其他',
+]
+
+function getRequestErrorMessage(error, fallback) {
+  if (error?.response?.data?.error) return error.response.data.error
+  if (error?.response?.data?.message) return error.response.data.message
+  if (typeof error?.response?.data === 'string' && error.response.data.trim()) {
+    return error.response.data.slice(0, 120)
+  }
+  if (error?.response?.status) return `服务器错误 (${error.response.status})`
+  if (error?.code === 'ECONNABORTED') return '请求超时，请稍后重试'
+  if (error?.request) return '无法连接服务器，请检查后端是否启动'
+  return fallback
+}
 
 export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved, categories }) {
   const CATEGORIES = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES
@@ -10,14 +42,19 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
   const [name, setName] = useState('')
   const [category, setCategory] = useState('其他')
   const [color, setColor] = useState('')
+  const [volume, setVolume] = useState('')
+  const [recognizedMeta, setRecognizedMeta] = useState({})
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [noticeMsg, setNoticeMsg] = useState('')
   const [saveError, setSaveError] = useState('')
 
   // 调用后端识别 API
   const handleRecognize = async () => {
     setStep('loading')
     setErrorMsg('')
+    setNoticeMsg('')
+    setSaveError('')
     try {
       const formData = new FormData()
       formData.append('photo', photoFile)
@@ -27,16 +64,30 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
         setName(result.name || '')
         setCategory(result.category || '其他')
         setColor(result.color || '')
+        setVolume(result.volume || '')
+        setRecognizedMeta({
+          ingredients: result.ingredients || '',
+          efficacy: result.efficacy || '',
+          suitable_skin: result.suitable_skin || '',
+          usage_instructions: result.usage_instructions || '',
+          source: result.source || 'gemini',
+          confidence: result.confidence || '',
+          recognition_mode: result.recognition_mode || '',
+        })
+        if (result.needs_review || result.message) {
+          setNoticeMsg(result.message || 'AI 已生成初步结果，请核对后再保存')
+        }
       } else {
         // 显示后端返回的失败原因
         setErrorMsg(result.message || '未能自动识别，请手动填写')
+        setRecognizedMeta({})
       }
     } catch (e) {
       // 网络错误 / 超时 / 服务端异常
       if (e.code === 'ECONNABORTED') {
-        setErrorMsg('识别超时，请检查网络后重试')
+        setErrorMsg('识别超时，请换一张更清晰的照片后重试')
       } else if (e.response) {
-        setErrorMsg(`服务器错误 (${e.response.status})，请稍后重试`)
+        setErrorMsg(getRequestErrorMessage(e, `服务器错误 (${e.response.status})，请稍后重试`))
       } else if (e.request) {
         setErrorMsg('无法连接服务器，请检查后端是否启动')
       } else {
@@ -63,11 +114,17 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
       formData.append('brand', brand.trim())
       formData.append('category', category)
       formData.append('color', color.trim())
+      formData.append('volume', volume.trim())
+      formData.append('ingredients', recognizedMeta.ingredients || '')
+      formData.append('efficacy', recognizedMeta.efficacy || '')
+      formData.append('suitable_skin', recognizedMeta.suitable_skin || '')
+      formData.append('usage_instructions', recognizedMeta.usage_instructions || '')
+      formData.append('source', recognizedMeta.source || 'gemini')
       formData.append('photo', photoFile)
       await createProduct(formData)
       onSaved()
-    } catch {
-      setSaveError('保存失败，请重试')
+    } catch (error) {
+      setSaveError(getRequestErrorMessage(error, '保存失败，请重试'))
     } finally {
       setSaving(false)
     }
@@ -94,7 +151,8 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
               style={{ width: '100%', maxHeight: 300, objectFit: 'cover', borderRadius: 12, marginBottom: 20 }}
             />
             <button className="btn btn-primary btn-block" onClick={handleRecognize}>
-              🔍 开始识别
+              <Search size={16} strokeWidth={1.7} />
+              开始识别
             </button>
           </div>
         )}
@@ -124,6 +182,12 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
               </div>
             )}
 
+            {noticeMsg && (
+              <div className="soft-error" style={{ marginBottom: 12 }}>
+                {noticeMsg}
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label">品牌</label>
               <input className="form-input" value={brand} onChange={e => setBrand(e.target.value)} placeholder="例如：La Mer" />
@@ -142,6 +206,11 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
             </div>
 
             <div className="form-group">
+              <label className="form-label">规格</label>
+              <input className="form-input" value={volume} onChange={e => setVolume(e.target.value)} placeholder="例如：30ml / 50g" />
+            </div>
+
+            <div className="form-group">
               <label className="form-label">色号</label>
               <input className="form-input" value={color} onChange={e => setColor(e.target.value)} placeholder="例如：#FF0000 或 正红色" />
             </div>
@@ -153,7 +222,8 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
               onClick={handleSearchOfficial}
               style={{ marginBottom: 12, fontSize: 13 }}
             >
-              🌐 搜索官网宣传图
+              <Globe2 size={16} strokeWidth={1.6} />
+              搜索官网宣传图
             </button>
 
             {saveError && (
@@ -168,7 +238,8 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
               onClick={handleSave}
               disabled={saving}
             >
-              {saving ? '添加中...' : '✅ 确认添加'}
+              {!saving && <Check size={16} strokeWidth={1.8} />}
+              {saving ? '添加中...' : '确认添加'}
             </button>
           </div>
         )}

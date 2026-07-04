@@ -1,34 +1,36 @@
 import { NavLink, useLocation } from 'react-router-dom'
+import { Sparkles, Package, BookOpen, BookOpenCheck, User } from 'lucide-react'
 
 const TABS = [
-  { path: '/', icon: '🫧', label: '首页' },
-  { path: '/products', icon: '✨', label: '产品' },
-  { path: '/diary', icon: '📖', label: '日记' },
-  { path: '/profile', icon: '👤', label: '我的' },
+  { path: '/', icon: Sparkles, label: '今日' },
+  { path: '/products', icon: Package, label: '产品' },
+  { path: '/diary', icon: BookOpen, label: '日记' },
+  { path: '/tutorial', icon: BookOpenCheck, label: '流程' },
+  { path: '/profile', icon: User, label: '我的' },
 ]
 
 export default function Layout({ children }) {
   const { pathname } = useLocation()
-  const isHome = pathname === '/'
 
   return (
     <div className="app-container">
-      {!isHome && <header className="app-header">护肤管理</header>}
       <main className="app-content">{children}</main>
-      <nav className="tab-bar">
+      <nav className="tab-bar" aria-label="主导航">
         {TABS.map(tab => {
           const isActive =
             tab.path === '/'
               ? pathname === '/'
               : pathname.startsWith(tab.path)
+          const Icon = tab.icon
+
           return (
             <NavLink
               key={tab.path}
               to={tab.path}
               className={`tab-item${isActive ? ' active' : ''}`}
             >
-              <span className="tab-icon">{tab.icon}</span>
-              {tab.label}
+              <Icon size={22} strokeWidth={isActive ? 2 : 1.6} className="tab-icon-svg" />
+              <span>{tab.label}</span>
             </NavLink>
           )
         })}

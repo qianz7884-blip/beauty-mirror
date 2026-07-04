@@ -1,0 +1,1180 @@
+/* ============================================================
+   DIARY — 日记模块
+   蓝色玻璃质感 · 与其他页面统一
+   ============================================================ */
+
+.diary-v2 {
+  min-height: 100vh;
+  margin: 0 -22px;
+  padding: 0 0 120px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(247, 252, 255, var(--bm-page-overlay-top, 0.10)) 0%,
+      rgba(237, 246, 251, var(--bm-page-overlay-mid, 0.18)) 46%,
+      rgba(237, 246, 251, var(--bm-page-overlay-bottom, 0.40)) 100%
+    ),
+    var(--bm-page-image, var(--bm-page-gradient));
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+
+/* ── Calendar header ── */
+.dv-diary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 34px 18px 12px;
+}
+
+.dv-diary-head h1 {
+  margin: 0;
+  color: #172638;
+  font-size: 31px;
+  line-height: 1.08;
+  font-weight: 780;
+  letter-spacing: 0;
+}
+
+.dv-diary-head p {
+  margin: 7px 0 0;
+  color: #627589;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dv-today-btn {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  color: #315f84;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 760;
+  box-shadow: 0 10px 22px rgba(74, 112, 143, 0.10);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  cursor: pointer;
+}
+
+.dv-month-panel {
+  --heatmap-cell: clamp(12px, 3.05vw, 15px);
+  --heatmap-gap: clamp(3px, 0.95vw, 6px);
+  display: grid;
+  gap: 13px;
+  margin: 0 10px 14px;
+  padding: 16px 12px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 24% 8%, rgba(255, 255, 255, 0.72), transparent 26%),
+    rgba(255, 255, 255, 0.64);
+  box-shadow: 0 18px 46px rgba(74, 112, 143, 0.13);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.dv-month-head {
+  display: grid;
+  grid-template-columns: 38px 42px minmax(0, 1fr) 42px 38px;
+  align-items: center;
+  gap: 8px;
+}
+
+.dv-month-head button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.56);
+  color: #315f84;
+  box-shadow: 0 8px 18px rgba(74, 112, 143, 0.10);
+  cursor: pointer;
+}
+
+.dv-month-head strong {
+  color: #1d3147;
+  font-size: 19px;
+  line-height: 1.25;
+  font-weight: 780;
+  text-align: center;
+}
+
+.dv-month-side {
+  color: #758596;
+  font-size: 13px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dv-heatmap-shell {
+  display: grid;
+  grid-template-columns: 30px max-content;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 0 0 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dv-heatmap-shell::-webkit-scrollbar {
+  display: none;
+}
+
+.dv-heatmap-week-labels {
+  display: grid;
+  grid-template-rows: repeat(7, var(--heatmap-cell));
+  gap: var(--heatmap-gap);
+}
+
+.dv-heatmap-week-labels span {
+  color: #718496;
+  font-size: 10px;
+  line-height: var(--heatmap-cell);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dv-heatmap-board {
+  display: grid;
+}
+
+.dv-heatmap-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--heatmap-cell);
+  gap: var(--heatmap-gap);
+}
+
+.dv-heatmap-week {
+  display: grid;
+  grid-template-rows: repeat(7, var(--heatmap-cell));
+  gap: var(--heatmap-gap);
+}
+
+.dv-heatmap-cell {
+  position: relative;
+  width: var(--heatmap-cell);
+  height: var(--heatmap-cell);
+  display: block;
+  border: 1px solid rgba(174, 205, 226, 0.46);
+  border-radius: 4px;
+  background: rgba(224, 239, 249, 0.64);
+  color: #587083;
+  padding: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.20);
+  cursor: pointer;
+  transition: transform 0.12s, background 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+
+.dv-heatmap-cell:active {
+  transform: scale(0.86);
+}
+
+.dv-heatmap-cell.muted {
+  opacity: 0.48;
+}
+
+.dv-heatmap-cell.has-entry {
+  border-color: var(--heatmap-border);
+  background: var(--heatmap-fill);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.36),
+    0 3px 8px var(--heatmap-shadow);
+}
+
+.dv-heatmap-cell.today {
+  border-color: rgba(47, 120, 173, 0.72);
+}
+
+.dv-heatmap-cell.selected {
+  border-color: rgba(47, 120, 173, 0.96);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.96),
+    0 0 0 4px rgba(47, 120, 173, 0.30),
+    0 8px 16px rgba(47, 120, 173, 0.15);
+}
+
+.dv-heatmap-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  max-width: 300px;
+  color: #718496;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.dv-heatmap-mood-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.dv-heatmap-mood-key i {
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 2px;
+  box-shadow: 0 2px 5px rgba(74, 112, 143, 0.08);
+}
+
+.dv-day-feed {
+  display: grid;
+  gap: 12px;
+  margin: 0 10px;
+  scroll-margin-top: 14px;
+}
+
+.dv-day-feed-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 4px 0;
+}
+
+.dv-day-feed-head span {
+  display: block;
+  color: #758596;
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.3;
+}
+
+.dv-day-feed-head h2 {
+  margin: 3px 0 0;
+  color: #172638;
+  font-size: 18px;
+  line-height: 1.25;
+  font-weight: 780;
+}
+
+.dv-day-feed-head button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  color: #315f84;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 760;
+  box-shadow: 0 8px 18px rgba(74, 112, 143, 0.10);
+  cursor: pointer;
+}
+
+.dv-day-empty {
+  min-height: 148px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 22px 18px;
+  border: 1px solid rgba(174, 205, 226, 0.42);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(235, 247, 255, 0.76), rgba(220, 237, 249, 0.58));
+  color: #647789;
+  text-align: center;
+  box-shadow: 0 12px 32px rgba(74, 112, 143, 0.09);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dv-day-empty strong {
+  color: #1d3147;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.dv-day-empty span {
+  max-width: 250px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* ── Feed 流 ── */
+.dv-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 10px;
+}
+
+.dv-day-feed .dv-feed {
+  margin: 0;
+}
+
+/* ── Feed 卡片 ── */
+.dv-card {
+  background: var(--bm-glass);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  box-shadow: 0 12px 32px rgba(74, 112, 143, 0.10);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.dv-card:active {
+  transform: scale(0.985);
+  box-shadow: 0 4px 16px rgba(74, 112, 143, 0.12);
+}
+
+/* 封面图 */
+.dv-cover {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  background: linear-gradient(135deg, #e8f0f5, #dde8f0);
+}
+
+.dv-cover-placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #eef6fb, #e6f1f8);
+  border: 1.5px dashed rgba(111, 151, 180, 0.22);
+  border-radius: 20px 20px 0 0;
+  color: var(--bm-soft);
+}
+
+.dv-cover-placeholder-text {
+  font-size: 11px;
+  color: var(--bm-soft);
+}
+
+/* 卡片内容区 */
+.dv-card-body {
+  padding: 12px 14px 10px;
+}
+
+/* 日期 + 心情行 */
+.dv-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.dv-card-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bm-ink);
+}
+
+/* 心情彩色 Badge */
+.dv-mood-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 18px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dv-mood-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.56);
+}
+
+/* 正文预览 */
+.dv-content-preview {
+  font-size: 13px;
+  color: #5d6b78;
+  line-height: 1.6;
+  margin: 0 0 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 底部元信息行 */
+.dv-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dv-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--bm-soft);
+  background: rgba(74, 112, 143, 0.06);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+/* 标签行 */
+.dv-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.dv-tag-chip {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--bm-blue-deep);
+  background: rgba(74, 112, 143, 0.07);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* ═══════════════════════════════════════════
+   DIARY DETAIL · 日记详情页
+   ═══════════════════════════════════════════ */
+
+.dv-detail {
+  min-height: 100vh;
+  margin: 0 -22px;
+  padding: 0 0 120px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(247, 252, 255, var(--bm-page-overlay-top, 0.12)) 0%,
+      rgba(237, 246, 251, var(--bm-page-overlay-mid, 0.20)) 46%,
+      rgba(237, 246, 251, var(--bm-page-overlay-bottom, 0.42)) 100%
+    ),
+    var(--bm-page-image, var(--bm-page-gradient));
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+
+.dv-detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 4px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(237, 246, 251, 0.46);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.dv-detail-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--bm-ink);
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 20px;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+.dv-detail-back:active {
+  background: rgba(74, 112, 143, 0.08);
+}
+
+.dv-detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dv-detail-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 17px;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  background: var(--bm-glass);
+  color: var(--bm-ink);
+  box-shadow: 0 4px 12px rgba(74, 112, 143, 0.08);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dv-detail-action-btn:active {
+  background: rgba(74, 112, 143, 0.10);
+}
+
+/* 详情封面 */
+.dv-detail-cover {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+  background: linear-gradient(135deg, #e8f0f5, #dde8f0);
+  border-radius: 16px;
+}
+
+/* 详情内容区 */
+.dv-detail-body {
+  padding: 18px 16px;
+  margin-top: -14px;
+  background: var(--bm-glass-strong);
+  border-radius: 22px 22px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 -8px 32px rgba(74, 112, 143, 0.10);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  position: relative;
+  z-index: 1;
+}
+
+/* 详情心情 */
+.dv-detail-mood {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dv-detail-date {
+  font-size: 11px;
+  color: var(--bm-soft);
+  margin-top: 6px;
+  margin-bottom: 14px;
+}
+
+/* 详情正文 */
+.dv-detail-content {
+  font-size: 14px;
+  color: var(--bm-ink);
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 详情产品区 */
+.dv-detail-section {
+  margin-top: 20px;
+}
+
+.dv-detail-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bm-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 8px;
+}
+
+.dv-detail-products {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+}
+
+.dv-detail-product-chip {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(74, 112, 143, 0.04);
+  border: 1px solid var(--bm-line);
+  cursor: pointer;
+  transition: background 0.15s;
+  min-width: 72px;
+  font-family: inherit;
+}
+.dv-detail-product-chip:active {
+  background: rgba(74, 112, 143, 0.10);
+}
+
+.dv-detail-product-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  background-color: #e6eef4;
+}
+
+.dv-detail-product-name {
+  font-size: 10px;
+  color: var(--bm-ink);
+  font-weight: 500;
+  text-align: center;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 详情肤质分析卡片 */
+.dv-detail-analysis-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(74, 112, 143, 0.05);
+  border: 1px solid var(--bm-line);
+}
+
+.dv-detail-analysis-score {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--bm-blue-deep);
+  line-height: 1;
+}
+
+.dv-detail-analysis-meta {
+  flex: 1;
+}
+
+.dv-detail-analysis-type {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bm-ink);
+}
+
+.dv-detail-analysis-date {
+  font-size: 10px;
+  color: var(--bm-soft);
+  margin-top: 2px;
+}
+
+.dv-detail-analysis-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dv-detail-analysis-btn {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--bm-line);
+  background: var(--bm-glass);
+  color: var(--bm-blue-deep);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+.dv-detail-analysis-btn:active {
+  background: rgba(74, 112, 143, 0.08);
+}
+
+/* 空态 */
+.dv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 54vh;
+  gap: 12px;
+  padding: 34px 20px 40px;
+  text-align: center;
+}
+
+.dv-empty-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
+  border: 1px solid var(--bm-line);
+  background: var(--bm-glass);
+  color: var(--bm-blue-deep);
+  box-shadow: 0 10px 24px rgba(74, 112, 143, 0.08);
+}
+
+.dv-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--bm-ink);
+  margin: 0;
+}
+
+.dv-empty-sub {
+  font-size: 13px;
+  color: var(--bm-soft);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.dv-empty .dv-form-photo-btn {
+  justify-content: center;
+  border-color: var(--bm-line);
+  background: var(--bm-glass);
+  box-shadow: 0 8px 20px rgba(74, 112, 143, 0.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* 创建按钮弹窗 */
+.dv-create-actions {
+  background: rgba(247, 252, 255, 0.76);
+  border-radius: 22px 22px 0 0;
+  padding: 6px 20px 28px;
+  box-shadow: 0 -4px 24px rgba(74, 112, 143, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dv-create-action-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 10px;
+  border: none;
+  border-bottom: 0.5px solid var(--bm-line);
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.15s;
+  border-radius: 14px;
+  margin-top: 3px;
+}
+.dv-create-action-item:active {
+  background: rgba(74, 112, 143, 0.05);
+}
+
+.dv-create-action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(74, 112, 143, 0.08);
+  color: var(--bm-blue-deep);
+  flex-shrink: 0;
+}
+
+.dv-create-action-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bm-ink);
+}
+
+.dv-create-action-sub {
+  font-size: 11px;
+  color: var(--bm-soft);
+  margin-top: 2px;
+}
+
+/* ═══════════════════════════════════════════
+   DIARY FORM · 日记表单
+   ═══════════════════════════════════════════ */
+
+.dv-form-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: dvFadeIn 0.2s;
+}
+
+.dv-form-sheet {
+  background: rgba(237, 246, 251, 0.98);
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  border-radius: 24px 24px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: dvSlideUp 0.28s ease-out;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.dv-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 0.5px solid var(--bm-line);
+  flex-shrink: 0;
+}
+
+.dv-form-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--bm-ink);
+  margin: 0;
+}
+
+.dv-form-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 15px;
+  border: none;
+  background: rgba(74, 112, 143, 0.08);
+  color: var(--bm-soft);
+  cursor: pointer;
+  font-size: 18px;
+  font-family: inherit;
+}
+
+.dv-form-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+}
+
+.dv-form-footer {
+  padding: 10px 18px 24px;
+  flex-shrink: 0;
+  border-top: 0.5px solid var(--bm-line);
+}
+
+.dv-form-submit {
+  width: 100%;
+  padding: 13px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(135deg, #4f8db5, #3f7298);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  font-family: inherit;
+  box-shadow: 0 8px 22px rgba(63, 114, 152, 0.25);
+}
+.dv-form-submit:active {
+  transform: scale(0.98);
+  box-shadow: 0 4px 12px rgba(63, 114, 152, 0.18);
+}
+.dv-form-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dv-form-section {
+  margin-bottom: 20px;
+}
+
+.dv-form-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bm-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 8px;
+}
+
+/* Section 1: 封面照片 */
+.dv-form-photo-area {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #eef6fb, #e5f0f7);
+  border: 1.5px dashed rgba(111, 151, 180, 0.22);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.dv-form-photo-area:active {
+  border-color: var(--bm-blue);
+}
+
+.dv-form-photo-area img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dv-form-photo-icon {
+  color: var(--bm-soft);
+}
+
+.dv-form-photo-text {
+  font-size: 12px;
+  color: var(--bm-soft);
+  font-weight: 500;
+}
+
+.dv-form-photo-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.dv-form-photo-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 9px;
+  border-radius: 12px;
+  border: 1px solid var(--bm-line);
+  background: var(--bm-glass);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bm-ink);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.dv-form-photo-btn:active {
+  background: rgba(74, 112, 143, 0.06);
+}
+
+/* Section 2: 心情 */
+.dv-mood-selector {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dv-mood-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1.5px solid var(--bm-line);
+  background: var(--bm-glass);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  flex: 1;
+  min-width: 50px;
+}
+.dv-mood-option:active {
+  transform: scale(0.96);
+}
+.dv-mood-option.dv-mood-selected {
+  border-width: 2px;
+}
+
+.dv-mood-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    0 4px 12px rgba(97, 74, 68, 0.10);
+}
+
+.dv-mood-option-label {
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Section 3: 正文 */
+.dv-form-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--bm-line);
+  background: var(--bm-glass);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--bm-ink);
+  resize: vertical;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.dv-form-textarea:focus {
+  border-color: rgba(79, 141, 181, 0.45);
+}
+.dv-form-textarea::placeholder {
+  color: #a0aeb8;
+}
+
+/* Section 4: 产品选择 */
+.dv-form-products-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dv-form-product-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--bm-line);
+  background: var(--bm-glass);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  min-width: 66px;
+  flex: 1;
+}
+.dv-form-product-chip:active {
+  transform: scale(0.96);
+}
+.dv-form-product-chip.dv-product-selected {
+  border-color: var(--bm-blue-deep);
+  background: rgba(47, 120, 173, 0.08);
+  box-shadow: 0 1px 6px rgba(47, 120, 173, 0.12);
+}
+
+.dv-form-product-chip-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  background-color: #e6eef4;
+}
+
+.dv-form-product-chip-name {
+  font-size: 10px;
+  color: var(--bm-ink);
+  font-weight: 500;
+  text-align: center;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Section 5: 肤质分析关联 */
+.dv-form-analysis-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--bm-glass);
+  border: 1px solid var(--bm-line);
+}
+
+.dv-form-analysis-score {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--bm-blue-deep);
+}
+
+.dv-form-analysis-info {
+  flex: 1;
+}
+
+.dv-form-analysis-type {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bm-ink);
+}
+
+.dv-form-analysis-date {
+  font-size: 10px;
+  color: var(--bm-soft);
+  margin-top: 2px;
+}
+
+.dv-form-analysis-none {
+  font-size: 12px;
+  color: var(--bm-soft);
+  font-style: italic;
+}
+
+/* Section 6: 标签 */
+.dv-form-tags-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dv-form-tag-chip {
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--bm-line);
+  background: var(--bm-glass);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bm-soft);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.dv-form-tag-chip:active {
+  transform: scale(0.96);
+}
+.dv-form-tag-chip.dv-tag-selected {
+  background: rgba(47, 120, 173, 0.08);
+  color: var(--bm-blue-deep);
+  border-color: rgba(47, 120, 173, 0.25);
+}
+
+/* ── Loading ── */
+.d-loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto;
+  border: 3px solid var(--bm-line);
+  border-top-color: var(--bm-blue-deep);
+  border-radius: 50%;
+  animation: dSpin 0.8s linear infinite;
+}
+
+@keyframes dSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes dvFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dvSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}

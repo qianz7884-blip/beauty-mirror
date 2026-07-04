@@ -3,12 +3,23 @@
 
 基于 MediaPipe Face Mesh 的 478 个地标，将面部划分为 8 个分析区域，
 并提供从原始图像中裁剪各区域 ROI 的功能。
+同时包含人脸轮廓 Mask 生成，用于热力图裁切。
 """
 
 import traceback
 from io import BytesIO
 
-from PIL import Image
+import numpy as np
+from PIL import Image, ImageOps, ImageDraw
+from scipy.ndimage import gaussian_filter
+
+
+def _load_image(image_bytes):
+    """加载图片并自动校正 EXIF 旋转方向"""
+    from io import BytesIO as _Bio
+    img = Image.open(_Bio(image_bytes))
+    img = ImageOps.exif_transpose(img)
+    return img
 
 
 # ============================================================
@@ -86,7 +97,7 @@ REGION_DEFINITIONS = {
 }
 
 
-def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_ratio=0.15):
+def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_ratio=0.15, max_side=180):
     """
     从原始图像中裁剪出指定面部区域的 ROI。
 
@@ -108,7 +119,7 @@ def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_
     w, h = image_size
 
     try:
-        img = Image.open(BytesIO(image_bytes))
+        img = _load_image(image_bytes)
         img = img.convert('RGB')
 
         # 1. 遍历该区域的地标，找到包围盒
@@ -154,8 +165,10 @@ def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_
         top_px = max(0, top_px - pad_y - extra_pad_y)
         bottom_px = min(h, bottom_px + pad_y + extra_pad_y)
 
-        # 4. 裁剪
+        # 4. 裁剪。ROI 只用于本地图像特征提取，不用于展示；限制尺寸能明显降低纹理计算耗时。
         roi_img = img.crop((left_px, top_px, right_px, bottom_px))
+        if max(roi_img.size) > max_side:
+            roi_img.thumbnail((max_side, max_side), Image.LANCZOS)
 
         # 5. 输出 JPEG
         buf = BytesIO()
@@ -170,7 +183,7 @@ def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_
         return None
 
 
-def extract_all_regions(image_bytes, landmarks, image_size):
+def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
     """
     一次性提取所有 8 个面部区域。
 
@@ -184,7 +197,7 @@ def extract_all_regions(image_bytes, landmarks, image_size):
     """
     regions = {}
     for name in REGION_DEFINITIONS:
-        roi = extract_region_roi(image_bytes, landmarks, name, image_size)
+        roi = extract_region_roi(image_bytes, landmarks, name, image_size, max_side=max_side)
         regions[name] = roi
         status = f'{len(roi)/1024:.1f}KB' if roi else '失败'
         print(f'[face_regions] {name}: {status}')
@@ -216,3 +229,85 @@ def get_region_centers(landmarks, image_size):
         centers[name] = (center_x, center_y)
 
     return centers
+
+
+# ============================================================
+# 人脸轮廓 & Mask 生成（用于热力图裁切）
+# ============================================================
+
+# MediaPipe Face Mesh 人脸轮廓（Face Oval）地标索引
+# 这些点沿面部外轮廓分布：额头 → 左脸颊 → 下巴 → 右脸颊 → 回到额头
+FACE_OVAL_INDICES = [
+    10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
+    397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
+    172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
+]
+
+
+def get_face_oval_points(landmarks, image_size):
+    """
+    从 MediaPipe 地标中提取人脸轮廓的像素坐标。
+
+    参数：
+        landmarks:  MediaPipe 归一化地标列表
+        image_size: (width, height)
+
+    返回：
+        ndarray: (N, 2) 形状的像素坐标数组 [x, y]
+    """
+    w, h = image_size
+    pts = []
+
+    for idx in FACE_OVAL_INDICES:
+        lm = landmarks[idx]
+        px = int(lm.x * w)
+        py = int(lm.y * h)
+        pts.append([px, py])
+
+    return np.array(pts)
+
+
+def generate_face_mask(landmarks, image_size, feather_px=5):
+    """
+    根据 MediaPipe 人脸轮廓生成二值蒙版，用于裁切热力图背景。
+
+    流程：
+        1. 从 Face Oval 地标提取轮廓点
+        2. 用 PIL 绘制填充多边形
+        3. 转为 numpy 浮点蒙版 (0.0 ~ 1.0)
+        4. 可选：边缘高斯羽化，使热力图边缘柔和过渡
+
+    参数：
+        landmarks:   MediaPipe 归一化地标列表
+        image_size:  (width, height)
+        feather_px:  边缘羽化像素数，默认 5px
+
+    返回：
+        mask: (h, w) 形状的 float64 数组
+              值域 [0, 1]，1=人脸内部，0=背景
+    """
+    w, h = image_size
+
+    # 1. 获取轮廓点
+    oval_pts = get_face_oval_points(landmarks, image_size)
+
+    # 2. 用 PIL 绘制填充多边形
+    mask_img = Image.new('L', (w, h), 0)  # 黑色背景
+    draw = ImageDraw.Draw(mask_img)
+
+    # 将点转为 tuple 列表
+    polygon = [(int(p[0]), int(p[1])) for p in oval_pts]
+    draw.polygon(polygon, fill=255)
+
+    # 3. 转为 numpy float
+    mask = np.array(mask_img, dtype=np.float64) / 255.0
+
+    # 4. 边缘羽化（可选）
+    if feather_px > 0:
+        sigma = feather_px / 3.0  # 约 3σ 内羽化
+        mask = gaussian_filter(mask, sigma=sigma, mode='constant')
+
+    print(f'[face_regions] 人脸 Mask 生成: 轮廓点={len(oval_pts)}, '
+          f'人脸占比={mask.mean()*100:.1f}%, 羽化={feather_px}px')
+
+    return mask
