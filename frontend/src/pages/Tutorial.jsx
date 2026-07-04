@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Check, Clock3, Package, Sun, Briefcase, Moon, ArrowRight, Sparkles, Save, Camera, Image as ImageIcon } from 'lucide-react'
 import { createDiary, fetchProducts } from '../api'
 import { usePageBackground } from '../utils/backgroundSettings'
+import { MOOD_OPTIONS } from '../utils/moods'
 
 const TIME_OPTIONS = [
   { id: 'three', label: '3 分钟', minutes: 3 },
@@ -231,6 +232,7 @@ export default function Tutorial() {
   const [timeId, setTimeId] = useState('')
   const [sceneId, setSceneId] = useState('')
   const [currentStep, setCurrentStep] = useState(0)
+  const [diaryMood, setDiaryMood] = useState('stable')
   const navigate = useNavigate()
   const cameraRef = useRef(null)
   const albumRef = useRef(null)
@@ -320,7 +322,7 @@ export default function Tutorial() {
       const formData = new FormData()
       formData.append('title', `${activeGuide.label} · ${activeGuide.time} 妆容记录`)
       formData.append('content', buildDiaryContent(activeGuide))
-      formData.append('mood', 'stable')
+      formData.append('mood', diaryMood)
       formData.append('created_date', getTodayString())
       formData.append('tags', JSON.stringify(['跟镜流程', activeGuide.label]))
       activeGuide.productIds.forEach(id => formData.append('product_ids', String(id)))
@@ -481,6 +483,26 @@ export default function Tutorial() {
                     <ImageIcon size={16} strokeWidth={1.7} />
                     相册
                   </button>
+                </div>
+
+                <div className="bm-flow-mood-block">
+                  <p className="bm-flow-mood-label">今日心情</p>
+                  <div className="dv-mood-selector">
+                    {MOOD_OPTIONS.map(opt => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        className={`dv-mood-option${diaryMood === opt.key ? ' dv-mood-selected' : ''}`}
+                        style={diaryMood === opt.key ? { borderColor: opt.color, background: opt.color + '0C' } : {}}
+                        onClick={() => setDiaryMood(opt.key)}
+                      >
+                        <span className="dv-mood-swatch" style={{ background: opt.color }} />
+                        <span className="dv-mood-option-label" style={{ color: diaryMood === opt.key ? opt.color : '#868685' }}>
+                          {opt.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <input
