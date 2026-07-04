@@ -400,7 +400,7 @@ def _resize_for_analysis(image_bytes, max_size=600):
         return image_bytes
 
 
-def analyze_skin(image_bytes, db_session=None):
+def analyze_skin(image_bytes, db_session=None, user_id=None):
     """
     分析面部照片的肤质 — Mirror Mate「AI 护肤陪伴助手」风格。
 
@@ -409,6 +409,7 @@ def analyze_skin(image_bytes, db_session=None):
     Args:
         image_bytes: 照片二进制数据
         db_session: SQLAlchemy session，传入则启用 Recommendation Engine
+        user_id: 匿名用户 ID，用于隔离用户产品库和历史记录
 
     返回：
         {
@@ -521,7 +522,7 @@ def analyze_skin(image_bytes, db_session=None):
     if db_session is not None:
         try:
             from recommendation_engine import RecommendationEngine
-            engine = RecommendationEngine(db_session)
+            engine = RecommendationEngine(db_session, user_id=user_id)
             rec_context = engine.generate_context(feature_json)
             ui_modules = engine.generate_ui_modules(feature_json)
             print('[skin_analyzer] Recommendation Engine 完成 — 4 模块已生成')

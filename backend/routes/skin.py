@@ -4,25 +4,31 @@ from models import SkinAnalysis, db
 from skin_analyzer import analyze_skin
 from upload_utils import delete_photo, save_photo_bytes
 
-from .common import error
+from .common import error, get_current_user_id
 
 skin_bp = Blueprint('skin', __name__, url_prefix='/api')
 
 
+def _user_skin_analyses_query(user_id=None):
+    return SkinAnalysis.query.filter(SkinAnalysis.user_id == (user_id or get_current_user_id()))
+
+
 @skin_bp.route('/skin-analysis', methods=['POST'])
 def skin_analysis():
+    user_id = get_current_user_id()
     photo_file = request.files.get('photo')
     if not photo_file or not photo_file.filename:
         return error('请上传一张正面面部照片')
 
     image_bytes = photo_file.read()
-    result = analyze_skin(image_bytes, db_session=db.session)
+    result = analyze_skin(image_bytes, db_session=db.session, user_id=user_id)
 
     if not result.get('success'):
         return jsonify(result), 422 if result.get('reason') == 'no_face' else 500
 
     try:
         record = SkinAnalysis(
+            user_id=user_id,
             skin_type=result.get('skin_type', ''),
             overall_score=result.get('overall_score', 0),
             summary=result.get('summary', ''),
@@ -66,13 +72,13 @@ def skin_analysis():
 
 @skin_bp.route('/skin-analyses')
 def skin_analyses_list():
-    records = SkinAnalysis.query.order_by(SkinAnalysis.created_at.desc()).all()
+    records = _user_skin_analyses_query().order_by(SkinAnalysis.created_at.desc()).all()
     return jsonify([record.to_dict() for record in records])
 
 
 @skin_bp.route('/skin-analyses/<int:sid>')
 def skin_analysis_detail(sid):
-    record = db.session.get(SkinAnalysis, sid)
+    record = _user_skin_analyses_query().filter(SkinAnalysis.id == sid).first()
     if not record:
         return error('记录不存在', 404)
     return jsonify(record.to_dict())
@@ -80,7 +86,7 @@ def skin_analysis_detail(sid):
 
 @skin_bp.route('/skin-analyses/<int:sid>', methods=['DELETE'])
 def skin_analysis_delete(sid):
-    record = db.session.get(SkinAnalysis, sid)
+    record = _user_skin_analyses_query().filter(SkinAnalysis.id == sid).first()
     if not record:
         return error('记录不存在', 404)
 

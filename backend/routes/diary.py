@@ -7,9 +7,33 @@ from constants import MOOD_LEGACY_MAP, MOOD_MAP
 from models import Diary, Product, SkinAnalysis, db
 from upload_utils import delete_photo, save_photo
 
-from .common import error
+from .common import error, get_current_user_id
 
 diary_bp = Blueprint('diary', __name__, url_prefix='/api')
+
+
+def _user_diaries_query(user_id=None):
+    return Diary.query.filter(Diary.user_id == (user_id or get_current_user_id()))
+
+
+def _user_products_query(user_id=None):
+    user_id = user_id or get_current_user_id()
+    return Product.query.filter(
+        Product.user_id == user_id,
+        db.or_(Product.source.is_(None), Product.source != 'knowledge_base'),
+    )
+
+
+def _user_skin_analyses_query(user_id=None):
+    return SkinAnalysis.query.filter(SkinAnalysis.user_id == (user_id or get_current_user_id()))
+
+
+def _visible_product_ids(product_ids, user_id):
+    if not product_ids:
+        return []
+    products = _user_products_query(user_id).filter(Product.id.in_(product_ids)).all()
+    visible_ids = {product.id for product in products}
+    return [pid for pid in product_ids if pid in visible_ids]
 
 
 def _resolve_mood(mood_val):
@@ -24,7 +48,8 @@ def _resolve_mood(mood_val):
 
 @diary_bp.route('/diary')
 def diary_list():
-    diaries = Diary.query.order_by(Diary.created_at.desc()).all()
+    user_id = get_current_user_id()
+    diaries = _user_diaries_query(user_id).order_by(Diary.created_at.desc()).all()
     now = datetime.now()
     today_str = now.strftime('%Y-%m-%d')
 
@@ -34,16 +59,15 @@ def diary_list():
 
     products_map = {}
     if all_product_ids:
-        products = Product.query.filter(
+        products = _user_products_query(user_id).filter(
             Product.id.in_(all_product_ids),
-            db.or_(Product.source.is_(None), Product.source != 'knowledge_base'),
         ).all()
         products_map = {product.id: product.to_dict() for product in products}
 
     analysis_ids = [diary.skin_analysis_id for diary in diaries if diary.skin_analysis_id]
     analyses_map = {}
     if analysis_ids:
-        analyses = SkinAnalysis.query.filter(SkinAnalysis.id.in_(analysis_ids)).all()
+        analyses = _user_skin_analyses_query(user_id).filter(SkinAnalysis.id.in_(analysis_ids)).all()
         analyses_map = {analysis.id: analysis.to_dict() for analysis in analyses}
 
     diary_list_data = []
@@ -102,16 +126,16 @@ def diary_list():
 
 @diary_bp.route('/diary/<int:did>')
 def diary_detail(did):
-    diary = db.session.get(Diary, did)
+    user_id = get_current_user_id()
+    diary = _user_diaries_query(user_id).filter(Diary.id == did).first()
     if not diary:
         return error('日记不存在', 404)
     entry = diary.to_dict()
 
     product_ids = diary.get_product_ids()
     if product_ids:
-        products = Product.query.filter(
+        products = _user_products_query(user_id).filter(
             Product.id.in_(product_ids),
-            db.or_(Product.source.is_(None), Product.source != 'knowledge_base'),
         ).all()
         products_map = {product.id: product.to_dict() for product in products}
         entry['products'] = [products_map[pid] for pid in product_ids if pid in products_map]
@@ -120,7 +144,7 @@ def diary_detail(did):
 
     entry['mood_info'] = _resolve_mood(diary.mood)
     if diary.skin_analysis_id:
-        analysis = db.session.get(SkinAnalysis, diary.skin_analysis_id)
+        analysis = _user_skin_analyses_query(user_id).filter(SkinAnalysis.id == diary.skin_analysis_id).first()
         entry['skin_analysis'] = analysis.to_dict() if analysis else None
     else:
         entry['skin_analysis'] = None
@@ -130,6 +154,7 @@ def diary_detail(did):
 
 @diary_bp.route('/diary', methods=['POST'])
 def diary_create():
+    user_id = get_current_user_id()
     title = request.form.get('title', '').strip()
     if not title:
         return error('日记标题不能为空')
@@ -139,13 +164,15 @@ def diary_create():
         mood_val = MOOD_LEGACY_MAP.get(mood_val, 'stable')
 
     diary = Diary(
+        user_id=user_id,
         title=title,
         content=request.form.get('content', '').strip(),
         mood=mood_val,
         created_date=request.form.get('created_date', datetime.now().strftime('%Y-%m-%d')).strip(),
     )
 
-    diary.set_product_ids([int(pid) for pid in request.form.getlist('product_ids') if pid])
+    product_ids = [int(pid) for pid in request.form.getlist('product_ids') if pid]
+    diary.set_product_ids(_visible_product_ids(product_ids, user_id))
 
     try:
         tags_raw = request.form.get('tags', '[]')
@@ -157,7 +184,9 @@ def diary_create():
     skin_analysis_id = request.form.get('skin_analysis_id', '').strip()
     if skin_analysis_id:
         try:
-            diary.skin_analysis_id = int(skin_analysis_id)
+            requested_analysis_id = int(skin_analysis_id)
+            analysis = _user_skin_analyses_query(user_id).filter(SkinAnalysis.id == requested_analysis_id).first()
+            diary.skin_analysis_id = analysis.id if analysis else None
         except (ValueError, TypeError):
             diary.skin_analysis_id = None
 
@@ -172,7 +201,8 @@ def diary_create():
 
 @diary_bp.route('/diary/<int:did>', methods=['PUT'])
 def diary_update(did):
-    diary = db.session.get(Diary, did)
+    user_id = get_current_user_id()
+    diary = _user_diaries_query(user_id).filter(Diary.id == did).first()
     if not diary:
         return error('日记不存在', 404)
 
@@ -187,7 +217,8 @@ def diary_update(did):
             diary.mood = MOOD_LEGACY_MAP[mood_val]
 
     diary.created_date = request.form.get('created_date', '').strip()
-    diary.set_product_ids([int(pid) for pid in request.form.getlist('product_ids') if pid])
+    product_ids = [int(pid) for pid in request.form.getlist('product_ids') if pid]
+    diary.set_product_ids(_visible_product_ids(product_ids, user_id))
 
     tags_raw = request.form.get('tags', None)
     if tags_raw is not None:
@@ -200,7 +231,12 @@ def diary_update(did):
     skin_analysis_id = request.form.get('skin_analysis_id', None)
     if skin_analysis_id is not None:
         try:
-            diary.skin_analysis_id = int(skin_analysis_id) if str(skin_analysis_id).strip() else None
+            requested_analysis_id = int(skin_analysis_id) if str(skin_analysis_id).strip() else None
+            if requested_analysis_id:
+                analysis = _user_skin_analyses_query(user_id).filter(SkinAnalysis.id == requested_analysis_id).first()
+                diary.skin_analysis_id = analysis.id if analysis else None
+            else:
+                diary.skin_analysis_id = None
         except (ValueError, TypeError):
             pass
 
@@ -215,7 +251,7 @@ def diary_update(did):
 
 @diary_bp.route('/diary/<int:did>', methods=['DELETE'])
 def diary_delete(did):
-    diary = db.session.get(Diary, did)
+    diary = _user_diaries_query().filter(Diary.id == did).first()
     if not diary:
         return error('日记不存在', 404)
 

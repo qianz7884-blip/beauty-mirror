@@ -123,8 +123,9 @@ class RecommendationEngine:
     产出结构化 Recommendation Context（不含任何分数/评级）。
     """
 
-    def __init__(self, db_session):
+    def __init__(self, db_session, user_id=None):
         self.db = db_session
+        self.user_id = user_id
         from models import Product, SkinAnalysis
         self.Product = Product
         self.SkinAnalysis = SkinAnalysis
@@ -862,9 +863,12 @@ class RecommendationEngine:
             return []
 
     def _user_products_query(self):
-        return self.Product.query.filter(
+        query = self.Product.query.filter(
             or_(self.Product.source.is_(None), self.Product.source != 'knowledge_base')
         )
+        if self.user_id:
+            query = query.filter(self.Product.user_id == self.user_id)
+        return query
 
     def _product_display_name(self, product):
         if not product:
@@ -1160,8 +1164,10 @@ class RecommendationEngine:
         不出现分数，只用自然语言状态词。
         """
         try:
-            records = (self.SkinAnalysis.query
-                       .order_by(self.SkinAnalysis.created_at.desc())
+            query = self.SkinAnalysis.query
+            if self.user_id:
+                query = query.filter(self.SkinAnalysis.user_id == self.user_id)
+            records = (query.order_by(self.SkinAnalysis.created_at.desc())
                        .limit(10)
                        .all())
         except Exception as e:

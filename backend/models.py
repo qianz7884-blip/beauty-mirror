@@ -11,6 +11,7 @@ class Product(db.Model):
 
     # === 基础识别字段（Gemini / 手动录入）===
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.String(80), index=True, default='', nullable=False)
     name = db.Column(db.String(100), nullable=False)
     brand = db.Column(db.String(100), default='')
     category = db.Column(db.String(50), default='其他')
@@ -56,6 +57,7 @@ class Diary(db.Model):
     __tablename__ = 'diaries'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.String(80), index=True, default='', nullable=False)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, default='')
     mood = db.Column(db.String(20), default='😊')
@@ -104,6 +106,7 @@ class SkinAnalysis(db.Model):
     __tablename__ = 'skin_analyses'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.String(80), index=True, default='', nullable=False)
     photo = db.Column(db.String(200), default='')
     skin_type = db.Column(db.String(50), default='')
     concerns = db.Column(db.Text, default='[]')      # JSON 数组

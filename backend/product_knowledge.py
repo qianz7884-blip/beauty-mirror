@@ -143,15 +143,27 @@ class ProductKnowledge:
     - 知识查询
     """
 
-    def __init__(self, db_session):
+    def __init__(self, db_session, user_id=None):
         """
         Args:
             db_session: SQLAlchemy 数据库 session
         """
         self.db = db_session
+        self.user_id = user_id
         # 延迟导入避免循环依赖
         from models import Product
         self.Product = Product
+
+    def _visible_products_query(self):
+        query = self.Product.query
+        if self.user_id:
+            return query.filter(
+                sql_or(
+                    self.Product.source == 'knowledge_base',
+                    self.Product.user_id == self.user_id,
+                )
+            )
+        return query.filter(self.Product.source == 'knowledge_base')
 
     # ============================================================
     # 相似度计算
@@ -195,7 +207,7 @@ class ProductKnowledge:
         results = []
 
         # 1. 搜索数据库中的现有产品
-        db_products = self.Product.query.all()
+        db_products = self._visible_products_query().all()
         for p in db_products:
             name_sim = self._similarity(name, p.name)
             brand_sim = self._similarity(brand, p.brand)
@@ -303,7 +315,7 @@ class ProductKnowledge:
         }
 
         # Step 1: 精确匹配（数据库中已有相同品牌+名称）
-        exact_match = self.Product.query.filter(
+        exact_match = self._visible_products_query().filter(
             self.Product.brand == brand,
             self.Product.name == name,
         ).first()
@@ -378,7 +390,7 @@ class ProductKnowledge:
         Returns:
             list[dict]: 匹配的产品知识条目
         """
-        query = self.Product.query
+        query = self._visible_products_query()
 
         if category:
             query = query.filter(self.Product.category == category)
@@ -436,6 +448,7 @@ class ProductKnowledge:
             existing = self.Product.query.filter(
                 self.Product.name == seed['name'],
                 self.Product.brand == seed['brand'],
+                self.Product.source == 'knowledge_base',
             ).first()
 
             if existing:
@@ -476,13 +489,14 @@ class ProductKnowledge:
 
     def get_stats(self):
         """获取知识库统计"""
-        total = self.Product.query.count()
-        with_knowledge = self.Product.query.filter(
+        visible_query = self._visible_products_query()
+        total = visible_query.count()
+        with_knowledge = visible_query.filter(
             (self.Product.ingredients != '') | (self.Product.efficacy != '')
         ).count()
         by_source = {}
         for source in ['gemini', 'manual', 'knowledge_base']:
-            by_source[source] = self.Product.query.filter(
+            by_source[source] = visible_query.filter(
                 self.Product.source == source
             ).count()
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { ArrowLeft, CalendarDays, ChevronRight, Edit3, Grid2X2, MapPin, Pencil, Plus, PlusCircle, Search, SlidersHorizontal, Trash2 } from 'lucide-react'
-import { fetchProducts, createProduct, updateProduct, deleteProduct, getPhotoUrl } from '../api'
+import { fetchProducts, createProduct, updateProduct, deleteProduct, getAnonymousUserId, getPhotoUrl } from '../api'
 import ProductAddSheet from '../components/ProductAddSheet'
 import ProductCategoryManager from '../components/ProductCategoryManager'
 import ProductForm from '../components/ProductForm'
@@ -27,18 +27,21 @@ import { usePageBackground } from '../utils/backgroundSettings'
 
 const PRODUCT_CACHE_KEY = 'beauty_mirror_products_cache_v1'
 let productMemoryCache = null
+let productMemoryCacheUserId = ''
 
 function normalizeProductList(data) {
   return Array.isArray(data) ? data : []
 }
 
 function readProductCache() {
-  if (productMemoryCache) return productMemoryCache
+  const userId = getAnonymousUserId()
+  if (productMemoryCacheUserId === userId && productMemoryCache) return productMemoryCache
   if (typeof window === 'undefined') return []
 
   try {
-    const cached = JSON.parse(window.sessionStorage.getItem(PRODUCT_CACHE_KEY) || '[]')
+    const cached = JSON.parse(window.sessionStorage.getItem(`${PRODUCT_CACHE_KEY}_${userId}`) || '[]')
     productMemoryCache = normalizeProductList(cached)
+    productMemoryCacheUserId = userId
     return productMemoryCache
   } catch {
     return []
@@ -46,12 +49,14 @@ function readProductCache() {
 }
 
 function writeProductCache(products) {
+  const userId = getAnonymousUserId()
   const nextProducts = normalizeProductList(products)
   productMemoryCache = nextProducts
+  productMemoryCacheUserId = userId
 
   if (typeof window === 'undefined') return
   try {
-    window.sessionStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(nextProducts))
+    window.sessionStorage.setItem(`${PRODUCT_CACHE_KEY}_${userId}`, JSON.stringify(nextProducts))
   } catch {
     // Cache is only for smoother navigation; ignore storage failures.
   }

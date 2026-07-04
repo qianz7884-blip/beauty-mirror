@@ -4,13 +4,15 @@ from models import Product, db
 from recognizer import recognize_product, recognize_product_voice
 from upload_utils import delete_photo, download_photo_from_url, save_photo
 
-from .common import error
+from .common import error, get_current_user_id
 
 products_bp = Blueprint('products', __name__, url_prefix='/api')
 
 
-def _user_products_query():
+def _user_products_query(user_id=None):
+    user_id = user_id or get_current_user_id()
     return Product.query.filter(
+        Product.user_id == user_id,
         db.or_(Product.source.is_(None), Product.source != 'knowledge_base')
     )
 
@@ -37,8 +39,8 @@ def product_list():
 
 @products_bp.route('/products/<int:pid>')
 def product_detail(pid):
-    product = db.session.get(Product, pid)
-    if not product or product.source == 'knowledge_base':
+    product = _user_products_query().filter(Product.id == pid).first()
+    if not product:
         return error('产品不存在', 404)
     return jsonify(product.to_dict())
 
@@ -56,6 +58,7 @@ def product_create():
 
     try:
         product = Product(
+            user_id=get_current_user_id(),
             name=name,
             brand=request.form.get('brand', '').strip(),
             category=request.form.get('category', '其他').strip() or '其他',
@@ -93,8 +96,8 @@ def product_create():
 
 @products_bp.route('/products/<int:pid>', methods=['PUT'])
 def product_update(pid):
-    product = db.session.get(Product, pid)
-    if not product or product.source == 'knowledge_base':
+    product = _user_products_query().filter(Product.id == pid).first()
+    if not product:
         return error('产品不存在', 404)
 
     try:
@@ -141,8 +144,8 @@ def product_update(pid):
 
 @products_bp.route('/products/<int:pid>', methods=['DELETE'])
 def product_delete(pid):
-    product = db.session.get(Product, pid)
-    if not product or product.source == 'knowledge_base':
+    product = _user_products_query().filter(Product.id == pid).first()
+    if not product:
         return error('产品不存在', 404)
 
     delete_photo(product.photo, current_app.config['UPLOAD_FOLDER_PRODUCTS'])
@@ -159,7 +162,7 @@ def product_knowledge_query():
 
     from product_knowledge import ProductKnowledge
 
-    pk = ProductKnowledge(db.session)
+    pk = ProductKnowledge(db.session, user_id=get_current_user_id())
     return jsonify({
         'results': pk.query_knowledge(category=category, skin_type=skin_type, keyword=keyword),
         'stats': pk.get_stats(),
@@ -170,7 +173,7 @@ def product_knowledge_query():
 def product_knowledge_seed():
     from product_knowledge import ProductKnowledge
 
-    pk = ProductKnowledge(db.session)
+    pk = ProductKnowledge(db.session, user_id=get_current_user_id())
     count = pk.seed_knowledge_base(force=True)
     return jsonify({'message': f'种子知识已写入 {count} 条', 'count': count})
 
@@ -193,7 +196,7 @@ def recognize():
 
     from product_knowledge import ProductKnowledge
 
-    pk = ProductKnowledge(db.session)
+    pk = ProductKnowledge(db.session, user_id=get_current_user_id())
     enriched = pk.enrich_product(gemini_result)
 
     return jsonify({
@@ -239,7 +242,7 @@ def recognize_voice():
 
     from product_knowledge import ProductKnowledge
 
-    pk = ProductKnowledge(db.session)
+    pk = ProductKnowledge(db.session, user_id=get_current_user_id())
     enriched = pk.enrich_product(voice_result)
     source = enriched['source']
     if source == 'gemini':

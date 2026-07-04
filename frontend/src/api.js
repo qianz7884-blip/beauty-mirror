@@ -7,6 +7,43 @@ function normalizeApiBaseURL(value) {
 }
 
 const apiBaseURL = normalizeApiBaseURL(import.meta.env.VITE_API_BASE_URL)
+const ANONYMOUS_USER_ID_KEY = 'beauty_mirror_anonymous_user_id'
+let cachedAnonymousUserId = ''
+
+function createAnonymousUserId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `anon_${crypto.randomUUID()}`
+  }
+  return `anon_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+}
+
+export function getAnonymousUserId() {
+  if (cachedAnonymousUserId) return cachedAnonymousUserId
+
+  if (typeof localStorage === 'undefined') {
+    cachedAnonymousUserId = createAnonymousUserId()
+    return cachedAnonymousUserId
+  }
+
+  try {
+    const existing = localStorage.getItem(ANONYMOUS_USER_ID_KEY)
+    if (existing) {
+      cachedAnonymousUserId = existing
+      return cachedAnonymousUserId
+    }
+  } catch {
+    cachedAnonymousUserId = createAnonymousUserId()
+    return cachedAnonymousUserId
+  }
+
+  cachedAnonymousUserId = createAnonymousUserId()
+  try {
+    localStorage.setItem(ANONYMOUS_USER_ID_KEY, cachedAnonymousUserId)
+  } catch {
+    // Keep the in-memory ID for this tab if storage is unavailable.
+  }
+  return cachedAnonymousUserId
+}
 
 // 上传文件的基础地址：／/api → 去掉 /api → 拼接 /uploads
 const _uploadsBase = (() => {
@@ -31,6 +68,12 @@ export function getPhotoUrl(filename, type = 'products') {
 const api = axios.create({
   baseURL: apiBaseURL,
   timeout: 10000,
+})
+
+api.interceptors.request.use(config => {
+  config.headers = config.headers || {}
+  config.headers['X-Anonymous-User-Id'] = getAnonymousUserId()
+  return config
 })
 
 // ==================== AI 识别 ====================

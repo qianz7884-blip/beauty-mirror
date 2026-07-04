@@ -5,6 +5,7 @@ from flask_cors import CORS
 
 from config import Config
 from models import Product, db
+from routes.common import DEFAULT_DEMO_USER_ID
 from routes import register_routes
 
 
@@ -53,11 +54,12 @@ def _add_column(conn, existing_columns, table_name, column_name, ddl):
 def _migrate_database():
     """Small compatibility migrations for existing local SQLite databases."""
     try:
-        from sqlalchemy import inspect
+        from sqlalchemy import inspect, text
 
         inspector = inspect(db.engine)
         with db.engine.connect() as conn:
             diary_columns = _column_names(inspector, 'diaries')
+            _add_column(conn, diary_columns, 'diaries', 'user_id', f"user_id VARCHAR(80) DEFAULT '{DEFAULT_DEMO_USER_ID}'")
             _add_column(conn, diary_columns, 'diaries', 'tags', "tags TEXT NOT NULL DEFAULT '[]'")
             _add_column(
                 conn,
@@ -68,6 +70,7 @@ def _migrate_database():
             )
 
             product_columns = _column_names(inspector, 'products')
+            _add_column(conn, product_columns, 'products', 'user_id', f"user_id VARCHAR(80) DEFAULT '{DEFAULT_DEMO_USER_ID}'")
             _add_column(conn, product_columns, 'products', 'volume', "volume VARCHAR(50) DEFAULT ''")
             _add_column(conn, product_columns, 'products', 'ingredients', "ingredients TEXT DEFAULT ''")
             _add_column(conn, product_columns, 'products', 'efficacy', "efficacy TEXT DEFAULT ''")
@@ -88,11 +91,25 @@ def _migrate_database():
             _add_column(conn, product_columns, 'products', 'source', "source VARCHAR(20) DEFAULT 'manual'")
 
             analysis_columns = _column_names(inspector, 'skin_analyses')
+            _add_column(conn, analysis_columns, 'skin_analyses', 'user_id', f"user_id VARCHAR(80) DEFAULT '{DEFAULT_DEMO_USER_ID}'")
             _add_column(conn, analysis_columns, 'skin_analyses', 'today_status', "today_status TEXT DEFAULT ''")
             _add_column(conn, analysis_columns, 'skin_analyses', 'observations', "observations TEXT DEFAULT '[]'")
             _add_column(conn, analysis_columns, 'skin_analyses', 'mirror_advice', "mirror_advice TEXT DEFAULT '[]'")
             _add_column(conn, analysis_columns, 'skin_analyses', 'today_routine', "today_routine TEXT DEFAULT '{}'")
             _add_column(conn, analysis_columns, 'skin_analyses', 'trend', "trend TEXT DEFAULT '{}'")
+
+            conn.execute(
+                text('UPDATE diaries SET user_id = :user_id WHERE user_id IS NULL OR user_id = ""'),
+                {'user_id': DEFAULT_DEMO_USER_ID},
+            )
+            conn.execute(
+                text('UPDATE products SET user_id = :user_id WHERE user_id IS NULL OR user_id = ""'),
+                {'user_id': DEFAULT_DEMO_USER_ID},
+            )
+            conn.execute(
+                text('UPDATE skin_analyses SET user_id = :user_id WHERE user_id IS NULL OR user_id = ""'),
+                {'user_id': DEFAULT_DEMO_USER_ID},
+            )
 
             conn.commit()
     except Exception as exc:
