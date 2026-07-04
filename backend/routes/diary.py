@@ -34,7 +34,10 @@ def diary_list():
 
     products_map = {}
     if all_product_ids:
-        products = Product.query.filter(Product.id.in_(all_product_ids)).all()
+        products = Product.query.filter(
+            Product.id.in_(all_product_ids),
+            db.or_(Product.source.is_(None), Product.source != 'knowledge_base'),
+        ).all()
         products_map = {product.id: product.to_dict() for product in products}
 
     analysis_ids = [diary.skin_analysis_id for diary in diaries if diary.skin_analysis_id]
@@ -106,7 +109,10 @@ def diary_detail(did):
 
     product_ids = diary.get_product_ids()
     if product_ids:
-        products = Product.query.filter(Product.id.in_(product_ids)).all()
+        products = Product.query.filter(
+            Product.id.in_(product_ids),
+            db.or_(Product.source.is_(None), Product.source != 'knowledge_base'),
+        ).all()
         products_map = {product.id: product.to_dict() for product in products}
         entry['products'] = [products_map[pid] for pid in product_ids if pid in products_map]
     else:

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify
 
 from models import Diary, Product, SkinAnalysis
+from models import db
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/api')
 
@@ -17,6 +18,12 @@ def _count_consecutive_days(date_values, today):
     return count
 
 
+def _user_products_query():
+    return Product.query.filter(
+        db.or_(Product.source.is_(None), Product.source != 'knowledge_base')
+    )
+
+
 @dashboard_bp.route('/dashboard')
 def dashboard():
     now = datetime.now()
@@ -25,7 +32,7 @@ def dashboard():
 
     recent_products = [
         p.to_dict()
-        for p in Product.query.order_by(Product.created_at.desc()).limit(4).all()
+        for p in _user_products_query().order_by(Product.created_at.desc()).limit(4).all()
     ]
     latest_diary = Diary.query.order_by(Diary.created_at.desc()).first()
     recent_analyses = [
@@ -45,9 +52,9 @@ def dashboard():
     ]
 
     return jsonify({
-        'total_products': Product.query.count(),
+        'total_products': _user_products_query().count(),
         'total_diary': Diary.query.count(),
-        'monthly_products': Product.query.filter(Product.created_at.like(f'{this_month}%')).count(),
+        'monthly_products': _user_products_query().filter(Product.created_at.like(f'{this_month}%')).count(),
         'total_analyses': SkinAnalysis.query.count(),
         'consecutive_diary_days': _count_consecutive_days(diary_dates, today),
         'consecutive_analysis_days': _count_consecutive_days(analysis_dates, today),

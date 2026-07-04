@@ -9,12 +9,23 @@ from .common import error
 products_bp = Blueprint('products', __name__, url_prefix='/api')
 
 
+def _user_products_query():
+    return Product.query.filter(
+        db.or_(Product.source.is_(None), Product.source != 'knowledge_base')
+    )
+
+
+def _normalize_user_product_source(source):
+    source = (source or 'manual').strip() or 'manual'
+    return 'gemini' if source == 'knowledge_base' else source
+
+
 @products_bp.route('/products')
 def product_list():
     search = request.args.get('search', '').strip()
     category = request.args.get('category', '').strip()
 
-    query = Product.query
+    query = _user_products_query()
     if search:
         query = query.filter(db.or_(Product.name.contains(search), Product.brand.contains(search)))
     if category and category != '全部':
@@ -27,7 +38,7 @@ def product_list():
 @products_bp.route('/products/<int:pid>')
 def product_detail(pid):
     product = db.session.get(Product, pid)
-    if not product:
+    if not product or product.source == 'knowledge_base':
         return error('产品不存在', 404)
     return jsonify(product.to_dict())
 
@@ -57,7 +68,7 @@ def product_create():
             efficacy=request.form.get('efficacy', '').strip(),
             suitable_skin=request.form.get('suitable_skin', '').strip(),
             usage_instructions=request.form.get('usage_instructions', '').strip(),
-            source=request.form.get('source', 'manual').strip(),
+            source=_normalize_user_product_source(request.form.get('source', 'manual')),
         )
 
         photo_file = request.files.get('photo')
@@ -83,7 +94,7 @@ def product_create():
 @products_bp.route('/products/<int:pid>', methods=['PUT'])
 def product_update(pid):
     product = db.session.get(Product, pid)
-    if not product:
+    if not product or product.source == 'knowledge_base':
         return error('产品不存在', 404)
 
     try:
@@ -131,7 +142,7 @@ def product_update(pid):
 @products_bp.route('/products/<int:pid>', methods=['DELETE'])
 def product_delete(pid):
     product = db.session.get(Product, pid)
-    if not product:
+    if not product or product.source == 'knowledge_base':
         return error('产品不存在', 404)
 
     delete_photo(product.photo, current_app.config['UPLOAD_FOLDER_PRODUCTS'])

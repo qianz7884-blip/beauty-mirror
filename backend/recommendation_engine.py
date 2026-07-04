@@ -26,6 +26,8 @@ import traceback
 from datetime import datetime, timedelta
 from collections import defaultdict
 
+from sqlalchemy import or_
+
 
 # ============================================================
 # 皮肤问题 → 护理方向映射
@@ -621,7 +623,7 @@ class RecommendationEngine:
         scores = feature_json.get('scores', {})
 
         try:
-            all_products = self.Product.query.order_by(self.Product.created_at.desc()).all()
+            all_products = self._user_products_query().order_by(self.Product.created_at.desc()).all()
         except Exception as e:
             print(f'[recommendation_engine] 查询产品失败: {e}')
             all_products = []
@@ -854,10 +856,15 @@ class RecommendationEngine:
 
     def _load_inventory_products(self):
         try:
-            return self.Product.query.order_by(self.Product.created_at.desc()).all()
+            return self._user_products_query().order_by(self.Product.created_at.desc()).all()
         except Exception as e:
             print(f'[recommendation_engine] 查询镜前推荐产品失败: {e}')
             return []
+
+    def _user_products_query(self):
+        return self.Product.query.filter(
+            or_(self.Product.source.is_(None), self.Product.source != 'knowledge_base')
+        )
 
     def _product_display_name(self, product):
         if not product:
