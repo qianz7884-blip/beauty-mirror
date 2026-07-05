@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Check, Clock3, Package, Sun, Briefcase, Moon, ArrowRight, Sparkles, Save, Camera, Image as ImageIcon } from 'lucide-react'
 import { createDiary, fetchProducts } from '../api'
+import { MOOD_OPTIONS } from '../utils/moods'
 import { usePageBackground } from '../utils/backgroundSettings'
 
 const TIME_OPTIONS = [
@@ -226,6 +227,7 @@ export default function Tutorial() {
   const [savingDiary, setSavingDiary] = useState(false)
   const [finishPhoto, setFinishPhoto] = useState(null)
   const [finishPreview, setFinishPreview] = useState('')
+  const [feedbackMood, setFeedbackMood] = useState('')
   const [showFinishReview, setShowFinishReview] = useState(false)
   const [toast, setToast] = useState(null)
   const [timeId, setTimeId] = useState('')
@@ -243,6 +245,7 @@ export default function Tutorial() {
   useEffect(() => {
     setFinishPhoto(null)
     setFinishPreview('')
+    setFeedbackMood('')
     setShowFinishReview(false)
   }, [timeId, sceneId])
 
@@ -320,7 +323,7 @@ export default function Tutorial() {
       const formData = new FormData()
       formData.append('title', `${activeGuide.label} · ${activeGuide.time} 妆容记录`)
       formData.append('content', buildDiaryContent(activeGuide))
-      formData.append('mood', 'stable')
+      formData.append('mood', feedbackMood || 'stable')
       formData.append('created_date', getTodayString())
       formData.append('tags', JSON.stringify(['跟镜流程', activeGuide.label]))
       activeGuide.productIds.forEach(id => formData.append('product_ids', String(id)))
@@ -499,6 +502,27 @@ export default function Tutorial() {
                   onChange={handleFinishPhotoSelected}
                 />
 
+                {/* ── 今日心情 ── */}
+                <div className="dv-form-section" style={{ marginTop: 16 }}>
+                  <p className="dv-form-section-label">今日心情</p>
+                  <div className="dv-mood-selector">
+                    {MOOD_OPTIONS.map(opt => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        className={`dv-mood-option${feedbackMood === opt.key ? ' dv-mood-selected' : ''}`}
+                        style={feedbackMood === opt.key ? { borderColor: opt.color, background: opt.color + '0C' } : {}}
+                        onClick={() => setFeedbackMood(opt.key)}
+                      >
+                        <span className="dv-mood-swatch" style={{ background: opt.color }} />
+                        <span className="dv-mood-option-label" style={{ color: feedbackMood === opt.key ? opt.color : '#868685' }}>
+                          {opt.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="bm-flow-review-actions">
                   <button type="button" className="bm-btn-light" onClick={handleSkipDiary}>
                     先不保存
@@ -507,7 +531,7 @@ export default function Tutorial() {
                     type="button"
                     className="bm-btn-primary bm-btn-finish"
                     onClick={handleSaveDiary}
-                    disabled={savingDiary || !finishPhoto}
+                    disabled={savingDiary || !finishPhoto || !feedbackMood}
                   >
                     <Save size={17} strokeWidth={2} />
                     <span>{savingDiary ? '保存中...' : '满意，保存到日记'}</span>
