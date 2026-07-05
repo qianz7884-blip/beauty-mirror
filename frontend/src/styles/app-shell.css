@@ -720,25 +720,6 @@ body {
   cursor: pointer;
 }
 
-.bm-flow-mood-block {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid rgba(108, 144, 172, 0.13);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.52);
-}
-
-.bm-flow-mood-label {
-  margin: 0 0 9px;
-  color: #49687e;
-  font-size: 13px;
-  font-weight: 760;
-}
-
-.bm-flow-mood-block .dv-mood-option {
-  background: rgba(255, 255, 255, 0.66);
-}
-
 .bm-flow-review-actions {
   grid-template-columns: 0.86fr 1.14fr;
 }
