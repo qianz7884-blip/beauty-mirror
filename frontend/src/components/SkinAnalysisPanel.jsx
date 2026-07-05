@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { analyzeSkin, fetchSkinAnalyses, fetchSkinAnalysis, deleteSkinAnalysis, getPhotoUrl } from '../api'
+import { analyzeSkin, fetchSkinAnalyses, fetchSkinAnalysis, deleteSkinAnalysis, getPhotoUrl, createDiary } from '../api'
+import { MOOD_OPTIONS } from '../utils/moods'
 import {
   CalendarDays,
   Camera,
@@ -31,6 +32,9 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
   const [loadingText, setLoadingText] = useState('正在处理照片...')
   const [viewerImage, setViewerImage] = useState(null)
   const [adviceChoice, setAdviceChoice] = useState('')
+  const [feedbackMood, setFeedbackMood] = useState('')
+  const [feedbackSatisfaction, setFeedbackSatisfaction] = useState('')
+  const [feedbackSaving, setFeedbackSaving] = useState(false)
   const cameraRef = useRef(null)
   const [cameraKey, setCameraKey] = useState(0)
 
@@ -163,6 +167,8 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     setHistoryView(false)
     setHistorySelectMode(false)
     setSelectedHistoryIds([])
+    setFeedbackMood('')
+    setFeedbackSatisfaction('')
   }
 
   const handleDeleteHistory = async (id, e) => {
@@ -576,6 +582,69 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
               </div>
             )}
 
+            {/* ── 今日心情 + 满意度（仅新分析，非历史查看） ── */}
+            {!historyView && !viewHistoryId && !forceHistoryMode && result?.success && (
+              <>
+                <div className="dv-form-section">
+                  <p className="dv-form-section-label">今日心情</p>
+                  <div className="dv-mood-selector">
+                    {MOOD_OPTIONS.map(opt => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        className={`dv-mood-option${feedbackMood === opt.key ? ' dv-mood-selected' : ''}`}
+                        style={feedbackMood === opt.key ? { borderColor: opt.color, background: opt.color + '0C' } : {}}
+                        onClick={() => setFeedbackMood(opt.key)}
+                      >
+                        <span className="dv-mood-swatch" style={{ background: opt.color }} />
+                        <span className="dv-mood-option-label" style={{ color: feedbackMood === opt.key ? opt.color : '#868685' }}>
+                          {opt.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="dv-form-section">
+                  <p className="dv-form-section-label">整体满意度</p>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    {[
+                      { key: 'satisfied', label: '满意', color: '#7C9473' },
+                      { key: 'unsatisfied', label: '不满意', color: '#B98791' },
+                    ].map(opt => {
+                      const isSel = feedbackSatisfaction === opt.key
+                      return (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => setFeedbackSatisfaction(opt.key)}
+                          style={{
+                            flex: 1,
+                            padding: '12px 16px',
+                            borderRadius: 12,
+                            border: isSel ? `2px solid ${opt.color}` : '2px solid #e5e5e0',
+                            background: isSel ? `${opt.color}0C` : '#fff',
+                            fontSize: 15,
+                            fontWeight: isSel ? 600 : 400,
+                            color: isSel ? opt.color : '#868685',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {feedbackSatisfaction === 'unsatisfied' && (
+                    <p style={{ fontSize: 12, color: '#B98791', marginTop: 8, textAlign: 'center' }}>
+                      不满意则不保存，分析结果将丢失
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
             {/* 操作按钮 */}
             {!historyView && <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
               {!viewHistoryId && !forceHistoryMode && (
@@ -583,6 +652,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                   className="btn btn-outline"
                   style={{ flex: 1 }}
                   onClick={handleRetry}
+                  disabled={feedbackSaving}
                 >
                   重新生成
                 </button>
@@ -590,9 +660,31 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
               <button
                 className="btn btn-primary"
                 style={{ flex: viewHistoryId || forceHistoryMode ? 2 : 1 }}
-                onClick={onClose}
+                disabled={
+                  feedbackSaving ||
+                  (!viewHistoryId && !forceHistoryMode && result?.success && (!feedbackMood || !feedbackSatisfaction))
+                }
+                onClick={async () => {
+                  if (!viewHistoryId && !forceHistoryMode && result?.success && feedbackSatisfaction === 'satisfied') {
+                    setFeedbackSaving(true)
+                    try {
+                      const formData = new FormData()
+                      const analysisId = result?.id || selectedHistory?.id
+                      formData.append('title', `镜前分析记录 — ${new Date().toLocaleDateString('zh-CN')}`)
+                      formData.append('mood', feedbackMood)
+                      formData.append('content', '')
+                      formData.append('created_date', new Date().toISOString().slice(0, 10))
+                      if (analysisId) formData.append('skin_analysis_id', String(analysisId))
+                      await createDiary(formData)
+                    } catch (e) {
+                      console.error('自动保存日记失败:', e)
+                    }
+                    setFeedbackSaving(false)
+                  }
+                  onClose()
+                }}
               >
-                {viewHistoryId || forceHistoryMode ? '关闭' : '完成'}
+                {feedbackSaving ? '保存中...' : viewHistoryId || forceHistoryMode ? '关闭' : '完成'}
               </button>
             </div>}
 
