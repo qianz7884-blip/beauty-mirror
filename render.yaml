@@ -1,14 +1,10 @@
 services:
   - type: web
     name: beauty-mirror-api
-    runtime: python
+    runtime: docker
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120
-    healthCheckPath: /api/dashboard
+    healthCheckPath: /api/health
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
@@ -19,3 +15,7 @@ services:
         value: 500
       - key: ROI_FEATURE_MAX_SIDE
         value: 180
+      - key: GEMINI_TIMEOUT_MS
+        value: 30000
+      - key: SKIN_ANALYSIS_HEATMAP_MAX_START_MS
+        value: 45000
