@@ -31,8 +31,9 @@ def _load_image(image_bytes):
     手机拍照常带有 90°/180°/270° 的 EXIF Orientation 元数据，
     浏览器会自动根据 EXIF 旋转显示，但 PIL 不会。
     此函数确保后端处理的图片与前端预览方向一致。
+    自动把图片旋转到正确的方向。
     """
-    img = Image.open(BytesIO(image_bytes))
+    img = Image.open(BytesIO(image_bytes)) #是把图片二进制数据包装成一个内存文件，open()函数读取这个内存文件，返回一个PIL.Image对象
     img = ImageOps.exif_transpose(img)
     return img
 
@@ -41,9 +42,8 @@ def _load_image(image_bytes):
 # 面部检测（MediaPipe Face Landmarker — Tasks API）
 # ============================================================
 
-# 模型文件路径（避免中文路径，用 HOME 目录）
-_MODEL_DIR = os.path.join(os.path.expanduser('~'), '.mediapipe')
-_MODEL_PATH = os.path.join(_MODEL_DIR, 'face_landmarker.task')
+# 模型文件路径 — 项目内置 models/face_landmarker.task
+_MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'face_landmarker.task')
 
 _FaceLandmarker = None  # 单例缓存
 ROI_FEATURE_BUDGET_MS = int(os.environ.get('ROI_FEATURE_BUDGET_MS', '500'))
@@ -65,13 +65,10 @@ def _get_detector():
         raise ImportError('未安装 mediapipe')
 
     if not os.path.exists(_MODEL_PATH):
-        # 自动下载模型文件
-        print('[skin_analyzer] 正在下载面部检测模型...')
-        os.makedirs(_MODEL_DIR, exist_ok=True)
-        import urllib.request
-        url = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task'
-        urllib.request.urlretrieve(url, _MODEL_PATH)
-        print('[skin_analyzer] 模型下载完成')
+        raise FileNotFoundError(
+            f'面部检测模型文件未找到: {_MODEL_PATH}\n'
+            f'请确保 face_landmarker.task 已放置在 backend/models/ 目录下。'
+        )
 
     base_options = mp_python.BaseOptions(model_asset_path=_MODEL_PATH)
     options = vision.FaceLandmarkerOptions(
@@ -105,7 +102,7 @@ def detect_face(image_bytes):
         return False, '面部检测模块未安装，请联系管理员'
     except Exception as e:
         print(f'[skin_analyzer] 模型加载失败: {e}')
-        traceback.print_exc()
+        traceback.print_exc()  # 打印完整报错详情的 traceback
         return False, f'面部检测模型加载失败: {str(e)}'
 
     mp_image = None
@@ -113,7 +110,9 @@ def detect_face(image_bytes):
         import mediapipe as mp
 
         # 将 bytes 转为 numpy 数组，再构造 MediaPipe Image
+
         img = _load_image(image_bytes)
+
         img = img.convert('RGB')
         img_np = np.array(img).copy()  # 独立拷贝，避免内存共享问题
 
@@ -133,6 +132,7 @@ def detect_face(image_bytes):
             return False, '检测到多张人脸，请确保照片中只有一张面部'
 
         # 提取全部地标（用于 ROI 裁剪）
+        print(results.face_landmarks)
         landmarks = results.face_landmarks[0]
         # 提取关键区域坐标（归一化 0-1），兼容旧格式
         face_data = {

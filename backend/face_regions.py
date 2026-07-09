@@ -97,7 +97,7 @@ REGION_DEFINITIONS = {
 }
 
 
-def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_ratio=0.15, max_side=180):
+def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_ratio=0.15, max_side=180, img=None):
     """
     从原始图像中裁剪出指定面部区域的 ROI。
 
@@ -107,6 +107,7 @@ def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_
         region_name: 区域名称（REGION_DEFINITIONS 的 key）
         image_size: (width, height) 原始图像尺寸
         padding_ratio: ROI 外扩比例，默认 0.15
+        img: 可选，已加载的 PIL RGB Image。传入则跳过解码，大幅减少重复 IO。
 
     返回:
         roi_bytes: 裁剪后区域图片的 JPEG 字节，失败返回 None
@@ -119,8 +120,9 @@ def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_
     w, h = image_size
 
     try:
-        img = _load_image(image_bytes)
-        img = img.convert('RGB')
+        if img is None:
+            img = _load_image(image_bytes)
+            img = img.convert('RGB')
 
         # 1. 遍历该区域的地标，找到包围盒
         min_x = 1.0
@@ -195,9 +197,13 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
     返回:
         dict: {region_name: roi_bytes, ...}，提取失败的区域为 None
     """
+    # 只加载一次图片，8 个区域共用，避免重复解码
+    img = _load_image(image_bytes)
+    img = img.convert('RGB')
+
     regions = {}
     for name in REGION_DEFINITIONS:
-        roi = extract_region_roi(image_bytes, landmarks, name, image_size, max_side=max_side)
+        roi = extract_region_roi(image_bytes, landmarks, name, image_size, max_side=max_side, img=img)
         regions[name] = roi
         status = f'{len(roi)/1024:.1f}KB' if roi else '失败'
         print(f'[face_regions] {name}: {status}')
