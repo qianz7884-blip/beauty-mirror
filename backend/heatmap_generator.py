@@ -19,6 +19,7 @@
 
 import traceback
 import base64
+import os
 from io import BytesIO
 
 import numpy as np
@@ -27,10 +28,13 @@ from face_regions import (
     build_improved_face_skin_mask,
     load_image,
 )
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, binary_erosion, binary_closing
 
 
-BEAUTY_BASE_COLOR = np.array([238, 213, 182], dtype=np.float64)
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+BUNDLED_CJK_FONT = os.path.join(MODULE_DIR, 'assets', 'fonts', 'NotoSansSC-Regular.otf')
+
+BEAUTY_BASE_COLOR = np.array([232, 214, 190], dtype=np.float64)
 BEAUTY_REGION_COLORS = {
     '前额': np.array([226, 184, 125], dtype=np.float64),
     '鼻子': np.array([228, 112, 100], dtype=np.float64),
@@ -42,10 +46,10 @@ BEAUTY_REGION_COLORS = {
     '右脸颊': np.array([166, 190, 151], dtype=np.float64),
 }
 BEAUTY_FALLBACK_COLOR = np.array([226, 178, 132], dtype=np.float64)
-BEAUTY_GOOD_COLOR = np.array([158, 194, 166], dtype=np.float64)
-BEAUTY_OK_COLOR = np.array([228, 190, 132], dtype=np.float64)
-BEAUTY_WARN_COLOR = np.array([230, 143, 112], dtype=np.float64)
-BEAUTY_BAD_COLOR = np.array([214, 82, 92], dtype=np.float64)
+BEAUTY_GOOD_COLOR = np.array([118, 178, 154], dtype=np.float64)
+BEAUTY_OK_COLOR = np.array([224, 196, 146], dtype=np.float64)
+BEAUTY_WARN_COLOR = np.array([224, 158, 126], dtype=np.float64)
+BEAUTY_BAD_COLOR = np.array([204, 86, 96], dtype=np.float64)
 
 _CJK_FONT_PROP = None
 _CJK_FONT_CHECKED = False
@@ -108,6 +112,13 @@ def _get_cjk_font_prop():
     try:
         import matplotlib.pyplot as plt
         from matplotlib.font_manager import FontProperties, findSystemFonts, findfont, fontManager
+
+        if os.path.exists(BUNDLED_CJK_FONT):
+            fontManager.addfont(BUNDLED_CJK_FONT)
+            _CJK_FONT_PROP = FontProperties(fname=BUNDLED_CJK_FONT)
+            plt.rcParams['font.family'] = [_CJK_FONT_PROP.get_name(), 'sans-serif']
+            print(f'[heatmap] 使用内置中文字体: {BUNDLED_CJK_FONT}')
+            return _CJK_FONT_PROP
 
         candidate_names = [
             'Noto Sans CJK SC', 'Noto Sans CJK JP', 'Source Han Sans SC',
@@ -356,40 +367,94 @@ def _region_blob_shape(region_name, face_span):
     return base * 0.25, base * 0.22
 
 
+def _build_visual_display_mask(face_mask_u8, image_size):
+    w, h = image_size
+    mask = np.asarray(face_mask_u8) > 0
+    if mask.shape != (h, w) or int(np.sum(mask)) < 100:
+        return np.zeros((h, w), dtype=np.float64)
+
+    shrink_px = max(1, int(round(min(w, h) * 0.006)))
+    eroded = binary_erosion(mask, iterations=shrink_px, border_value=0)
+    if int(np.sum(eroded)) > 100:
+        mask = eroded
+
+    close_iter = max(1, shrink_px // 2)
+    mask = binary_closing(mask, iterations=close_iter)
+    sigma = max(min(w, h) * 0.006, 1.5)
+    soft_mask = gaussian_filter(mask.astype(np.float64), sigma=sigma, mode='constant')
+    max_val = float(soft_mask.max())
+    if max_val > 1e-8:
+        soft_mask = soft_mask / max_val
+    return np.clip(soft_mask, 0.0, 1.0)
+
+
 def _score_to_beauty_color(score, region_name):
-    if score >= 82:
+    if score >= 80:
         status_color = BEAUTY_GOOD_COLOR
-        status_mix = 0.78
-    elif score >= 68:
+        status_mix = 0.82
+    elif score >= 60:
         status_color = BEAUTY_OK_COLOR
-        status_mix = 0.62
-    elif score >= 52:
+        status_mix = 0.74
+    elif score >= 40:
         status_color = BEAUTY_WARN_COLOR
-        status_mix = 0.72
+        status_mix = 0.62
     else:
         status_color = BEAUTY_BAD_COLOR
-        status_mix = 0.84
+        status_mix = 0.78
 
     region_color = BEAUTY_REGION_COLORS.get(region_name, BEAUTY_FALLBACK_COLOR)
     return region_color * (1.0 - status_mix) + status_color * status_mix
 
 
-def _render_face_outline(ax, display_mask):
+def _smooth_closed_curve(points, iterations=4, shrink_ratio=0.985):
+    pts = np.asarray(points, dtype=np.float64)
+    if pts.ndim != 2 or pts.shape[0] < 4 or pts.shape[1] != 2:
+        return None
+
+    for _ in range(iterations):
+        nxt = np.roll(pts, -1, axis=0)
+        q = pts * 0.75 + nxt * 0.25
+        r = pts * 0.25 + nxt * 0.75
+        smoothed = np.empty((pts.shape[0] * 2, 2), dtype=np.float64)
+        smoothed[0::2] = q
+        smoothed[1::2] = r
+        pts = smoothed
+
+    center = np.mean(pts, axis=0)
+    pts = center + (pts - center) * shrink_ratio
+    return pts
+
+
+def _render_face_outline(ax, display_mask, contour_pts=None):
+    smooth_curve = _smooth_closed_curve(contour_pts) if contour_pts is not None else None
+    if smooth_curve is not None:
+        closed = np.vstack([smooth_curve, smooth_curve[0]])
+        ax.plot(
+            closed[:, 0],
+            closed[:, 1],
+            color='white',
+            linewidth=0.62,
+            alpha=0.40,
+            linestyle='--',
+            zorder=5,
+        )
+        return
+
     if display_mask is None:
         return
     smooth_mask = gaussian_filter(
         np.clip(display_mask.astype(np.float64), 0.0, 1.0),
-        sigma=1.4,
+        sigma=2.4,
         mode='constant',
     )
     if int(np.sum(smooth_mask > 0.18)) < 100:
         return
     ax.contour(
         smooth_mask,
-        levels=[0.46],
+        levels=[0.50],
         colors='white',
-        linewidths=0.72,
-        alpha=0.42,
+        linewidths=0.62,
+        alpha=0.38,
         linestyles='--',
         zorder=5,
     )
@@ -415,7 +480,7 @@ def _build_beauty_overlay(original_rgb, region_centers, region_scores,
         face_span = min(w, h) * 0.35
 
     # A warm translucent face wash keeps the original skin visible.
-    base_alpha = np.clip(display_mask * 0.15 * intensity, 0.0, 0.24)
+    base_alpha = np.clip(display_mask * 0.09 * intensity, 0.0, 0.16)
     output = _alpha_blend_rgb(output, BEAUTY_BASE_COLOR, base_alpha)
 
     yy, xx = np.mgrid[0:h, 0:w]
@@ -439,17 +504,17 @@ def _build_beauty_overlay(original_rgb, region_centers, region_scores,
 
         color = _score_to_beauty_color(score, region_name)
         if region_name in ('左脸颊', '右脸颊'):
-            strength = (0.12 + 0.18 * max(heat_val, 0.18)) * intensity
+            strength = (0.08 + 0.16 * max(heat_val, 0.12)) * intensity
         elif region_name == '鼻子':
-            strength = (0.16 + 0.30 * heat_val) * intensity
+            strength = (0.10 + 0.26 * heat_val) * intensity
         else:
-            strength = (0.11 + 0.25 * heat_val) * intensity
-        if score >= 82:
-            strength = max(strength, 0.20 * intensity)
-        elif score < 52:
-            strength = max(strength, 0.30 * intensity)
+            strength = (0.08 + 0.20 * heat_val) * intensity
+        if score >= 80:
+            strength = max(strength, 0.21 * intensity)
+        elif score < 40:
+            strength = max(strength, 0.26 * intensity)
 
-        region_alpha = np.clip(blob * strength * display_mask, 0.0, 0.42)
+        region_alpha = np.clip(blob * strength * display_mask, 0.0, 0.34)
         output = _alpha_blend_rgb(output, color, region_alpha)
         contour_field += blob * (0.32 + heat_val * 0.85)
 
@@ -467,7 +532,7 @@ def _build_beauty_overlay(original_rgb, region_centers, region_scores,
 
 
 def _render_topographic_lines(ax, contour_field, display_mask):
-    valid = (display_mask > 0.08) & np.isfinite(contour_field)
+    valid = (display_mask > 0.22) & np.isfinite(contour_field)
     if int(np.sum(valid)) < 100:
         return
 
@@ -477,7 +542,7 @@ def _render_topographic_lines(ax, contour_field, display_mask):
     if high - low < 1e-4:
         return
 
-    levels = np.linspace(low, high, 14)
+    levels = np.linspace(low, high, 12)
     masked_field = np.ma.masked_where(~valid, contour_field)
     ax.contour(
         masked_field,
@@ -542,9 +607,7 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
             return_debug=True,
         )
         display_mask_u8 = mask_debug.get('face_mask', skin_mask_u8) if isinstance(mask_debug, dict) else skin_mask_u8
-        display_mask = display_mask_u8.astype(np.float64) / 255.0
-        display_mask = gaussian_filter(display_mask, sigma=5 / 3.0, mode='constant')
-        display_mask = np.clip(display_mask, 0.0, 1.0)
+        display_mask = _build_visual_display_mask(display_mask_u8, image_size)
 
         # ═══════════════════════════════════════════════════════
         # Step 2: 获取区域中心坐标
@@ -588,7 +651,8 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
         if show_labels:
             _render_labels(ax, region_centers, region_scores, image_size, display_mask)
 
-        _render_face_outline(ax, display_mask)
+        contour_pts = mask_debug.get('improved_contour') if isinstance(mask_debug, dict) else None
+        _render_face_outline(ax, display_mask, contour_pts=contour_pts)
 
         ax.set_xlim(0, w)
         ax.set_ylim(h, 0)  # y 轴翻转匹配 origin='upper'
@@ -727,7 +791,7 @@ def _select_beauty_callouts(region_centers, region_scores):
                 'slot': slot,
             })
 
-    add('前额', '额头', '敏感度', 'concern', 'forehead')
+    add('前额', '额头', '状态', 'overall', 'forehead')
 
     eye_candidates = [name for name in ('左眼周', '右眼周') if name in region_centers and name in region_scores]
     if eye_candidates:
@@ -735,9 +799,9 @@ def _select_beauty_callouts(region_centers, region_scores):
             eye_candidates,
             key=lambda name: _numeric_score(region_scores[name], 'brightness', _numeric_score(region_scores[name])),
         )
-        add(eye_region, '眼下', '暗沉度', 'brightness_concern', 'under_eye')
+        add(eye_region, '眼周', '亮度', 'brightness', 'under_eye')
 
-    add('鼻子', '泛红', '强度', 'evenness_concern', 'nose')
+    add('鼻子', '肤色', '均匀度', 'evenness', 'nose')
 
     cheek_candidates = [name for name in ('左脸颊', '右脸颊') if name in region_centers and name in region_scores]
     if cheek_candidates:
@@ -745,9 +809,9 @@ def _select_beauty_callouts(region_centers, region_scores):
         add(cheek_region, '脸颊', '水润度', 'hydration', 'cheek')
 
     if '唇周' in region_centers and '唇周' in region_scores:
-        add('唇周', '口周', '敏感度', 'concern', 'perioral')
+        add('唇周', '口周', '状态', 'overall', 'perioral')
     else:
-        add('下巴', '下巴', '稳定度', 'concern', 'perioral')
+        add('下巴', '下巴', '状态', 'overall', 'perioral')
 
     return callouts[:5]
 
@@ -756,13 +820,24 @@ def _callout_percent(scores, metric):
     overall = _numeric_score(scores, 'overall', 50.0)
     if metric == 'hydration':
         value = _numeric_score(scores, 'hydration', overall)
-    elif metric == 'brightness_concern':
-        value = 100.0 - _numeric_score(scores, 'brightness', overall)
-    elif metric == 'evenness_concern':
-        value = 100.0 - _numeric_score(scores, 'evenness', overall)
+    elif metric == 'brightness':
+        value = _numeric_score(scores, 'brightness', overall)
+    elif metric == 'evenness':
+        value = _numeric_score(scores, 'evenness', overall)
     else:
-        value = 100.0 - overall
+        value = overall
     return int(round(float(np.clip(value, 0, 99))))
+
+
+def _callout_visual_score(scores, metric):
+    overall = _numeric_score(scores, 'overall', 50.0)
+    if metric == 'hydration':
+        return _numeric_score(scores, 'hydration', overall)
+    if metric == 'brightness':
+        return _numeric_score(scores, 'brightness', overall)
+    if metric == 'evenness':
+        return _numeric_score(scores, 'evenness', overall)
+    return overall
 
 
 def _callout_text_position(slot, point, image_size, face_w, face_h, scale):
