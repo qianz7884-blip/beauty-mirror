@@ -34,7 +34,7 @@ from face_regions import load_image  # 共享的图片加载工具（EXIF 自动
 _MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'face_landmarker.task')
 
 _FaceLandmarker = None  # 单例缓存
-ROI_FEATURE_BUDGET_MS = int(os.environ.get('ROI_FEATURE_BUDGET_MS', '500'))
+ROI_FEATURE_BUDGET_MS = int(os.environ.get('ROI_FEATURE_BUDGET_MS', '1500'))
 ROI_FEATURE_MAX_SIDE = int(os.environ.get('ROI_FEATURE_MAX_SIDE', '180'))
 
 
@@ -337,9 +337,10 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
         roi_analysis_elapsed_ms = (time.perf_counter() - roi_analysis_started) * 1000
 
         if roi_analysis_elapsed_ms > ROI_FEATURE_BUDGET_MS:
+            roi_analysis_error = f'ROI 提取超时 {roi_analysis_elapsed_ms:.0f}ms > {ROI_FEATURE_BUDGET_MS}ms'
             print(
                 f'[skin_analyzer] ROI 提取超时 {roi_analysis_elapsed_ms:.0f}ms '
-                f'> {ROI_FEATURE_BUDGET_MS}ms，降级为原 prompt'
+                f'> {ROI_FEATURE_BUDGET_MS}ms，判定为 ROI 失败'
             )
             feature_json = extractor._make_default_result()
         else:
@@ -353,17 +354,19 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
                 ]
                 print(f'[skin_analyzer] ROI 有效区域: {len(valid_regions)} / {len(region_rois)} — {valid_regions}')
 
-            if roi_analysis_elapsed_ms <= ROI_FEATURE_BUDGET_MS:
+            if roi_analysis_elapsed_ms > ROI_FEATURE_BUDGET_MS:
+                roi_analysis_error = f'ROI 特征分析超时 {roi_analysis_elapsed_ms:.0f}ms > {ROI_FEATURE_BUDGET_MS}ms'
+                print(
+                    f'[skin_analyzer] ROI 特征分析超时 {roi_analysis_elapsed_ms:.0f}ms '
+                    f'> {ROI_FEATURE_BUDGET_MS}ms，判定为 ROI 失败'
+                )
+                feature_json = extractor._make_default_result()
+            else:
                 from skin_roi_prompt import build_roi_prompt_context
                 roi_prompt_context = build_roi_prompt_context(feature_json)
                 roi_prompt_enabled = bool(roi_prompt_context)
                 if roi_prompt_enabled:
                     print('[skin_analyzer] ROI prompt 上下文已生成')
-            else:
-                print(
-                    f'[skin_analyzer] ROI 特征分析超时 {roi_analysis_elapsed_ms:.0f}ms '
-                    f'> {ROI_FEATURE_BUDGET_MS}ms，降级为原 prompt'
-                )
     except ImportError:
         print('[skin_analyzer] ROI 分析模块不可用，降级为原 prompt')
         roi_analysis_error = 'ROI 分析模块不可用'
