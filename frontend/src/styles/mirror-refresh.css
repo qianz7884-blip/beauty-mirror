@@ -501,6 +501,10 @@
   background: #f7fbfd;
 }
 
+.mirror-detail-panel .skin-face-reference-img {
+  filter: none !important;
+}
+
 .face-region-tags {
   display: flex;
   flex-wrap: wrap;

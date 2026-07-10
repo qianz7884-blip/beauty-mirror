@@ -473,7 +473,8 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                       <img
                         src={faceReferenceImage}
                         alt="面部分区参考图"
-                        className="skin-heatmap-img clickable-thumb"
+                        className="skin-heatmap-img skin-face-reference-img clickable-thumb"
+                        style={{ filter: 'none' }}
                         onClick={() => setViewerImage(faceReferenceImage)}
                       />
                       <p className="face-reference-note">分区图仅用于解释建议来源，不代表医学诊断。</p>
@@ -725,6 +726,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
             src={viewerImage}
             alt="放大查看"
             className="image-viewer-img"
+            style={{ filter: 'none' }}
             onClick={(e) => e.stopPropagation()}
           />
         </div>
