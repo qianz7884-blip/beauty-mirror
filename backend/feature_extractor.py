@@ -155,6 +155,29 @@ class FeatureExtractor:
         for region_name, roi_input in region_rois.items():
             if roi_input is None:
                 continue
+            if isinstance(roi_input, dict) and (
+                roi_input.get('valid') is False or not roi_input.get('roi_bytes')
+            ):
+                roi_quality[region_name] = {
+                    key: roi_input.get(key)
+                    for key in (
+                        'bbox',
+                        'center',
+                        'valid_pixel_count',
+                        'roi_area',
+                        'mask_coverage_ratio',
+                        'face_area_ratio',
+                        'quality_warning',
+                        'quality_detail',
+                        'valid',
+                    )
+                    if key in roi_input
+                }
+                print(
+                    f'[feature_extractor] {region_name} ROI 无效，跳过特征统计: '
+                    f"{roi_quality[region_name].get('quality_warning')}"
+                )
+                continue
             try:
                 roi_rgb, roi_mask, roi_meta = self._decode_roi_payload(roi_input)
                 if roi_rgb.shape[0] < 10 or roi_rgb.shape[1] < 10:
@@ -281,11 +304,13 @@ class FeatureExtractor:
                 key: roi_input.get(key)
                 for key in (
                     'bbox',
+                    'center',
                     'valid_pixel_count',
                     'roi_area',
                     'mask_coverage_ratio',
                     'face_area_ratio',
                     'quality_warning',
+                    'quality_detail',
                     'valid',
                 )
                 if key in roi_input

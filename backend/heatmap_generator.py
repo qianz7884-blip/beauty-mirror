@@ -578,6 +578,7 @@ def _build_beauty_overlay(original_rgb, region_centers, region_scores,
     yy, xx = np.mgrid[0:h, 0:w]
     contour_field = np.zeros((h, w), dtype=np.float64)
     region_fields = {}
+    region_peaks = {}
     label_sources = {}
 
     for region_name, scores in region_scores.items():
@@ -615,15 +616,26 @@ def _build_beauty_overlay(original_rgb, region_centers, region_scores,
         region_fields[region_name] = region_heat
         label_sources[region_name] = score_info
 
+        if np.max(region_heat) > 1e-10:
+            peak_y, peak_x = np.unravel_index(int(np.argmax(region_heat)), region_heat.shape)
+            peak = (int(peak_x), int(peak_y))
+        else:
+            peak = (int(round(cx)), int(round(cy)))
+        region_peaks[region_name] = peak
+        peak_dist = float(np.hypot(peak[0] - cx, peak[1] - cy))
+
         print(f'[heatmap] beauty blob: {region_name} center=({cx:.0f},{cy:.0f}) '
               f'feature={metric} raw={score_info["raw_score"]} '
-              f'display={score:.0f} heat={heat_val:.3f} peak_alpha={peak_alpha:.3f}')
+              f'display={score:.0f} heat={heat_val:.3f} peak_alpha={peak_alpha:.3f} '
+              f'peak={peak} center_peak_distance={peak_dist:.1f}')
 
     contour_field = gaussian_filter(contour_field * display_mask, sigma=max(face_span * 0.018, 1.2), mode='constant')
     debug_data = {
         'region_fields': region_fields,
         'fused_heat_field': contour_field,
         'colored_heatmap': np.clip(heat_only, 0, 255).astype(np.uint8),
+        'region_centers': dict(region_centers),
+        'region_peaks': region_peaks,
         'label_sources': label_sources,
     }
 
@@ -663,7 +675,8 @@ def _render_topographic_lines(ax, contour_field, display_mask):
 
 def _heatmap_debug_enabled():
     debug_roi = os.environ.get('DEBUG_ROI', '').lower() in ('1', 'true', 'yes', 'on')
-    return DEBUG_HEATMAP or debug_roi
+    debug_alignment = os.environ.get('DEBUG_ROI_ALIGNMENT', '').lower() in ('1', 'true', 'yes', 'on')
+    return DEBUG_HEATMAP or debug_roi or debug_alignment
 
 
 def _field_to_uint8(field):
@@ -679,12 +692,12 @@ def _safe_debug_name(name):
     return ''.join(ch if ch.isalnum() else '_' for ch in str(name))[:32] or 'region'
 
 
-def _save_heatmap_debug_images(skin_mask_u8, display_mask, heatmap_debug, final_png_bytes, debug_id):
+def _save_heatmap_debug_images(skin_mask_u8, display_mask, heatmap_debug, final_png_bytes, debug_id, original_rgb=None):
     if not _heatmap_debug_enabled():
         return
 
     try:
-        from PIL import Image
+        from PIL import Image, ImageDraw
 
         os.makedirs(HEATMAP_DEBUG_DIR, exist_ok=True)
         Image.fromarray(np.asarray(skin_mask_u8, dtype=np.uint8)).save(
@@ -718,6 +731,24 @@ def _save_heatmap_debug_images(skin_mask_u8, display_mask, heatmap_debug, final_
         if final_png_bytes:
             with open(os.path.join(HEATMAP_DEBUG_DIR, f'{debug_id}_05_final_contour_overlay.png'), 'wb') as f:
                 f.write(final_png_bytes)
+
+        debug_alignment = os.environ.get('DEBUG_ROI_ALIGNMENT', '').lower() in ('1', 'true', 'yes', 'on')
+        if debug_alignment and original_rgb is not None and isinstance(heatmap_debug, dict):
+            overlay = Image.fromarray(np.asarray(original_rgb, dtype=np.uint8)).convert('RGB')
+            draw = ImageDraw.Draw(overlay)
+            centers = heatmap_debug.get('region_centers', {}) or {}
+            peaks = heatmap_debug.get('region_peaks', {}) or {}
+            for region_name, center in centers.items():
+                if center is None:
+                    continue
+                cx, cy = int(center[0]), int(center[1])
+                peak = peaks.get(region_name, center)
+                px, py = int(peak[0]), int(peak[1])
+                draw.line((cx, cy, px, py), fill=(255, 255, 255), width=1)
+                draw.ellipse((cx - 5, cy - 5, cx + 5, cy + 5), outline=(255, 255, 255), width=2)
+                draw.ellipse((px - 3, py - 3, px + 3, py + 3), fill=(255, 80, 80))
+                draw.text((cx + 6, cy - 6), str(region_name), fill=(255, 255, 255))
+            overlay.save(os.path.join(HEATMAP_DEBUG_DIR, f'{debug_id}_06_alignment_overlay.png'))
 
         print(f'[heatmap] debug images saved: {HEATMAP_DEBUG_DIR} ({debug_id})')
     except Exception as exc:
@@ -779,7 +810,12 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
         # ═══════════════════════════════════════════════════════
         # Step 2: 获取区域中心坐标
         # ═══════════════════════════════════════════════════════
-        region_centers = get_region_centers(landmarks, image_size)
+        region_centers = get_region_centers(
+            landmarks,
+            image_size,
+            skin_mask=skin_mask_u8,
+            mask_debug=mask_debug,
+        )
 
         # ═══════════════════════════════════════════════════════
         # Step 3: 构建连续热场（高斯扩散）
@@ -838,6 +874,7 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
             heatmap_debug,
             final_png_bytes,
             debug_id,
+            original_rgb=img_np,
         )
 
         b64 = base64.b64encode(final_png_bytes).decode('utf-8')
