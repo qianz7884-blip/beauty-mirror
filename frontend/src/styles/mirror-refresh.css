@@ -499,7 +499,6 @@
 .skin-heatmap-img {
   border-color: rgba(111, 151, 180, 0.18);
   background: #f7fbfd;
-  filter: saturate(0.38) hue-rotate(150deg) opacity(0.82);
 }
 
 .face-region-tags {

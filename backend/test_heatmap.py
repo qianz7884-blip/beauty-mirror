@@ -6,7 +6,7 @@ import base64
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-from skin_analyzer import detect_face, _load_image, _get_detector
+from skin_analyzer import detect_face, _get_detector
 from heatmap_generator import generate_skin_heatmap
 
 # 找测试图片

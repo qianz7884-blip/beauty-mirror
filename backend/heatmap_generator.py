@@ -22,26 +22,17 @@ import base64
 from io import BytesIO
 
 import numpy as np
-from PIL import Image, ImageOps, ImageDraw
-
 from face_regions import (
-    REGION_DEFINITIONS,
     get_region_centers,
     get_face_oval_points,
     generate_face_mask,
+    load_image,
 )
 
 
 # ============================================================
 # 内部工具函数
 # ============================================================
-
-def _load_image(image_bytes):
-    """加载图片并自动校正 EXIF 旋转方向"""
-    img = Image.open(BytesIO(image_bytes))
-    img = ImageOps.exif_transpose(img)
-    return img
-
 
 def _setup_cjk_font():
     """自动检测并配置中文字体，避免 matplotlib 中文乱码"""
@@ -299,7 +290,7 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
         w, h = image_size
 
         # ── 加载原图 ──
-        img = _load_image(image_bytes).convert('RGB')
+        img = load_image(image_bytes).convert('RGB')
         img_np = np.array(img, dtype=np.uint8)
 
         # ═══════════════════════════════════════════════════════

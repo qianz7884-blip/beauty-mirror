@@ -19,23 +19,11 @@ import re
 import base64
 import traceback
 import time
-from io import BytesIO
-
-from PIL import Image, ImageOps
+from PIL import Image
 import numpy as np
 
 
-def _load_image(image_bytes):
-    """
-    加载图片并自动校正 EXIF 旋转方向。
-    手机拍照常带有 90°/180°/270° 的 EXIF Orientation 元数据，
-    浏览器会自动根据 EXIF 旋转显示，但 PIL 不会。
-    此函数确保后端处理的图片与前端预览方向一致。
-    自动把图片旋转到正确的方向。
-    """
-    img = Image.open(BytesIO(image_bytes)) #是把图片二进制数据包装成一个内存文件，open()函数读取这个内存文件，返回一个PIL.Image对象
-    img = ImageOps.exif_transpose(img)
-    return img
+from face_regions import load_image  # 共享的图片加载工具（EXIF 自动校正）
 
 
 # ============================================================
@@ -111,7 +99,7 @@ def detect_face(image_bytes):
 
         # 将 bytes 转为 numpy 数组，再构造 MediaPipe Image
 
-        img = _load_image(image_bytes)
+        img = load_image(image_bytes)
 
         img = img.convert('RGB')
         img_np = np.array(img).copy()  # 独立拷贝，避免内存共享问题
@@ -132,9 +120,8 @@ def detect_face(image_bytes):
             return False, '检测到多张人脸，请确保照片中只有一张面部'
 
         # 提取全部地标（用于 ROI 裁剪）
-        print(results.face_landmarks)
         landmarks = results.face_landmarks[0]
-        # 提取关键区域坐标（归一化 0-1），兼容旧格式
+        # 提取关键区域坐标（归一化 0-1），兼容旧格式,是在整个图片的0-1范围内的坐标
         face_data = {
             'landmark_count': len(landmarks),
             'forehead_y': round(landmarks[10].y, 3),
@@ -161,84 +148,6 @@ def detect_face(image_bytes):
                 mp_image.close()
             except Exception:
                 pass  # 忽略 close 时的错误
-
-
-# ============================================================
-# 人脸 ROI 裁剪
-# ============================================================
-
-def extract_face_roi(image_bytes, landmarks, image_size, padding_ratio=0.2):
-    """
-    从全部 478 个面部地标计算人脸包围盒，裁剪出面部 ROI。
-
-    参数:
-        image_bytes: 原始图片字节
-        landmarks: MediaPipe 返回的归一化地标列表（NormalizedLandmark 对象，x/y 范围 0-1）
-        image_size: (width, height) 原始图像尺寸（像素）
-        padding_ratio: 包围盒外扩比例，默认 0.2（即四周各扩展 20%）
-
-    返回:
-        roi_bytes: 裁剪后面部 ROI 的 JPEG 字节
-    """
-    try:
-        img = _load_image(image_bytes)
-        img = img.convert('RGB')
-        w, h = image_size
-
-        # 1. 遍历全部地标，找到归一化坐标的包围盒
-        min_x = 1.0
-        min_y = 1.0
-        max_x = 0.0
-        max_y = 0.0
-
-        for lm in landmarks:
-            if lm.x < min_x:
-                min_x = lm.x
-            if lm.x > max_x:
-                max_x = lm.x
-            if lm.y < min_y:
-                min_y = lm.y
-            if lm.y > max_y:
-                max_y = lm.y
-
-        # 2. 归一化坐标 → 像素坐标
-        left_px = int(min_x * w)
-        right_px = int(max_x * w)
-        top_px = int(min_y * h)
-        bottom_px = int(max_y * h)
-
-        # 3. 外扩边距
-        box_w = right_px - left_px
-        box_h = bottom_px - top_px
-        pad_x = int(box_w * padding_ratio)
-        pad_y = int(box_h * padding_ratio)
-
-        left_px = max(0, left_px - pad_x)
-        right_px = min(w, right_px + pad_x)
-        top_px = max(0, top_px - pad_y)
-        bottom_px = min(h, bottom_px + pad_y)
-
-        print(f'[skin_analyzer] ROI 原始包围盒: ({int(min_x*w)},{int(min_y*h)})-({int(max_x*w)},{int(max_y*h)}) '
-              f'外扩后: ({left_px},{top_px})-({right_px},{bottom_px}) '
-              f'占原图 {(right_px-left_px)*(bottom_px-top_px)/(w*h)*100:.0f}%')
-
-        # 4. 裁剪
-        roi_img = img.crop((left_px, top_px, right_px, bottom_px))
-
-        # 5. 输出 JPEG bytes
-        buf = BytesIO()
-        roi_img.save(buf, format='JPEG', quality=92)
-        roi_bytes = buf.getvalue()
-
-        print(f'[skin_analyzer] ROI 裁剪完成: {roi_img.size[0]}x{roi_img.size[1]}, '
-              f'{len(roi_bytes)/1024:.1f} KB')
-
-        return roi_bytes
-
-    except Exception as e:
-        print(f'[skin_analyzer] ROI 裁剪失败: {e}')
-        traceback.print_exc()
-        return None  # 返回 None 表示裁剪失败，调用方应回退到全图
 
 
 # ============================================================
@@ -351,18 +260,6 @@ def generate_heatmap(image_bytes, landmarks, image_size, region_scores):
 # 肤质分析（Gemini Vision）
 # ============================================================
 
-def _detect_mime(data):
-    """根据文件头检测图片 MIME 类型"""
-    try:
-        img = Image.open(BytesIO(data))
-        fmt = img.format
-        if fmt:
-            return f'image/{fmt.lower()}'
-    except Exception:
-        pass
-    return 'image/jpeg'
-
-
 # Gemini 客户端单例（避免每次都创建新连接）
 _genai_client = None
 _genai_client_api_key = None
@@ -379,25 +276,6 @@ def _get_genai_client(api_key):
     return _genai_client
 
 
-def _resize_for_analysis(image_bytes, max_size=600):
-    """
-    压缩图片以加速上传和 AI 分析。
-    将长边缩放到 max_size，保持比例，JPEG 压缩。
-    """
-    try:
-        img = _load_image(image_bytes)
-        img = img.convert('RGB')
-        w, h = img.size
-        if max(w, h) > max_size:
-            ratio = max_size / max(w, h)
-            new_size = (int(w * ratio), int(h * ratio))
-            img = img.resize(new_size, Image.LANCZOS)
-        buf = BytesIO()
-        img.save(buf, format='JPEG', quality=75)
-        return buf.getvalue()
-    except Exception:
-        # 压缩失败则返回原图
-        return image_bytes
 
 
 def analyze_skin(image_bytes, db_session=None, user_id=None):

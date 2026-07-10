@@ -14,7 +14,7 @@ from PIL import Image, ImageOps, ImageDraw
 from scipy.ndimage import gaussian_filter
 
 
-def _load_image(image_bytes):
+def load_image(image_bytes):
     """加载图片并自动校正 EXIF 旋转方向"""
     from io import BytesIO as _Bio
     img = Image.open(_Bio(image_bytes))
@@ -121,7 +121,7 @@ def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_
 
     try:
         if img is None:
-            img = _load_image(image_bytes)
+            img = load_image(image_bytes)
             img = img.convert('RGB')
 
         # 1. 遍历该区域的地标，找到包围盒
@@ -198,7 +198,7 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
         dict: {region_name: roi_bytes, ...}，提取失败的区域为 None
     """
     # 只加载一次图片，8 个区域共用，避免重复解码
-    img = _load_image(image_bytes)
+    img = load_image(image_bytes)
     img = img.convert('RGB')
 
     regions = {}
