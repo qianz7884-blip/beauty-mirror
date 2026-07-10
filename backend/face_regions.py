@@ -44,11 +44,25 @@ DEBUG_ROI = os.environ.get('DEBUG_ROI', '').lower() in ('1', 'true', 'yes', 'on'
 DEBUG_ROI_ALIGNMENT = (
     os.environ.get('DEBUG_ROI_ALIGNMENT', '').lower() in ('1', 'true', 'yes', 'on')
 )
+DEBUG_MEMORY = os.environ.get('DEBUG_MEMORY', '').lower() in ('1', 'true', 'yes', 'on')
 ROI_DEBUG_DIR = os.environ.get(
     'ROI_DEBUG_DIR',
     os.path.join(os.path.dirname(__file__), 'debug_roi'),
 )
 ROI_UNRELIABLE_WARNING = '该区域 ROI 无法可靠生成'
+
+
+def _log_array_memory(label, arr):
+    if not DEBUG_MEMORY or arr is None:
+        return
+    try:
+        np_arr = np.asarray(arr)
+        print(
+            f'[memory] {label}: shape={np_arr.shape}, dtype={np_arr.dtype}, '
+            f'nbytes={np_arr.nbytes} ({np_arr.nbytes / 1024 / 1024:.2f}MB)'
+        )
+    except Exception as exc:
+        print(f'[memory] {label}: log failed: {exc}')
 
 
 def load_image(image_bytes):
@@ -165,10 +179,84 @@ def _draw_poly(mask, points, value=255):
     return np.array(img, dtype=np.uint8)
 
 
-def _draw_smooth_poly(image_size, points, sigma=0.8, threshold=96):
+def _clip_bbox(bbox, image_size):
     w, h = image_size
-    mask = np.zeros((h, w), dtype=np.uint8)
+    left, top, right, bottom = [int(round(v)) for v in bbox]
+    left = max(0, min(left, w))
+    top = max(0, min(top, h))
+    right = max(left, min(right, w))
+    bottom = max(top, min(bottom, h))
+    return [left, top, right, bottom]
+
+
+def _pad_bbox(bbox, image_size, pad_px):
+    left, top, right, bottom = bbox
+    return _clip_bbox(
+        [left - pad_px, top - pad_px, right + pad_px, bottom + pad_px],
+        image_size,
+    )
+
+
+def _work_bbox_from_mask(mask, image_size, pad_ratio=0.025):
+    bbox = _bbox_from_mask(mask)
+    if not bbox:
+        return [0, 0, image_size[0], image_size[1]]
+    left, top, right, bottom = bbox
+    pad_px = int(round(max(right - left, bottom - top) * pad_ratio))
+    return _pad_bbox(bbox, image_size, max(pad_px, 2))
+
+
+def _empty_mask(image_size, work_bbox=None):
+    if work_bbox is not None:
+        left, top, right, bottom = work_bbox
+        return np.zeros((max(bottom - top, 0), max(right - left, 0)), dtype=np.uint8)
+    return np.zeros((image_size[1], image_size[0]), dtype=np.uint8)
+
+
+def _points_for_work_bbox(points, work_bbox):
     pts = np.asarray(points, dtype=np.float64)
+    if work_bbox is None:
+        return pts
+    left, top, _, _ = work_bbox
+    return pts - np.array([left, top], dtype=np.float64)
+
+
+def _offset_point(point, origin):
+    if point is None:
+        return None
+    return (int(point[0] + origin[0]), int(point[1] + origin[1]))
+
+
+def _offset_bbox(bbox, origin):
+    if not bbox:
+        return bbox
+    return [
+        int(bbox[0] + origin[0]),
+        int(bbox[1] + origin[1]),
+        int(bbox[2] + origin[0]),
+        int(bbox[3] + origin[1]),
+    ]
+
+
+def _paste_local_mask(local_mask, image_size, work_bbox):
+    full = np.zeros((image_size[1], image_size[0]), dtype=np.uint8)
+    if local_mask is None or work_bbox is None:
+        return full
+    left, top, right, bottom = work_bbox
+    local = np.asarray(local_mask, dtype=np.uint8)
+    full[top:bottom, left:right] = local[:max(bottom - top, 0), :max(right - left, 0)]
+    return full
+
+
+def _draw_smooth_poly(image_size, points, sigma=0.8, threshold=96, work_bbox=None):
+    if work_bbox is not None:
+        left, top, right, bottom = work_bbox
+        w, h = max(right - left, 0), max(bottom - top, 0)
+        pts = _points_for_work_bbox(points, work_bbox)
+    else:
+        w, h = image_size
+        pts = np.asarray(points, dtype=np.float64)
+    mask = np.zeros((h, w), dtype=np.uint8)
     if pts.ndim != 2 or pts.shape[0] < 3:
         return mask
     mask = _draw_poly(mask, pts, 255)
@@ -426,6 +514,7 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
     """
     img = load_image(image_bytes).convert('RGB')
     img_np = np.array(img, dtype=np.uint8)
+    _log_array_memory('roi.input_rgb', img_np)
     debug_id = f'roi_{int(time.time() * 1000)}'
 
     skin_mask, mask_debug = build_improved_face_skin_mask(
@@ -446,6 +535,16 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
     skin_area = int(np.sum(skin_mask > 0))
     if skin_area < ROI_MIN_VALID_PIXELS * 8:
         raise ValueError(f'整脸 skin mask 面积过小: {skin_area}px')
+    _log_array_memory('roi.skin_mask.full', skin_mask)
+
+    work_bbox = _work_bbox_from_mask(skin_mask, image_size)
+    work_left, work_top, work_right, work_bottom = work_bbox
+    skin_mask_work = skin_mask[work_top:work_bottom, work_left:work_right]
+    _log_array_memory('roi.skin_mask.work', skin_mask_work)
+    print(
+        f'[face_regions] ROI work bbox={work_bbox}, '
+        f'work_shape={skin_mask_work.shape}, skin_area={skin_area}'
+    )
 
     regions = {}
     region_masks = {}
@@ -458,9 +557,11 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
             landmarks=landmarks,
             region_name=name,
             image_size=image_size,
-            skin_mask=skin_mask,
+            skin_mask=skin_mask_work,
             max_side=max_side,
             mask_debug=mask_debug,
+            work_bbox=work_bbox,
+            skin_area=skin_area,
         )
         regions[name] = payload
 
@@ -484,7 +585,8 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
             status = '失败'
         print(f'[face_regions] {name}: {status}')
 
-    _warn_region_overlap(region_masks)
+    if DEBUG_ROI or DEBUG_ROI_ALIGNMENT:
+        _warn_region_overlap(region_masks)
 
     if DEBUG_ROI or DEBUG_ROI_ALIGNMENT:
         _save_roi_debug_images(
@@ -495,6 +597,58 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
         )
 
     return regions
+
+
+def get_region_heatmap_masks(landmarks, image_size, skin_mask=None, mask_debug=None):
+    """Return local ROI masks plus global centers for heatmap rendering."""
+    region_info = {}
+
+    try:
+        if skin_mask is None or mask_debug is None:
+            skin_mask, mask_debug = build_improved_face_skin_mask(
+                landmarks,
+                image_size,
+                return_debug=True,
+            )
+
+        work_bbox = _work_bbox_from_mask(skin_mask, image_size)
+        work_left, work_top, work_right, work_bottom = work_bbox
+        skin_mask_work = skin_mask[work_top:work_bottom, work_left:work_right]
+        _log_array_memory('roi.heatmap.skin_mask.work', skin_mask_work)
+
+        for name in REGION_DEFINITIONS:
+            try:
+                final_mask = _build_region_mask(
+                    name,
+                    landmarks,
+                    image_size,
+                    skin_mask_work,
+                    mask_debug,
+                    work_bbox=work_bbox,
+                )
+                valid_count = int(np.sum(final_mask > 0))
+                if valid_count < ROI_MIN_VALID_PIXELS:
+                    print(f'[face_regions] {name} heatmap mask skipped: valid={valid_count}')
+                    continue
+                center = _offset_point(_mask_center(final_mask), (work_left, work_top))
+                if center is None:
+                    continue
+                bbox = _offset_bbox(_bbox_from_mask(final_mask), (work_left, work_top))
+                region_info[name] = {
+                    'center': (center[0], center[1]),
+                    'mask': final_mask,
+                    'mask_origin': [int(work_left), int(work_top)],
+                    'bbox': bbox,
+                    'valid_pixel_count': valid_count,
+                }
+                print(f'[face_regions] {name} mask center=({center[0]},{center[1]}), valid={valid_count}')
+            except Exception as exc:
+                print(f'[face_regions] {name} heatmap mask calculation failed: {exc}')
+                continue
+    except Exception as exc:
+        print(f'[face_regions] ROI heatmap masks calculation failed: {exc}')
+
+    return region_info
 
 
 def get_region_centers(landmarks, image_size, skin_mask=None, mask_debug=None):
@@ -517,14 +671,26 @@ def get_region_centers(landmarks, image_size, skin_mask=None, mask_debug=None):
                 return_debug=True,
             )
 
+        work_bbox = _work_bbox_from_mask(skin_mask, image_size)
+        work_left, work_top, work_right, work_bottom = work_bbox
+        skin_mask_work = skin_mask[work_top:work_bottom, work_left:work_right]
+        _log_array_memory('roi.centers.skin_mask.work', skin_mask_work)
+
         for name in REGION_DEFINITIONS:
             try:
-                final_mask = _build_region_mask(name, landmarks, image_size, skin_mask, mask_debug)
+                final_mask = _build_region_mask(
+                    name,
+                    landmarks,
+                    image_size,
+                    skin_mask_work,
+                    mask_debug,
+                    work_bbox=work_bbox,
+                )
                 valid_count = int(np.sum(final_mask > 0))
                 if valid_count < ROI_MIN_VALID_PIXELS:
                     print(f'[face_regions] {name} center skipped: valid={valid_count}')
                     continue
-                center = _mask_center(final_mask)
+                center = _offset_point(_mask_center(final_mask), (work_left, work_top))
                 if center is None:
                     continue
                 centers[name] = (center[0], center[1])
@@ -803,50 +969,64 @@ def _make_box_mask(image_size, bbox, shape='ellipse'):
     return mask
 
 
-def _lip_body_mask(landmarks, image_size, face_width, dilate=True):
+def _lip_body_mask(landmarks, image_size, face_width, dilate=True, work_bbox=None):
     if not _has_landmarks(landmarks, OUTER_LIP_INDICES):
-        return np.zeros((image_size[1], image_size[0]), dtype=np.uint8)
+        return _empty_mask(image_size, work_bbox)
     lip = _draw_smooth_poly(
         image_size,
         _points_from_indices(landmarks, OUTER_LIP_INDICES, image_size),
         sigma=0.45,
         threshold=72,
+        work_bbox=work_bbox,
     )
     if dilate:
         lip = _dilate_mask(lip, radius_px=max(1, int(round(face_width * 0.010))))
     return lip
 
 
-def _build_under_eye_region_mask(region_name, landmarks, image_size, face_height):
+def _build_under_eye_region_mask(region_name, landmarks, image_size, face_height, work_bbox=None):
     indices = LEFT_UNDER_EYE_INDICES if region_name == '左眼周' else RIGHT_UNDER_EYE_INDICES
     if not _has_landmarks(landmarks, indices):
-        return np.zeros((image_size[1], image_size[0]), dtype=np.uint8), np.empty((0, 2))
+        return _empty_mask(image_size, work_bbox), np.empty((0, 2))
 
     lower_lid = _points_from_indices(landmarks, indices, image_size)
-    top_offset = max(face_height * 0.007, 1.0)
-    band_height = np.clip(face_height * 0.062, 9.0, face_height * 0.082)
+    top_offset = max(face_height * 0.003, 0.75)
+    band_height = np.clip(face_height * 0.050, 9.0, face_height * 0.068)
     top_edge = lower_lid + np.array([0.0, top_offset])
     bottom_edge = lower_lid + np.array([0.0, band_height])
     poly = np.vstack([top_edge, bottom_edge[::-1]])
-    return _draw_smooth_poly(image_size, poly, sigma=0.55, threshold=88), poly
+    return _draw_smooth_poly(image_size, poly, sigma=0.55, threshold=88, work_bbox=work_bbox), poly
 
 
-def _build_lip_ring_region_mask(landmarks, image_size, face_width):
+def _build_lip_ring_region_mask(landmarks, image_size, face_width, work_bbox=None):
     if not _has_landmarks(landmarks, OUTER_LIP_INDICES):
-        return np.zeros((image_size[1], image_size[0]), dtype=np.uint8), np.empty((0, 2))
+        return _empty_mask(image_size, work_bbox), np.empty((0, 2))
 
     outer_lip = _points_from_indices(landmarks, OUTER_LIP_INDICES, image_size)
     center = np.mean(outer_lip, axis=0)
-    outer_ring = _scale_points(outer_lip, center, scale_x=1.28, scale_y=1.48)
-    outer_mask = _draw_smooth_poly(image_size, outer_ring, sigma=0.65, threshold=82)
-    lip_mask = _lip_body_mask(landmarks, image_size, face_width, dilate=True)
+    outer_ring = outer_lip.copy()
+    outer_ring[:, 0] = center[0] + (outer_ring[:, 0] - center[0]) * 1.28
+    dy = outer_ring[:, 1] - center[1]
+    y_scale = np.where(dy < 0, 1.50, 1.28)
+    outer_ring[:, 1] = center[1] + dy * y_scale - face_width * 0.006
+    outer_mask = _draw_smooth_poly(image_size, outer_ring, sigma=0.65, threshold=82, work_bbox=work_bbox)
+    lip_mask = _lip_body_mask(landmarks, image_size, face_width, dilate=True, work_bbox=work_bbox)
     ring = _subtract_masks(outer_mask, [lip_mask])
     return ring, np.vstack([outer_ring, outer_lip])
 
 
-def _build_nose_region_mask(landmarks, image_size, face_height):
+def _cached_region_shape(mask_debug, cache_key, builder):
+    if not isinstance(mask_debug, dict):
+        return builder()
+    cache = mask_debug.setdefault('region_shape_cache', {})
+    if cache_key not in cache:
+        cache[cache_key] = builder()
+    return cache[cache_key]
+
+
+def _build_nose_region_mask(landmarks, image_size, face_height, work_bbox=None):
     if not _has_landmarks(landmarks, NOSE_REGION_INDICES + [13]):
-        return np.zeros((image_size[1], image_size[0]), dtype=np.uint8), np.empty((0, 2))
+        return _empty_mask(image_size, work_bbox), np.empty((0, 2))
 
     pts = _points_from_indices(landmarks, NOSE_REGION_INDICES, image_size)
     center = _landmark_xy(landmarks, 1, image_size)
@@ -856,13 +1036,13 @@ def _build_nose_region_mask(landmarks, image_size, face_height):
     max_nose_y = mouth_top_y - face_height * 0.030
     pts[:, 1] = np.minimum(pts[:, 1], max_nose_y)
     hull = _convex_hull_points(pts)
-    return _draw_smooth_poly(image_size, hull, sigma=0.55, threshold=88), pts
+    return _draw_smooth_poly(image_size, hull, sigma=0.55, threshold=88, work_bbox=work_bbox), pts
 
 
-def _build_chin_region_mask(landmarks, image_size, face_width, face_height, nose_x):
+def _build_chin_region_mask(landmarks, image_size, face_width, face_height, nose_x, work_bbox=None):
     required = CHIN_DEBUG_INDICES + [17]
     if not _has_landmarks(landmarks, required):
-        return np.zeros((image_size[1], image_size[0]), dtype=np.uint8), np.empty((0, 2))
+        return _empty_mask(image_size, work_bbox), np.empty((0, 2))
 
     mouth_bottom = _landmark_xy(landmarks, 17, image_size)
     top_y = float(mouth_bottom[1] + face_height * 0.030)
@@ -892,16 +1072,16 @@ def _build_chin_region_mask(landmarks, image_size, face_width, face_height, nose
     poly[:, 0] = np.clip(poly[:, 0], left_limit, right_limit)
     poly[:, 1] = np.maximum(poly[:, 1], top_y)
 
-    chin = _draw_smooth_poly(image_size, poly, sigma=0.65, threshold=88)
-    lip_mask = _lip_body_mask(landmarks, image_size, face_width, dilate=True)
+    chin = _draw_smooth_poly(image_size, poly, sigma=0.65, threshold=88, work_bbox=work_bbox)
+    lip_mask = _lip_body_mask(landmarks, image_size, face_width, dilate=True, work_bbox=work_bbox)
     return _subtract_masks(chin, [lip_mask]), poly
 
 
-def _build_cheek_region_mask(region_name, landmarks, image_size, face_width, face_height):
+def _build_cheek_region_mask(region_name, landmarks, image_size, face_width, face_height, mask_debug=None, work_bbox=None):
     if region_name == '左脸颊':
         required = LEFT_CHEEK_DEBUG_INDICES
         if not _has_landmarks(landmarks, required):
-            return np.zeros((image_size[1], image_size[0]), dtype=np.uint8), np.empty((0, 2))
+            return _empty_mask(image_size, work_bbox), np.empty((0, 2))
         p = lambda idx: _landmark_xy(landmarks, idx, image_size)
         top_outer = (p(33) * 0.55 + p(7) * 0.45) + np.array([0.0, face_height * 0.070])
         top_inner = (p(133) * 0.55 + p(155) * 0.45) + np.array([-face_width * 0.015, face_height * 0.090])
@@ -922,7 +1102,7 @@ def _build_cheek_region_mask(region_name, landmarks, image_size, face_width, fac
     else:
         required = RIGHT_CHEEK_DEBUG_INDICES
         if not _has_landmarks(landmarks, required):
-            return np.zeros((image_size[1], image_size[0]), dtype=np.uint8), np.empty((0, 2))
+            return _empty_mask(image_size, work_bbox), np.empty((0, 2))
         p = lambda idx: _landmark_xy(landmarks, idx, image_size)
         top_outer = (p(263) * 0.55 + p(249) * 0.45) + np.array([0.0, face_height * 0.070])
         top_inner = (p(362) * 0.55 + p(382) * 0.45) + np.array([face_width * 0.015, face_height * 0.090])
@@ -941,21 +1121,40 @@ def _build_cheek_region_mask(region_name, landmarks, image_size, face_width, fac
             p(356),
         ], dtype=np.float64)
 
-    cheek = _draw_smooth_poly(image_size, poly, sigma=0.70, threshold=90)
-    nose_mask, _ = _build_nose_region_mask(landmarks, image_size, face_height)
-    lip_ring, _ = _build_lip_ring_region_mask(landmarks, image_size, face_width)
-    chin_mask, _ = _build_chin_region_mask(
-        landmarks,
-        image_size,
-        face_width,
-        face_height,
-        float(_landmark_xy(landmarks, 1, image_size)[0]),
+    cheek = _draw_smooth_poly(image_size, poly, sigma=0.70, threshold=90, work_bbox=work_bbox)
+    nose_mask, _ = _cached_region_shape(
+        mask_debug,
+        ('shape:鼻子', tuple(work_bbox) if work_bbox is not None else None),
+        lambda: _build_nose_region_mask(landmarks, image_size, face_height, work_bbox=work_bbox),
     )
-    eye_mask, _ = _build_under_eye_region_mask(
-        '左眼周' if region_name == '左脸颊' else '右眼周',
-        landmarks,
-        image_size,
-        face_height,
+    lip_ring, _ = _cached_region_shape(
+        mask_debug,
+        ('shape:唇周', tuple(work_bbox) if work_bbox is not None else None),
+        lambda: _build_lip_ring_region_mask(landmarks, image_size, face_width, work_bbox=work_bbox),
+    )
+    chin_mask, _ = _cached_region_shape(
+        mask_debug,
+        ('shape:下巴', tuple(work_bbox) if work_bbox is not None else None),
+        lambda: _build_chin_region_mask(
+            landmarks,
+            image_size,
+            face_width,
+            face_height,
+            float(_landmark_xy(landmarks, 1, image_size)[0]),
+            work_bbox=work_bbox,
+        ),
+    )
+    eye_region = '左眼周' if region_name == '左脸颊' else '右眼周'
+    eye_mask, _ = _cached_region_shape(
+        mask_debug,
+        (f'shape:{eye_region}', tuple(work_bbox) if work_bbox is not None else None),
+        lambda: _build_under_eye_region_mask(
+            eye_region,
+            landmarks,
+            image_size,
+            face_height,
+            work_bbox=work_bbox,
+        ),
     )
     exclusions = [
         _dilate_mask(nose_mask, radius_px=max(1, int(round(face_width * 0.006)))),
@@ -966,23 +1165,30 @@ def _build_cheek_region_mask(region_name, landmarks, image_size, face_width, fac
     return _subtract_masks(cheek, exclusions), poly
 
 
-def _record_region_debug(mask_debug, region_name, debug_points, region_mask, final_mask, warning=''):
-    if not isinstance(mask_debug, dict):
+def _record_region_debug(mask_debug, region_name, debug_points, region_mask, final_mask, warning='', mask_origin=(0, 0)):
+    if not isinstance(mask_debug, dict) or not (DEBUG_ROI or DEBUG_ROI_ALIGNMENT):
         return
     region_debug = mask_debug.setdefault('region_debug', {})
     region_debug[region_name] = {
         'points': np.asarray(debug_points, dtype=np.float64),
         'region_mask': np.asarray(region_mask, dtype=np.uint8),
         'final_mask': np.asarray(final_mask, dtype=np.uint8),
-        'center': _mask_center(final_mask),
+        'mask_origin': [int(mask_origin[0]), int(mask_origin[1])],
+        'center': _offset_point(_mask_center(final_mask), mask_origin),
         'valid_pixel_count': int(np.sum(final_mask > 0)),
         'quality_warning': warning,
     }
 
 
-def _build_region_mask(region_name, landmarks, image_size, skin_mask, mask_debug):
+def _build_region_mask(region_name, landmarks, image_size, skin_mask, mask_debug, work_bbox=None):
+    final_cache = mask_debug.setdefault('final_region_mask_cache', {}) if isinstance(mask_debug, dict) else None
+    cache_key = (region_name, tuple(work_bbox) if work_bbox is not None else None)
+    if final_cache is not None and cache_key in final_cache:
+        return final_cache[cache_key]
+
     w, h = image_size
-    metrics = mask_debug.get('metrics', {})
+    mask_origin = (int(work_bbox[0]), int(work_bbox[1])) if work_bbox is not None else (0, 0)
+    metrics = mask_debug.get('metrics', {}) if isinstance(mask_debug, dict) else {}
     face_bbox = metrics.get('face_bbox') or _bbox_from_mask(skin_mask) or [0, 0, w, h]
     face_left, face_top, face_right, face_bottom = face_bbox
     face_width = max(face_right - face_left, 1)
@@ -991,7 +1197,7 @@ def _build_region_mask(region_name, landmarks, image_size, skin_mask, mask_debug
 
     definition = REGION_DEFINITIONS.get(region_name)
     if not definition:
-        return np.zeros((h, w), dtype=np.uint8)
+        return np.zeros_like(skin_mask, dtype=np.uint8)
 
     debug_points = np.empty((0, 2), dtype=np.float64)
 
@@ -1009,33 +1215,53 @@ def _build_region_mask(region_name, landmarks, image_size, skin_mask, mask_debug
             [region_left + face_width * 0.07, region_bottom],
         ])
         debug_points = poly
-        region_mask = _draw_smooth_poly(image_size, poly, sigma=0.75, threshold=88)
+        region_mask = _draw_smooth_poly(image_size, poly, sigma=0.75, threshold=88, work_bbox=work_bbox)
     elif region_name in ('左眼周', '右眼周'):
-        region_mask, debug_points = _build_under_eye_region_mask(
-            region_name,
-            landmarks,
-            image_size,
-            face_height,
+        region_mask, debug_points = _cached_region_shape(
+            mask_debug,
+            (f'shape:{region_name}', tuple(work_bbox) if work_bbox is not None else None),
+            lambda: _build_under_eye_region_mask(
+                region_name,
+                landmarks,
+                image_size,
+                face_height,
+                work_bbox=work_bbox,
+            ),
         )
     elif region_name == '唇周':
-        region_mask, debug_points = _build_lip_ring_region_mask(
-            landmarks,
-            image_size,
-            face_width,
+        region_mask, debug_points = _cached_region_shape(
+            mask_debug,
+            ('shape:唇周', tuple(work_bbox) if work_bbox is not None else None),
+            lambda: _build_lip_ring_region_mask(
+                landmarks,
+                image_size,
+                face_width,
+                work_bbox=work_bbox,
+            ),
         )
     elif region_name == '鼻子':
-        region_mask, debug_points = _build_nose_region_mask(
-            landmarks,
-            image_size,
-            face_height,
+        region_mask, debug_points = _cached_region_shape(
+            mask_debug,
+            ('shape:鼻子', tuple(work_bbox) if work_bbox is not None else None),
+            lambda: _build_nose_region_mask(
+                landmarks,
+                image_size,
+                face_height,
+                work_bbox=work_bbox,
+            ),
         )
     elif region_name == '下巴':
-        region_mask, debug_points = _build_chin_region_mask(
-            landmarks,
-            image_size,
-            face_width,
-            face_height,
-            nose_x,
+        region_mask, debug_points = _cached_region_shape(
+            mask_debug,
+            ('shape:下巴', tuple(work_bbox) if work_bbox is not None else None),
+            lambda: _build_chin_region_mask(
+                landmarks,
+                image_size,
+                face_width,
+                face_height,
+                nose_x,
+                work_bbox=work_bbox,
+            ),
         )
     elif region_name in ('左脸颊', '右脸颊'):
         region_mask, debug_points = _build_cheek_region_mask(
@@ -1044,20 +1270,24 @@ def _build_region_mask(region_name, landmarks, image_size, skin_mask, mask_debug
             image_size,
             face_width,
             face_height,
+            mask_debug=mask_debug,
+            work_bbox=work_bbox,
         )
     else:
-        region_mask = np.zeros((h, w), dtype=np.uint8)
+        region_mask = np.zeros_like(skin_mask, dtype=np.uint8)
 
     final_mask = np.where((region_mask > 0) & (skin_mask > 0), 255, 0).astype(np.uint8)
     warning = ROI_UNRELIABLE_WARNING if int(np.sum(region_mask > 0)) == 0 or int(np.sum(final_mask > 0)) == 0 else ''
-    _record_region_debug(mask_debug, region_name, debug_points, region_mask, final_mask, warning)
+    _record_region_debug(mask_debug, region_name, debug_points, region_mask, final_mask, warning, mask_origin=mask_origin)
+    if final_cache is not None:
+        final_cache[cache_key] = final_mask
     return final_mask
 
 
-def _invalid_region_payload(region_name, full_mask, skin_area, detail):
+def _invalid_region_payload(region_name, full_mask, skin_area, detail, mask_origin=(0, 0)):
     full_mask = np.asarray(full_mask, dtype=np.uint8)
     valid_count = int(np.sum(full_mask > 0))
-    bbox = _bbox_from_mask(full_mask)
+    bbox = _offset_bbox(_bbox_from_mask(full_mask), mask_origin)
     roi_area = 0
     if bbox:
         left, top, right, bottom = bbox
@@ -1067,7 +1297,8 @@ def _invalid_region_payload(region_name, full_mask, skin_area, detail):
         'mask': None,
         'bbox': bbox,
         'full_mask': full_mask,
-        'center': _mask_center(full_mask),
+        'mask_origin': [int(mask_origin[0]), int(mask_origin[1])],
+        'center': _offset_point(_mask_center(full_mask), mask_origin),
         'valid_pixel_count': valid_count,
         'roi_area': int(roi_area),
         'mask_coverage_ratio': 0.0,
@@ -1087,10 +1318,14 @@ def _extract_masked_region_payload(
         image_size,
         skin_mask,
         max_side,
-        mask_debug):
-    full_mask = _build_region_mask(region_name, landmarks, image_size, skin_mask, mask_debug)
+        mask_debug,
+        work_bbox=None,
+        skin_area=None):
+    mask_origin = (int(work_bbox[0]), int(work_bbox[1])) if work_bbox is not None else (0, 0)
+    full_mask = _build_region_mask(region_name, landmarks, image_size, skin_mask, mask_debug, work_bbox=work_bbox)
+    _log_array_memory(f'roi.region_mask.{region_name}', full_mask)
     valid_count = int(np.sum(full_mask > 0))
-    skin_area = max(int(np.sum(skin_mask > 0)), 1)
+    skin_area = max(int(skin_area if skin_area is not None else np.sum(skin_mask > 0)), 1)
     face_ratio = float(valid_count / skin_area)
 
     warning = ''
@@ -1104,16 +1339,18 @@ def _extract_masked_region_payload(
     if warning:
         print(f'[face_regions] 警告: {region_name} {warning}')
         if valid_count < ROI_MIN_VALID_PIXELS:
-            return _invalid_region_payload(region_name, full_mask, skin_area, warning)
+            return _invalid_region_payload(region_name, full_mask, skin_area, warning, mask_origin=mask_origin)
 
-    bbox = _bbox_from_mask(full_mask)
-    if not bbox:
+    local_bbox = _bbox_from_mask(full_mask)
+    if not local_bbox:
         print(f'[face_regions] 警告: {region_name} 无有效 mask')
-        return _invalid_region_payload(region_name, full_mask, skin_area, '无有效 mask')
+        return _invalid_region_payload(region_name, full_mask, skin_area, '无有效 mask', mask_origin=mask_origin)
 
+    bbox = _offset_bbox(local_bbox, mask_origin)
     left, top, right, bottom = bbox
     roi_img = img.crop((left, top, right, bottom))
-    roi_mask = full_mask[top:bottom, left:right]
+    local_left, local_top, local_right, local_bottom = local_bbox
+    roi_mask = full_mask[local_top:local_bottom, local_left:local_right]
 
     if max(roi_img.size) > max_side:
         scale = max_side / float(max(roi_img.size))
@@ -1138,7 +1375,8 @@ def _extract_masked_region_payload(
         'mask': roi_mask.astype(np.uint8),
         'bbox': [int(left), int(top), int(right), int(bottom)],
         'full_mask': full_mask,
-        'center': _mask_center(full_mask),
+        'mask_origin': [int(mask_origin[0]), int(mask_origin[1])],
+        'center': _offset_point(_mask_center(full_mask), mask_origin),
         'valid_pixel_count': roi_valid,
         'roi_area': roi_area,
         'mask_coverage_ratio': coverage,
@@ -1189,25 +1427,26 @@ def _save_mask_debug_images(image_rgb, debug_info, debug_id):
     Image.fromarray(debug_info['skin_mask']).save(os.path.join(ROI_DEBUG_DIR, f'{debug_id}_04_skin_mask.png'))
 
 
-def _draw_mask_boundary(draw, mask, color, width=2):
+def _draw_mask_boundary(draw, mask, color, width=2, offset=(0, 0)):
     if mask is None:
         return
     mask_u8 = np.asarray(mask, dtype=np.uint8)
     if int(np.sum(mask_u8 > 0)) == 0:
         return
+    off_x, off_y = int(offset[0]), int(offset[1])
     if cv2 is not None:
         contours, _ = cv2.findContours(mask_u8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         for contour in contours:
             pts = contour.reshape(-1, 2)
             if pts.shape[0] < 2:
                 continue
-            seq = [(int(x), int(y)) for x, y in pts]
+            seq = [(int(x + off_x), int(y + off_y)) for x, y in pts]
             draw.line(seq + [seq[0]], fill=color, width=width)
         return
 
     bbox = _bbox_from_mask(mask_u8)
     if bbox:
-        draw.rectangle(tuple(bbox), outline=color, width=width)
+        draw.rectangle(tuple(_offset_bbox(bbox, (off_x, off_y))), outline=color, width=width)
 
 
 def _save_roi_debug_images(image_rgb, mask_debug, roi_items, debug_id):
@@ -1231,11 +1470,22 @@ def _save_roi_debug_images(image_rgb, mask_debug, roi_items, debug_id):
 
         full_mask = item.get('full_mask')
         if full_mask is not None:
-            mask_img = Image.fromarray(full_mask).convert('L')
+            origin = item.get('mask_origin') or [0, 0]
+            full_mask_arr = np.asarray(full_mask, dtype=np.uint8)
+            if full_mask_arr.shape != image_rgb.shape[:2]:
+                full_debug_mask = _paste_local_mask(full_mask, image_rgb.shape[1::-1], [
+                    int(origin[0]),
+                    int(origin[1]),
+                    int(origin[0]) + int(full_mask_arr.shape[1]),
+                    int(origin[1]) + int(full_mask_arr.shape[0]),
+                ])
+            else:
+                full_debug_mask = full_mask_arr
+            mask_img = Image.fromarray(full_debug_mask).convert('L')
             tint = Image.new('RGB', base.size, color)
             overlay = Image.composite(Image.blend(overlay, tint, 0.22), overlay, mask_img)
             draw = ImageDraw.Draw(overlay)
-            _draw_mask_boundary(draw, full_mask, color, width=2)
+            _draw_mask_boundary(draw, full_mask, color, width=2, offset=origin)
 
         debug_item = region_debug.get(item.get('region_name', ''), {})
         points = np.asarray(debug_item.get('points', []), dtype=np.float64)

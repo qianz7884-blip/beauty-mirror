@@ -19,6 +19,7 @@ import re
 import base64
 import traceback
 import time
+from io import BytesIO
 from PIL import Image
 import numpy as np
 
@@ -36,6 +37,46 @@ _MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'face_landmarker
 _FaceLandmarker = None  # 单例缓存
 ROI_FEATURE_BUDGET_MS = int(os.environ.get('ROI_FEATURE_BUDGET_MS', '2500'))
 ROI_FEATURE_MAX_SIDE = int(os.environ.get('ROI_FEATURE_MAX_SIDE', '180'))
+ANALYSIS_MAX_WIDTH = int(os.environ.get('ANALYSIS_MAX_WIDTH', '1024'))
+DEBUG_MEMORY = os.environ.get('DEBUG_MEMORY', '').lower() in ('1', 'true', 'yes', 'on')
+
+
+def _log_array_memory(label, arr):
+    if not DEBUG_MEMORY or arr is None:
+        return
+    try:
+        np_arr = np.asarray(arr)
+        print(
+            f'[memory] {label}: shape={np_arr.shape}, dtype={np_arr.dtype}, '
+            f'nbytes={np_arr.nbytes} ({np_arr.nbytes / 1024 / 1024:.2f}MB)'
+        )
+    except Exception as exc:
+        print(f'[memory] {label}: log failed: {exc}')
+
+
+def _prepare_analysis_image_bytes(image_bytes):
+    """
+    Keep the whole analysis pipeline on one resized image so landmarks, ROI masks
+    and heatmap coordinates stay aligned while limiting Render memory peaks.
+    """
+    img = load_image(image_bytes).convert('RGB')
+    original_size = img.size
+    if ANALYSIS_MAX_WIDTH > 0 and img.width > ANALYSIS_MAX_WIDTH:
+        scale = ANALYSIS_MAX_WIDTH / float(img.width)
+        new_size = (ANALYSIS_MAX_WIDTH, max(1, int(round(img.height * scale))))
+        img = img.resize(new_size, Image.LANCZOS)
+        buf = BytesIO()
+        img.save(buf, format='JPEG', quality=92)
+        resized = buf.getvalue()
+        print(
+            f'[skin_analyzer] analysis image resized: '
+            f'{original_size[0]}x{original_size[1]} -> {new_size[0]}x{new_size[1]}, '
+            f'bytes={len(resized)}'
+        )
+        return resized, {'original_size': original_size, 'analysis_size': new_size, 'scale': scale}
+
+    print(f'[skin_analyzer] analysis image size kept: {original_size[0]}x{original_size[1]}')
+    return image_bytes, {'original_size': original_size, 'analysis_size': original_size, 'scale': 1.0}
 
 
 def _get_detector():
@@ -102,7 +143,8 @@ def detect_face(image_bytes):
         img = load_image(image_bytes)
 
         img = img.convert('RGB')
-        img_np = np.array(img).copy()  # 独立拷贝，避免内存共享问题
+        img_np = np.ascontiguousarray(np.array(img, dtype=np.uint8))
+        _log_array_memory('detect_face.rgb', img_np)
 
         mp_image = mp.Image(
             image_format=mp.ImageFormat.SRGB,
@@ -307,12 +349,18 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
     """
     from google import genai
 
+    analysis_image_bytes, analysis_meta = _prepare_analysis_image_bytes(image_bytes)
+
     # Step 1: 面部检测
-    has_face, face_info = detect_face(image_bytes)
+    has_face, face_info = detect_face(analysis_image_bytes)
     if not has_face:
         return {'success': False, 'reason': 'no_face', 'message': face_info}
 
     face_data = face_info.get('face_data', {})
+    print(
+        f'[skin_analyzer] image sizes: original={analysis_meta["original_size"]}, '
+        f'analysis={analysis_meta["analysis_size"]}, scale={analysis_meta["scale"]:.4f}'
+    )
     landmarks = face_info['landmarks']
     img_size = face_info['image_size']
 
@@ -329,7 +377,7 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
     try:
         from face_regions import extract_all_regions
         region_rois = extract_all_regions(
-            image_bytes,
+            analysis_image_bytes,
             landmarks,
             img_size,
             max_side=ROI_FEATURE_MAX_SIDE,
@@ -530,7 +578,7 @@ mirror_advice 要求：
         heatmap_b64 = None
         if feature_json.get('region_scores'):
             try:
-                heatmap_b64 = generate_heatmap(image_bytes, landmarks, img_size, feature_json['region_scores'])
+                heatmap_b64 = generate_heatmap(analysis_image_bytes, landmarks, img_size, feature_json['region_scores'])
             except Exception as e:
                 print(f'[skin_analyzer] 热点图生成异常: {e}')
 
@@ -553,7 +601,7 @@ mirror_advice 要求：
         heatmap_b64 = None
         if feature_json.get('region_scores'):
             try:
-                heatmap_b64 = generate_heatmap(image_bytes, landmarks, img_size, feature_json['region_scores'])
+                heatmap_b64 = generate_heatmap(analysis_image_bytes, landmarks, img_size, feature_json['region_scores'])
             except Exception as he:
                 print(f'[skin_analyzer] 热点图生成异常: {he}')
 
