@@ -34,7 +34,7 @@ from face_regions import load_image  # 共享的图片加载工具（EXIF 自动
 _MODEL_PATH = os.path.join(os.path.dirname(__file__), 'models', 'face_landmarker.task')
 
 _FaceLandmarker = None  # 单例缓存
-ROI_FEATURE_BUDGET_MS = int(os.environ.get('ROI_FEATURE_BUDGET_MS', '1500'))
+ROI_FEATURE_BUDGET_MS = int(os.environ.get('ROI_FEATURE_BUDGET_MS', '2500'))
 ROI_FEATURE_MAX_SIDE = int(os.environ.get('ROI_FEATURE_MAX_SIDE', '180'))
 
 
