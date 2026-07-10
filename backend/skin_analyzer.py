@@ -324,6 +324,7 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
     roi_prompt_enabled = False
     region_rois = {}
     roi_prompt_context = ''
+    roi_analysis_error = ''
 
     try:
         from face_regions import extract_all_regions
@@ -345,6 +346,12 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
             feature_json = extractor.extract_all_features(region_rois, landmarks, img_size)
             roi_analysis_elapsed_ms = (time.perf_counter() - roi_analysis_started) * 1000
             print(f'[skin_analyzer] 特征提取完成 — 肤质: {feature_json["skin_type"]}，耗时 {roi_analysis_elapsed_ms:.0f}ms')
+            if feature_json.get('roi_quality'):
+                valid_regions = [
+                    name for name, quality in feature_json.get('roi_quality', {}).items()
+                    if isinstance(quality, dict) and quality.get('valid', True)
+                ]
+                print(f'[skin_analyzer] ROI 有效区域: {len(valid_regions)} / {len(region_rois)} — {valid_regions}')
 
             if roi_analysis_elapsed_ms <= ROI_FEATURE_BUDGET_MS:
                 from skin_roi_prompt import build_roi_prompt_context
@@ -359,9 +366,11 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
                 )
     except ImportError:
         print('[skin_analyzer] ROI 分析模块不可用，降级为原 prompt')
+        roi_analysis_error = 'ROI 分析模块不可用'
         feature_json = extractor._make_default_result()
     except Exception as e:
         print(f'[skin_analyzer] ROI 分析失败，降级为原 prompt: {e}')
+        roi_analysis_error = str(e)
         feature_json = extractor._make_default_result()
 
     if not roi_prompt_enabled:
@@ -370,6 +379,12 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
     # 注意：Gemini 仍只在后续 NLG 阶段调用一次，不会按 ROI 分区调用。
     if not feature_json.get('skin_type'):
         feature_json = extractor._make_default_result()
+
+    if not feature_json.get('region_scores'):
+        message = '面部皮肤区域提取失败，请换一张无遮挡、光线充足的正面照'
+        if roi_analysis_error:
+            message = f'{message}（{roi_analysis_error}）'
+        return {'success': False, 'reason': 'roi_failed', 'message': message}
 
     # Step 1.6: RAG 知识检索
     rag_query_parts = [f'{feature_json["skin_type"]}肌肤']

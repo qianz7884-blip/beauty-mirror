@@ -10,11 +10,16 @@
     feature_json = extractor.extract_all_features(region_rois, landmarks, image_size)
 """
 
+import os
 import numpy as np
 from PIL import Image
 from io import BytesIO
 from scipy.ndimage import uniform_filter, sobel, label as ndi_label, gaussian_filter
 from scipy.ndimage import binary_erosion, generate_binary_structure
+
+
+DEBUG_ROI = os.environ.get('DEBUG_ROI', '').lower() in ('1', 'true', 'yes', 'on')
+ROI_MIN_VALID_PIXELS = int(os.environ.get('ROI_MIN_VALID_PIXELS', '120'))
 
 
 # ============================================================
@@ -146,20 +151,41 @@ class FeatureExtractor:
         """
         # Step 1: 逐区域提取原始特征
         all_region_features = {}
-        for region_name, roi_bytes in region_rois.items():
-            if roi_bytes is None:
+        roi_quality = {}
+        for region_name, roi_input in region_rois.items():
+            if roi_input is None:
                 continue
             try:
-                roi_rgb = self._decode_roi(roi_bytes)
+                roi_rgb, roi_mask, roi_meta = self._decode_roi_payload(roi_input)
                 if roi_rgb.shape[0] < 10 or roi_rgb.shape[1] < 10:
                     print(f'[feature_extractor] {region_name} 区域太小，跳过')
                     continue
 
-                color = self._extract_color_features(roi_rgb)
-                texture = self._extract_texture_features(roi_rgb)
-                pores = self._extract_pore_features(roi_rgb)
-                spots = self._extract_spot_features(roi_rgb)
-                shine = self._extract_shine_features(roi_rgb)
+                valid_pixels = self._valid_pixel_count(roi_mask, roi_rgb.shape[:2])
+                roi_area = int(roi_rgb.shape[0] * roi_rgb.shape[1])
+                if valid_pixels < ROI_MIN_VALID_PIXELS:
+                    print(f'[feature_extractor] {region_name} 有效像素过少({valid_pixels})，跳过')
+                    roi_quality[region_name] = {
+                        **roi_meta,
+                        'valid': False,
+                        'valid_pixel_count': valid_pixels,
+                        'quality_warning': f'有效像素过少: {valid_pixels}',
+                    }
+                    continue
+
+                color = self._extract_color_features(roi_rgb, roi_mask)
+                texture = self._extract_texture_features(roi_rgb, roi_mask)
+                pores = self._extract_pore_features(roi_rgb, roi_mask)
+                spots = self._extract_spot_features(roi_rgb, roi_mask)
+                shine = self._extract_shine_features(roi_rgb, roi_mask)
+
+                quality = {
+                    **roi_meta,
+                    'valid': True,
+                    'valid_pixel_count': int(valid_pixels),
+                    'roi_area': int(roi_area),
+                    'mask_coverage_ratio': float(valid_pixels / max(roi_area, 1)),
+                }
 
                 all_region_features[region_name] = {
                     'color': color,
@@ -167,7 +193,18 @@ class FeatureExtractor:
                     'pores': pores,
                     'spots': spots,
                     'shine': shine,
+                    'quality': quality,
                 }
+                roi_quality[region_name] = quality
+
+                if DEBUG_ROI:
+                    print(
+                        f'[feature_extractor][debug] {region_name}: '
+                        f'valid={valid_pixels}, coverage={quality["mask_coverage_ratio"]:.2f}, '
+                        f'L={color["lab_mean"][0]:.1f}, red={color["erythema_index"]:.3f}, '
+                        f'rough={texture["roughness"]:.3f}, pore={pores["pore_visibility"]:.3f}, '
+                        f'gloss={shine["gloss_score"]:.3f}'
+                    )
             except Exception as e:
                 print(f'[feature_extractor] {region_name} 特征提取异常: {e}')
                 continue
@@ -207,6 +244,7 @@ class FeatureExtractor:
             'region_features': all_region_features,
             'region_scores': region_scores,
             'aggregated_features': aggregated,
+            'roi_quality': roi_quality,
         }
 
     # ============================================================
@@ -221,31 +259,106 @@ class FeatureExtractor:
             img = img.convert('RGB')
         return np.array(img, dtype=np.uint8)
 
+    @staticmethod
+    def _decode_roi_payload(roi_input):
+        """
+        支持两种输入：
+        1. 旧格式：JPEG bytes
+        2. 新格式：{'roi_bytes': bytes, 'mask': uint8 ndarray, ...}
+        """
+        if isinstance(roi_input, dict):
+            roi_bytes = roi_input.get('roi_bytes') or roi_input.get('image_bytes')
+            if not roi_bytes:
+                raise ValueError('ROI payload 缺少 roi_bytes')
+            roi_rgb = FeatureExtractor._decode_roi(roi_bytes)
+            mask = roi_input.get('mask')
+            if mask is not None:
+                mask = np.array(mask, dtype=np.uint8)
+                if mask.shape != roi_rgb.shape[:2]:
+                    mask_img = Image.fromarray(mask, mode='L')
+                    mask = np.array(mask_img.resize((roi_rgb.shape[1], roi_rgb.shape[0]), Image.NEAREST), dtype=np.uint8)
+            meta = {
+                key: roi_input.get(key)
+                for key in (
+                    'bbox',
+                    'valid_pixel_count',
+                    'roi_area',
+                    'mask_coverage_ratio',
+                    'face_area_ratio',
+                    'quality_warning',
+                    'valid',
+                )
+                if key in roi_input
+            }
+            return roi_rgb, mask, meta
+
+        return FeatureExtractor._decode_roi(roi_input), None, {}
+
+    @staticmethod
+    def _valid_mask(mask, shape):
+        if mask is None:
+            return np.ones(shape, dtype=bool)
+        valid = np.array(mask > 0, dtype=bool)
+        if valid.shape != shape:
+            mask_img = Image.fromarray(mask.astype(np.uint8), mode='L')
+            valid = np.array(mask_img.resize((shape[1], shape[0]), Image.NEAREST), dtype=np.uint8) > 0
+        return valid
+
+    @staticmethod
+    def _valid_pixel_count(mask, shape):
+        return int(np.sum(FeatureExtractor._valid_mask(mask, shape)))
+
+    @staticmethod
+    def _masked_bbox(valid):
+        ys, xs = np.where(valid)
+        if xs.size == 0 or ys.size == 0:
+            return None
+        return int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1)
+
+    @staticmethod
+    def _masked_gray_crop(gray, valid):
+        bbox = FeatureExtractor._masked_bbox(valid)
+        if bbox is None:
+            return gray, valid
+        left, top, right, bottom = bbox
+        gray_crop = gray[top:bottom, left:right].copy()
+        valid_crop = valid[top:bottom, left:right]
+        if np.any(valid_crop):
+            fill_value = float(np.median(gray_crop[valid_crop]))
+            gray_crop[~valid_crop] = fill_value
+        return gray_crop, valid_crop
+
     # ============================================================
     # 颜色特征
     # ============================================================
 
     @staticmethod
-    def _extract_color_features(roi_rgb):
+    def _extract_color_features(roi_rgb, roi_mask=None):
         """
         提取颜色特征：Lab 均值/标准差、HSV 均值/标准差、红斑指数、黑色素估计值。
         """
         lab = _rgb_to_lab(roi_rgb)
         hsv = _rgb_to_hsv(roi_rgb)
+        valid = FeatureExtractor._valid_mask(roi_mask, roi_rgb.shape[:2])
+        if not np.any(valid):
+            raise ValueError('颜色特征提取失败：空 mask')
 
-        lab_mean = [float(lab[..., i].mean()) for i in range(3)]
-        lab_std = [float(lab[..., i].std()) for i in range(3)]
-        hsv_mean = [float(hsv[..., i].mean()) for i in range(3)]
-        hsv_std = [float(hsv[..., i].std()) for i in range(3)]
+        lab_valid = lab[valid]
+        hsv_valid = hsv[valid]
+
+        lab_mean = [float(lab_valid[:, i].mean()) for i in range(3)]
+        lab_std = [float(lab_valid[:, i].std()) for i in range(3)]
+        hsv_mean = [float(hsv_valid[:, i].mean()) for i in range(3)]
+        hsv_std = [float(hsv_valid[:, i].std()) for i in range(3)]
 
         # 红斑指数: a* 通道正值 = 红色，归一化到 [0, 1]
-        a_channel = lab[..., 1]
+        a_channel = lab_valid[:, 1]
         erythema = float(max(0.0, a_channel.mean()) / 128.0)
         erythema = min(erythema, 1.0)
 
         # 黑色素估计: 低亮度 + 高 b* (黄色调) → 较多黑色素
-        L_channel = lab[..., 0]
-        b_channel = lab[..., 2]
+        L_channel = lab_valid[:, 0]
+        b_channel = lab_valid[:, 2]
         melanin = float(max(0.0, (255.0 - L_channel.mean()) / 255.0 * (1.0 + max(0.0, b_channel.mean()) / 128.0)))
         melanin = min(melanin, 1.0)
 
@@ -363,23 +476,29 @@ class FeatureExtractor:
             'correlation': float(correlation),
         }
 
-    def _extract_texture_features(self, roi_rgb):
+    def _extract_texture_features(self, roi_rgb, roi_mask=None):
         """
         提取纹理特征：GLCM 属性 + 熵 + 粗糙度。
         """
         # 灰度图
         gray = (0.299 * roi_rgb[..., 0].astype(np.float64) +
                 0.587 * roi_rgb[..., 1].astype(np.float64) +
-                0.114 * roi_rgb[..., 2].astype(np.float64)).astype(np.uint8)
+                0.114 * roi_rgb[..., 2].astype(np.float64))
+        valid = FeatureExtractor._valid_mask(roi_mask, roi_rgb.shape[:2])
+        if not np.any(valid):
+            raise ValueError('纹理特征提取失败：空 mask')
+        gray_for_glcm, valid_crop = FeatureExtractor._masked_gray_crop(gray, valid)
+        gray_for_glcm = np.clip(gray_for_glcm, 0, 255).astype(np.uint8)
+        gray_valid = gray[valid]
 
         # GLCM
-        glcm = self._compute_glcm(gray, levels=self.GLCM_LEVELS,
+        glcm = self._compute_glcm(gray_for_glcm, levels=self.GLCM_LEVELS,
                                   distances=self.GLCM_DISTANCES,
                                   angles=self.GLCM_ANGLES)
         haralick = self._glcm_properties(glcm)
 
         # 灰度直方图熵
-        hist, _ = np.histogram(gray, bins=256, range=(0, 255), density=True)
+        hist, _ = np.histogram(gray_valid, bins=256, range=(0, 255), density=True)
         hist = hist[hist > 0]
         entropy = -np.sum(hist * np.log2(hist + 1e-10))
         entropy_norm = entropy / np.log2(256)  # 归一化到 [0, 1]
@@ -404,28 +523,33 @@ class FeatureExtractor:
     # ============================================================
 
     @staticmethod
-    def _extract_pore_features(roi_rgb):
+    def _extract_pore_features(roi_rgb, roi_mask=None):
         """
         提取毛孔相关特征：高频分量比、毛孔可见度。
         """
         gray = (0.299 * roi_rgb[..., 0].astype(np.float64) +
                 0.587 * roi_rgb[..., 1].astype(np.float64) +
                 0.114 * roi_rgb[..., 2].astype(np.float64))
+        valid = FeatureExtractor._valid_mask(roi_mask, roi_rgb.shape[:2])
+        if not np.any(valid):
+            raise ValueError('毛孔特征提取失败：空 mask')
+        gray_crop, valid_crop = FeatureExtractor._masked_gray_crop(gray, valid)
 
         # Sobel 梯度 → 边缘能量比
-        gx = sobel(gray, axis=1)
-        gy = sobel(gray, axis=0)
+        gx = sobel(gray_crop, axis=1)
+        gy = sobel(gray_crop, axis=0)
         grad_mag = np.sqrt(gx ** 2 + gy ** 2)
+        grad_valid = grad_mag[valid_crop]
 
         # 高频像素：梯度幅度 > 均值 + 1 倍标准差
-        threshold = grad_mag.mean() + grad_mag.std()
-        edge_pixels = np.sum(grad_mag > threshold)
-        total_pixels = grad_mag.size
+        threshold = grad_valid.mean() + grad_valid.std()
+        edge_pixels = np.sum((grad_mag > threshold) & valid_crop)
+        total_pixels = int(np.sum(valid_crop))
 
         hf_ratio = float(edge_pixels / max(total_pixels, 1))
 
         # 毛孔可见度（结合 HF 比和局部方差）
-        local_var = float(np.var(gray))
+        local_var = float(np.var(gray_crop[valid_crop]))
         var_norm = min(local_var / 500.0, 1.0)  # 经验阈值
         pore_visibility = float(0.5 * hf_ratio + 0.5 * var_norm)
 
@@ -439,29 +563,34 @@ class FeatureExtractor:
     # ============================================================
 
     @staticmethod
-    def _extract_spot_features(roi_rgb):
+    def _extract_spot_features(roi_rgb, roi_mask=None):
         """
         检测暗斑、色素沉着：斑点计数、斑点密度、颜色方差。
         """
         gray = (0.299 * roi_rgb[..., 0].astype(np.float64) +
                 0.587 * roi_rgb[..., 1].astype(np.float64) +
                 0.114 * roi_rgb[..., 2].astype(np.float64))
+        valid = FeatureExtractor._valid_mask(roi_mask, roi_rgb.shape[:2])
+        if not np.any(valid):
+            raise ValueError('斑点特征提取失败：空 mask')
+        gray_crop, valid_crop = FeatureExtractor._masked_gray_crop(gray, valid)
 
-        H, W = gray.shape
-        total_pixels = max(H * W, 1)
+        H, W = gray_crop.shape
+        total_pixels = max(int(np.sum(valid_crop)), 1)
 
         # 背景估计（大核均值滤波）
         kernel_size = max(5, min(H, W) // 8)
         if kernel_size % 2 == 0:
             kernel_size += 1
-        background = uniform_filter(gray, size=kernel_size)
+        background = uniform_filter(gray_crop, size=kernel_size)
 
         # 细节 = 原图 - 背景（暗斑为负值）
-        detail = gray - background
-        dark_threshold = -1.5 * detail.std()
+        detail = gray_crop - background
+        detail_valid = detail[valid_crop]
+        dark_threshold = -1.5 * detail_valid.std()
 
         # 暗斑掩模
-        dark_mask = detail < dark_threshold
+        dark_mask = (detail < dark_threshold) & valid_crop
 
         # 形态学清理：仅保留 3~200 像素的连通域
         struct = generate_binary_structure(2, 1)
@@ -477,7 +606,7 @@ class FeatureExtractor:
 
         # 颜色方差（从 Lab L* 计算）
         lab = _rgb_to_lab(roi_rgb)
-        color_variance = float(lab[..., 0].std() / 100.0)  # 归一化到 ~[0, 1]
+        color_variance = float(lab[..., 0][valid].std() / 100.0)  # 归一化到 ~[0, 1]
 
         return {
             'spot_count': spot_count,
@@ -490,19 +619,22 @@ class FeatureExtractor:
     # ============================================================
 
     @staticmethod
-    def _extract_shine_features(roi_rgb):
+    def _extract_shine_features(roi_rgb, roi_mask=None):
         """
         检测镜面高光（油光/水光）：高光像素比、光泽度评分。
         """
         hsv = _rgb_to_hsv(roi_rgb)
         S, V = hsv[..., 1], hsv[..., 2]
+        valid = FeatureExtractor._valid_mask(roi_mask, roi_rgb.shape[:2])
+        if not np.any(valid):
+            raise ValueError('油光特征提取失败：空 mask')
 
         # 高光：低饱和度 + 高亮度
-        specular_mask = (S < 0.12) & (V > 0.78)
-        specular_ratio = float(np.sum(specular_mask) / max(specular_mask.size, 1))
+        specular_mask = (S < 0.12) & (V > 0.78) & valid
+        specular_ratio = float(np.sum(specular_mask) / max(np.sum(valid), 1))
 
         # 光泽度 = 高光比 × 0.6 + 平均亮度 × 0.4
-        gloss_score = 0.6 * specular_ratio + 0.4 * float(V.mean())
+        gloss_score = 0.6 * specular_ratio + 0.4 * float(V[valid].mean())
         gloss_score = min(gloss_score, 1.0)
 
         return {
@@ -838,4 +970,5 @@ class FeatureExtractor:
             'region_features': {},
             'region_scores': {},
             'aggregated_features': {},
+            'roi_quality': {},
         }

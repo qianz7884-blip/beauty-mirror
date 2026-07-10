@@ -25,9 +25,10 @@ import numpy as np
 from face_regions import (
     get_region_centers,
     get_face_oval_points,
-    generate_face_mask,
+    build_improved_face_skin_mask,
     load_image,
 )
+from scipy.ndimage import gaussian_filter
 
 
 # ============================================================
@@ -294,9 +295,16 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
         img_np = np.array(img, dtype=np.uint8)
 
         # ═══════════════════════════════════════════════════════
-        # Step 1: 生成人脸 Mask（MediaPipe 轮廓 + 羽化）
+        # Step 1: 生成人脸 Skin Mask（改进轮廓 + 五官排除 + 羽化）
         # ═══════════════════════════════════════════════════════
-        face_mask = generate_face_mask(landmarks, image_size, feather_px=5)
+        skin_mask_u8, mask_debug = build_improved_face_skin_mask(
+            landmarks,
+            image_size,
+            image_rgb=img_np,
+            return_debug=True,
+        )
+        face_mask = skin_mask_u8.astype(np.float64) / 255.0
+        face_mask = gaussian_filter(face_mask, sigma=5 / 3.0, mode='constant')
 
         # ═══════════════════════════════════════════════════════
         # Step 2: 获取区域中心坐标
@@ -334,10 +342,13 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
         if show_labels:
             _render_labels(ax, region_centers, region_scores, image_size)
 
-        # ── 人脸轮廓线（白色虚线）──
-        oval_pts = get_face_oval_points(landmarks, image_size)
-        if len(oval_pts) > 0:
-            ax.plot(oval_pts[:, 0], oval_pts[:, 1],
+        # ── 改进后人脸皮肤轮廓线（白色虚线）──
+        contour_pts = mask_debug.get('improved_contour') if isinstance(mask_debug, dict) else None
+        if contour_pts is None or len(contour_pts) == 0:
+            contour_pts = get_face_oval_points(landmarks, image_size)
+        if len(contour_pts) > 0:
+            closed_pts = np.vstack([contour_pts, contour_pts[0]])
+            ax.plot(closed_pts[:, 0], closed_pts[:, 1],
                     color='white', linewidth=1.0, alpha=0.45,
                     linestyle='--', zorder=5)
 
