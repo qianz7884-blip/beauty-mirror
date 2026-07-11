@@ -30,7 +30,13 @@ from face_regions import (
     build_lower_lip_visual_mask,
     load_image,
 )
-from scipy.ndimage import gaussian_filter, binary_erosion, binary_closing, binary_dilation
+from scipy.ndimage import (
+    gaussian_filter,
+    binary_erosion,
+    binary_closing,
+    binary_dilation,
+    binary_fill_holes,
+)
 
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -586,36 +592,38 @@ def _smooth_closed_curve(points, iterations=4, shrink_ratio=0.985):
 
 
 def _render_face_outline(ax, display_mask, contour_pts=None):
-    smooth_curve = _smooth_closed_curve(contour_pts) if contour_pts is not None else None
-    if smooth_curve is not None:
+    if display_mask is None:
+        smooth_curve = _smooth_closed_curve(contour_pts, iterations=1, shrink_ratio=1.0) if contour_pts is not None else None
+        if smooth_curve is None:
+            return
         closed = np.vstack([smooth_curve, smooth_curve[0]])
         ax.plot(
             closed[:, 0],
             closed[:, 1],
             color='white',
-            linewidth=0.62,
-            alpha=0.40,
-            linestyle='--',
+            linewidth=0.36,
+            alpha=0.12,
+            linestyle='-',
             zorder=5,
         )
         return
 
-    if display_mask is None:
-        return
+    outer_mask = binary_fill_holes(np.asarray(display_mask) > 0.18)
+    outer_mask = binary_closing(outer_mask, iterations=1)
     smooth_mask = gaussian_filter(
-        np.clip(display_mask.astype(np.float64), 0.0, 1.0),
-        sigma=2.4,
+        outer_mask.astype(np.float32),
+        sigma=1.25,
         mode='constant',
     )
     if int(np.sum(smooth_mask > 0.18)) < 100:
         return
     ax.contour(
         smooth_mask,
-        levels=[0.50],
+        levels=[0.42],
         colors='white',
-        linewidths=0.62,
-        alpha=0.38,
-        linestyles='--',
+        linewidths=0.36,
+        alpha=0.12,
+        linestyles='solid',
         zorder=5,
     )
 

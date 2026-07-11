@@ -777,8 +777,8 @@ def _build_forehead_arc(landmarks, image_size, oval_pts, face_bbox, face_height)
     # 使用左右额侧点约束弧线横向范围，避免覆盖到头发/耳侧。
     left_candidates = _points_from_indices(landmarks, [67, 103, 109], image_size)
     right_candidates = _points_from_indices(landmarks, [297, 332, 338], image_size)
-    left_x = max(np.min(left_candidates[:, 0]) - face_width * 0.018, face_left + face_width * 0.025)
-    right_x = min(np.max(right_candidates[:, 0]) + face_width * 0.018, face_right - face_width * 0.025)
+    left_x = max(np.min(left_candidates[:, 0]) - face_width * 0.024, face_left + face_width * 0.024)
+    right_x = min(np.max(right_candidates[:, 0]) + face_width * 0.024, face_right - face_width * 0.024)
 
     forehead_expand_px = float(np.clip(
         face_height * FOREHEAD_EXPAND_RATIO,
@@ -790,8 +790,8 @@ def _build_forehead_arc(landmarks, image_size, oval_pts, face_bbox, face_height)
     xs = np.linspace(left_x, right_x, point_count)
     t_values = np.linspace(0.0, 1.0, point_count)
     endpoint_y = min(float(left_top[1]), float(right_top[1]), top_y + face_height * 0.035)
-    arc_weight = np.sin(np.pi * t_values) ** 0.72
-    side_lift = face_height * 0.018 * np.sin(np.pi * t_values)
+    arc_weight = np.sin(np.pi * t_values) ** 1.08
+    side_lift = face_height * 0.010 * np.sin(np.pi * t_values)
     ys = endpoint_y - forehead_expand_px * arc_weight - side_lift
 
     # 保守限制：补偿点不超过图像上界，也不超过 face bbox 顶部太多。
@@ -799,13 +799,20 @@ def _build_forehead_arc(landmarks, image_size, oval_pts, face_bbox, face_height)
     ys = np.clip(ys, min_allowed_y, h - 1)
 
     arc_core = np.stack([xs, ys], axis=1)
-    left_lower = oval_pts[-1]
-    right_lower = oval_pts[1]
-    left_bridge = left_lower * 0.62 + arc_core[0] * 0.38
-    right_bridge = right_lower * 0.62 + arc_core[-1] * 0.38
-    left_bridge[1] -= face_height * 0.012
-    right_bridge[1] -= face_height * 0.012
-    arc = np.vstack([left_bridge, arc_core, right_bridge])
+    left_temple = oval_pts[-1]
+    right_temple = oval_pts[1]
+
+    # Add two soft transition points on each temple side. This keeps the
+    # forehead compensation wide enough while avoiding sharp "gourd" shoulders.
+    left_transition = np.vstack([
+        left_temple * 0.78 + arc_core[0] * 0.22,
+        left_temple * 0.42 + arc_core[1] * 0.58,
+    ])
+    right_transition = np.vstack([
+        right_temple * 0.42 + arc_core[-2] * 0.58,
+        right_temple * 0.78 + arc_core[-1] * 0.22,
+    ])
+    arc = np.vstack([left_transition, arc_core[2:-2], right_transition])
     return _clip_points(arc, image_size), int(round(forehead_expand_px))
 
 
