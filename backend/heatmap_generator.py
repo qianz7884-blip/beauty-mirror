@@ -27,6 +27,7 @@ import numpy as np
 from face_regions import (
     get_region_heatmap_masks,
     build_improved_face_skin_mask,
+    build_lower_lip_visual_mask,
     load_image,
 )
 from scipy.ndimage import gaussian_filter, binary_erosion, binary_closing, binary_dilation
@@ -57,6 +58,7 @@ BEAUTY_GOOD_COLOR = np.array([118, 178, 154], dtype=np.float32)
 BEAUTY_OK_COLOR = np.array([224, 196, 146], dtype=np.float32)
 BEAUTY_WARN_COLOR = np.array([224, 158, 126], dtype=np.float32)
 BEAUTY_BAD_COLOR = np.array([204, 86, 96], dtype=np.float32)
+LOWER_LIP_VISUAL_COLOR = np.array([226, 139, 132], dtype=np.float32)
 
 _CJK_FONT_PROP = None
 _CJK_FONT_CHECKED = False
@@ -374,6 +376,25 @@ def _alpha_blend_rgb(base_rgb, overlay_color, alpha_map):
     return base * (1.0 - alpha_map) + color * alpha_map
 
 
+def _apply_lower_lip_visual_overlay(output_rgb, landmarks, image_size, intensity=1.0):
+    try:
+        lip_mask = build_lower_lip_visual_mask(landmarks, image_size)
+    except Exception as exc:
+        print(f'[heatmap] lower lip visual mask failed: {exc}')
+        return output_rgb
+
+    if lip_mask is None or int(np.sum(np.asarray(lip_mask) > 0)) < 20:
+        return output_rgb
+
+    soft = gaussian_filter((np.asarray(lip_mask, dtype=np.float32) / 255.0), sigma=1.1, mode='constant')
+    max_val = float(soft.max()) if soft.size else 0.0
+    if max_val > 1e-8:
+        soft = soft / max_val
+    alpha = np.clip(soft * 0.115 * float(np.clip(intensity, 0.45, 1.35)), 0.0, 0.13)
+    _log_array_memory('heatmap.lower_lip_visual_mask', lip_mask)
+    return _alpha_blend_rgb(output_rgb, LOWER_LIP_VISUAL_COLOR, alpha)
+
+
 def _region_blob_shape(region_name, face_span):
     base = max(face_span, 1.0)
     if region_name in ('左脸颊', '右脸颊'):
@@ -600,7 +621,7 @@ def _render_face_outline(ax, display_mask, contour_pts=None):
 
 
 def _build_beauty_overlay(original_rgb, region_infos, region_scores,
-                          image_size, display_mask, alpha=0.5):
+                          image_size, display_mask, alpha=0.5, landmarks=None):
     w, h = image_size
     debug_enabled = _heatmap_debug_enabled()
     output = np.asarray(original_rgb, dtype=np.float32)
@@ -727,6 +748,8 @@ def _build_beauty_overlay(original_rgb, region_infos, region_scores,
     if region_contours:
         largest = max(region_contours, key=lambda item: item['field'].nbytes)
         _log_array_memory('heatmap.local_contour_largest', largest['field'])
+    if landmarks is not None:
+        output = _apply_lower_lip_visual_overlay(output, landmarks, image_size, intensity=intensity)
     debug_data = {
         'region_fields': region_fields if debug_enabled else {},
         'region_contours': region_contours,
@@ -1018,6 +1041,7 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
             image_size,
             display_mask,
             alpha=alpha,
+            landmarks=landmarks,
         )
         _log_array_memory('heatmap.composite', composite)
 

@@ -133,6 +133,24 @@ def _scale_points(points, center, scale_x=1.0, scale_y=1.0):
     return out
 
 
+def _smooth_closed_contour(points, image_size, iterations=2, compensation=1.004):
+    pts = np.asarray(points, dtype=np.float64)
+    if pts.ndim != 2 or pts.shape[0] < 4:
+        return _clip_points(pts, image_size)
+
+    center = np.mean(pts, axis=0)
+    for _ in range(max(int(iterations), 0)):
+        nxt = np.roll(pts, -1, axis=0)
+        q = 0.76 * pts + 0.24 * nxt
+        r = 0.24 * pts + 0.76 * nxt
+        smoothed = np.empty((pts.shape[0] * 2, 2), dtype=np.float64)
+        smoothed[0::2] = q
+        smoothed[1::2] = r
+        pts = center + (smoothed - center) * compensation
+
+    return _clip_points(pts, image_size)
+
+
 def _convex_hull_points(points):
     pts = np.asarray(points, dtype=np.float64)
     pts = pts[np.isfinite(pts).all(axis=1)]
@@ -399,6 +417,10 @@ RIGHT_UNDER_EYE_INDICES = [263, 249, 390, 373, 374, 380, 381, 382, 362]
 OUTER_LIP_INDICES = [
     61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291,
     375, 321, 405, 314, 17, 84, 181, 91, 146,
+]
+LOWER_LIP_VISUAL_INDICES = [
+    61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291,
+    308, 324, 318, 402, 317, 14, 87, 178, 88, 95, 78,
 ]
 
 NOSE_REGION_INDICES = [
@@ -747,29 +769,43 @@ def _build_forehead_arc(landmarks, image_size, oval_pts, face_bbox, face_height)
     """
     w, h = image_size
     top_y = float(np.min(oval_pts[:, 1]))
+    face_left, face_top, face_right, _ = face_bbox
+    face_width = max(float(face_right - face_left), 1.0)
     left_top = _landmark_xy(landmarks, 109, image_size)
     right_top = _landmark_xy(landmarks, 338, image_size)
 
     # 使用左右额侧点约束弧线横向范围，避免覆盖到头发/耳侧。
     left_candidates = _points_from_indices(landmarks, [67, 103, 109], image_size)
     right_candidates = _points_from_indices(landmarks, [297, 332, 338], image_size)
-    left_top[0] = max(np.min(left_candidates[:, 0]), face_bbox[0])
-    right_top[0] = min(np.max(right_candidates[:, 0]), face_bbox[2])
+    left_x = max(np.min(left_candidates[:, 0]) - face_width * 0.018, face_left + face_width * 0.025)
+    right_x = min(np.max(right_candidates[:, 0]) + face_width * 0.018, face_right - face_width * 0.025)
 
-    forehead_expand_px = float(face_height * FOREHEAD_EXPAND_RATIO)
-    forehead_expand_px = min(forehead_expand_px, face_height * 0.22)
-    forehead_expand_px = max(forehead_expand_px, face_height * 0.12)
+    forehead_expand_px = float(np.clip(
+        face_height * FOREHEAD_EXPAND_RATIO,
+        face_height * 0.15,
+        face_height * 0.22,
+    ))
 
-    xs = np.linspace(left_top[0], right_top[0], 7)
-    t_values = np.linspace(0.0, 1.0, 7)
-    endpoint_y = min(float(left_top[1]), float(right_top[1]), top_y + face_height * 0.04)
-    ys = endpoint_y - forehead_expand_px * np.sin(np.pi * t_values)
+    point_count = 13
+    xs = np.linspace(left_x, right_x, point_count)
+    t_values = np.linspace(0.0, 1.0, point_count)
+    endpoint_y = min(float(left_top[1]), float(right_top[1]), top_y + face_height * 0.035)
+    arc_weight = np.sin(np.pi * t_values) ** 0.72
+    side_lift = face_height * 0.018 * np.sin(np.pi * t_values)
+    ys = endpoint_y - forehead_expand_px * arc_weight - side_lift
 
     # 保守限制：补偿点不超过图像上界，也不超过 face bbox 顶部太多。
-    min_allowed_y = max(0.0, face_bbox[1] - face_height * 0.02)
+    min_allowed_y = max(0.0, face_top - face_height * 0.16)
     ys = np.clip(ys, min_allowed_y, h - 1)
 
-    arc = np.stack([xs, ys], axis=1)
+    arc_core = np.stack([xs, ys], axis=1)
+    left_lower = oval_pts[-1]
+    right_lower = oval_pts[1]
+    left_bridge = left_lower * 0.62 + arc_core[0] * 0.38
+    right_bridge = right_lower * 0.62 + arc_core[-1] * 0.38
+    left_bridge[1] -= face_height * 0.012
+    right_bridge[1] -= face_height * 0.012
+    arc = np.vstack([left_bridge, arc_core, right_bridge])
     return _clip_points(arc, image_size), int(round(forehead_expand_px))
 
 
@@ -901,7 +937,8 @@ def build_improved_face_skin_mask(
     right_chain = expanded_oval[1:19]
     left_chain = expanded_oval[19:36]
     contour = np.vstack([right_chain, left_chain, forehead_arc])
-    contour = _clip_points(contour, image_size)
+    raw_contour = _clip_points(contour, image_size)
+    contour = _smooth_closed_contour(raw_contour, image_size, iterations=2, compensation=1.004)
 
     face_mask = np.zeros((h, w), dtype=np.uint8)
     face_mask = _draw_poly(face_mask, contour, 255)
@@ -918,6 +955,7 @@ def build_improved_face_skin_mask(
     face_area = int(np.sum(face_mask > 0))
     metrics.update({
         'forehead_expand_px': int(forehead_expand_px),
+        'contour_point_count': int(contour.shape[0]),
         'face_mask_area': face_area,
         'skin_mask_area': skin_area,
         'skin_mask_ratio': float(skin_area / max(w * h, 1)),
@@ -937,6 +975,7 @@ def build_improved_face_skin_mask(
     debug_info = {
         'base_oval': base_oval,
         'expanded_oval': expanded_oval,
+        'raw_contour': raw_contour,
         'improved_contour': contour,
         'forehead_arc': forehead_arc,
         'face_mask': face_mask,
@@ -982,6 +1021,15 @@ def _lip_body_mask(landmarks, image_size, face_width, dilate=True, work_bbox=Non
     if dilate:
         lip = _dilate_mask(lip, radius_px=max(1, int(round(face_width * 0.010))))
     return lip
+
+
+def build_lower_lip_visual_mask(landmarks, image_size):
+    """Build a lower-lip-only visual mask. It is not used for skin feature extraction."""
+    if not _has_landmarks(landmarks, LOWER_LIP_VISUAL_INDICES):
+        return np.zeros((image_size[1], image_size[0]), dtype=np.uint8)
+    lower_lip = _points_from_indices(landmarks, LOWER_LIP_VISUAL_INDICES, image_size)
+    mask = _draw_smooth_poly(image_size, lower_lip, sigma=0.42, threshold=72)
+    return _dilate_mask(mask, radius_px=1)
 
 
 def _build_under_eye_region_mask(region_name, landmarks, image_size, face_height, work_bbox=None):
@@ -1414,6 +1462,7 @@ def _save_mask_debug_images(image_rgb, debug_info, debug_id):
     for pts, color, width in [
         (debug_info['base_oval'], (255, 255, 255), 2),
         (debug_info['expanded_oval'], (0, 180, 255), 2),
+        (debug_info.get('raw_contour', []), (120, 210, 255), 2),
         (debug_info['improved_contour'], (0, 255, 120), 3),
         (debug_info['forehead_arc'], (255, 80, 80), 4),
     ]:
