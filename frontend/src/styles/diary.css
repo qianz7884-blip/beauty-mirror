@@ -280,12 +280,12 @@
 }
 
 .dv-day-empty {
-  min-height: 148px;
+  min-height: 230px;
   display: grid;
   align-content: center;
   justify-items: center;
-  gap: 8px;
-  padding: 22px 18px;
+  gap: 7px;
+  padding: 16px 18px 20px;
   border: 1px solid rgba(174, 205, 226, 0.42);
   border-radius: 22px;
   background:
@@ -295,6 +295,15 @@
   box-shadow: 0 12px 32px rgba(74, 112, 143, 0.09);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+.dv-day-empty-art {
+  display: block;
+  width: min(78vw, 360px);
+  max-width: 100%;
+  height: auto;
+  margin: -8px auto 0;
+  filter: drop-shadow(0 14px 20px rgba(74, 112, 143, 0.10));
 }
 
 .dv-day-empty strong {

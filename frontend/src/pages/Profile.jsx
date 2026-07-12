@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Bell, Camera, ChevronRight, ChevronUp, ClipboardList, Clock3, HelpCircle, Minus, Palette, Plus, RotateCcw, Settings, ShieldCheck, SlidersHorizontal, Trash2, Upload } from 'lucide-react'
-import { fetchDashboard } from '../api'
 import {
   BACKGROUND_PAGES,
   DEFAULT_BACKGROUND_VISIBILITY,
@@ -14,6 +12,7 @@ import {
   subscribeBackgroundSettings,
   usePageBackground,
 } from '../utils/backgroundSettings'
+import profileIpSticker from '../assets/illustrations/beauty-mirror-ip/ip-avatar-only.png'
 
 const SKIN_TYPES = ['干性', '油性', '混合', '敏感', '中性']
 const SKIN_TYPE_KEY = 'beauty_mirror_skin_type'
@@ -163,7 +162,6 @@ function BackgroundRows({
 
 export default function Profile() {
   const pageBackground = usePageBackground('profile')
-  const [data, setData] = useState(null)
   const [skinType, setSkinType] = useState(() => localStorage.getItem(SKIN_TYPE_KEY) || '')
   const [reminderOn, setReminderOn] = useState(() => localStorage.getItem('beauty_mirror_reminder') === 'true')
   const [profileImage, setProfileImage] = useState(() => localStorage.getItem(PROFILE_IMAGE_KEY) || '')
@@ -172,11 +170,6 @@ export default function Profile() {
   const [showSkinPicker, setShowSkinPicker] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const backgroundPreviewUrlsRef = useRef({})
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    fetchDashboard().then(setData).catch(() => {})
-  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -301,8 +294,13 @@ export default function Profile() {
     handlePageVisibilityChange(key, DEFAULT_BACKGROUND_VISIBILITY)
   }
 
-  const latestAnalysis = data?.recent_analyses?.[0]
-  const analysisCount = data?.total_analyses || data?.recent_analyses?.length || 0
+  const profileHighlights = [
+    { icon: SlidersHorizontal, label: '肤质', value: skinType || '未设' },
+    { icon: Bell, label: '提醒', value: reminderOn ? '已开' : '已关' },
+    { icon: Camera, label: '头像', value: profileImage ? '已设' : '未设' },
+    { icon: Palette, label: '外观', value: backgroundSettings.useGlobalImage ? '统一' : '分页' },
+    { icon: ShieldCheck, label: '隐私', value: '本地' },
+  ]
 
   return (
     <div className="bm-screen bm-profile" style={pageBackground.style}>
@@ -325,6 +323,36 @@ export default function Profile() {
       </section>
 
       <section className="bm-section bm-section-first">
+        <div className="bm-profile-id-card" aria-label="个人状态卡片">
+          <span className="bm-profile-id-stitch" aria-hidden="true" />
+          <div className="bm-profile-avatar-wrap">
+            <label className={`bm-profile-avatar bm-profile-avatar-card ${profileImage ? 'has-image' : ''}`} aria-label="上传个人头像">
+              {profileImage ? (
+                <img src={profileImage} alt="个人头像" />
+              ) : (
+                <Camera size={28} strokeWidth={1.8} />
+              )}
+              <input type="file" accept="image/*" onChange={handleProfileImageChange} />
+            </label>
+            <img className="bm-profile-ip-sticker" src={profileIpSticker} alt="" aria-hidden="true" />
+            <span className="bm-profile-avatar-star" aria-hidden="true" />
+          </div>
+          <div className="bm-profile-id-copy">
+            <div className="bm-profile-id-title">
+              <span>记录 · 管理 · 遇见更好的自己</span>
+              <ChevronRight size={17} strokeWidth={1.7} aria-hidden="true" />
+            </div>
+            <div className="bm-profile-highlight-row">
+              {profileHighlights.map(({ icon: Icon, label, value }) => (
+                <span className="bm-profile-highlight" key={label}>
+                  <Icon size={15} strokeWidth={1.6} aria-hidden="true" />
+                  <small>{label}</small>
+                  <strong>{value}</strong>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
         {showSkinPicker && (
           <div className="bm-skin-picker">
             {SKIN_TYPES.map(type => (
@@ -340,26 +368,6 @@ export default function Profile() {
           </div>
         )}
         <div className="bm-menu-card">
-          <MenuItem
-            icon={ClipboardList}
-            label="肤质档案"
-            desc="查看当前肌肤状态"
-            badge={latestAnalysis ? '已生成' : ''}
-            onClick={() => {
-              navigate('/')
-              window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-skin-history')), 100)
-            }}
-          />
-          <MenuItem
-            icon={Clock3}
-            label="分析历史"
-            desc="查看过往记录"
-            badge={analysisCount ? `${analysisCount} 次` : ''}
-            onClick={() => {
-              navigate('/')
-              window.setTimeout(() => window.dispatchEvent(new CustomEvent('open-skin-history')), 100)
-            }}
-          />
           <MenuItem
             icon={SlidersHorizontal}
             label="肤质偏好"

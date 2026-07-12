@@ -116,6 +116,10 @@ export function updateProduct(id, formData) {
   return api.put(`/products/${id}`, formData).then(r => r.data)
 }
 
+export function updateProductUsage(id, usagePercent) {
+  return api.patch(`/products/${id}/usage`, { usage_percent: usagePercent }).then(r => r.data)
+}
+
 export function deleteProduct(id) {
   return api.delete(`/products/${id}`).then(r => r.data)
 }

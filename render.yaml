@@ -12,9 +12,11 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ROI_FEATURE_BUDGET_MS
-        value: 500
+        value: 2500
       - key: ROI_FEATURE_MAX_SIDE
         value: 180
+      - key: SKIN_ANALYSIS_CONCURRENCY
+        value: 1
       - key: GEMINI_TIMEOUT_MS
         value: 30000
       - key: SKIN_ANALYSIS_HEATMAP_MAX_START_MS

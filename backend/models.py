@@ -21,6 +21,7 @@ class Product(db.Model):
     price = db.Column(db.Float, default=0.0)
     photo = db.Column(db.String(200), default='')
     notes = db.Column(db.Text, default='')
+    usage_percent = db.Column(db.Integer, default=0)
 
     # === 产品知识字段（Product Knowledge Base）===
     ingredients = db.Column(db.Text, default='')           # 核心成分
@@ -43,6 +44,7 @@ class Product(db.Model):
             'price': self.price,
             'photo': self.photo,
             'notes': self.notes,
+            'usage_percent': self.usage_percent or 0,
             # 产品知识字段
             'ingredients': self.ingredients,
             'efficacy': self.efficacy,

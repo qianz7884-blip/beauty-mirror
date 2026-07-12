@@ -72,6 +72,7 @@ def _migrate_database():
             product_columns = _column_names(inspector, 'products')
             _add_column(conn, product_columns, 'products', 'user_id', f"user_id VARCHAR(80) DEFAULT '{DEFAULT_DEMO_USER_ID}'")
             _add_column(conn, product_columns, 'products', 'volume', "volume VARCHAR(50) DEFAULT ''")
+            _add_column(conn, product_columns, 'products', 'usage_percent', "usage_percent INTEGER DEFAULT 0")
             _add_column(conn, product_columns, 'products', 'ingredients', "ingredients TEXT DEFAULT ''")
             _add_column(conn, product_columns, 'products', 'efficacy', "efficacy TEXT DEFAULT ''")
             _add_column(

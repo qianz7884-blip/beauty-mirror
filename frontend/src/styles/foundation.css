@@ -23,6 +23,7 @@
   --tab-h: 60px;
   --max-w: 480px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --bm-font-family: "Long Cang", "Xiaolai SC", "Xiaolai", "LXGW Marker Gothic", "LXGW WenKai Screen", "LXGW WenKai", "STKaiti", "KaiTi", "Kaiti SC", "Microsoft YaHei", sans-serif;
   --score-high: #8b9b80;         /* >=80 绿色 */
   --score-mid:  #c4a85c;         /* 60-79 琥珀色 */
   --score-low:  #c97a7a;         /* <60 柔红 */
@@ -35,15 +36,23 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-family: var(--bm-font-family);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   line-height: 1.6;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   background:
     radial-gradient(circle at 82% 5%, rgba(197, 225, 242, 0.72), transparent 32%),
     radial-gradient(circle at 8% 18%, rgba(255, 255, 255, 0.92), transparent 25%),
     linear-gradient(180deg, #eef8ff 0%, #f7fbfd 42%, #edf6fb 100%);
+}
+
+button,
+input,
+textarea,
+select,
+option {
+  font-family: var(--bm-font-family);
 }
 
 /* ============================

@@ -15,6 +15,7 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
   const [purchaseDate, setPurchaseDate] = useState(product?.purchase_date || initialValues.purchase_date || '')
   const [price, setPrice] = useState(product?.price || initialValues.price || '')
   const [notes, setNotes] = useState(product?.notes || initialValues.notes || '')
+  const [usagePercent, setUsagePercent] = useState(product?.usage_percent ?? initialValues.usage_percent ?? 0)
   const [photo, setPhoto] = useState(initialPhoto?.file || null)
   const [photoPreview, setPhotoPreview] = useState(
     initialPhoto?.previewUrl || getPhotoUrl(product?.photo, 'products')
@@ -74,6 +75,7 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
     formData.append('purchase_date', purchaseDate)
     formData.append('price', price || 0)
     formData.append('notes', notes.trim())
+    formData.append('usage_percent', usagePercent || 0)
     formData.append('ingredients', initialValues.ingredients || product?.ingredients || '')
     formData.append('efficacy', initialValues.efficacy || product?.efficacy || '')
     formData.append('suitable_skin', initialValues.suitable_skin || product?.suitable_skin || '')
@@ -186,6 +188,22 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
             <div className="form-group">
               <label className="form-label">备注</label>
               <textarea className="form-input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="使用感受、适合肤质..." />
+            </div>
+          )}
+
+          {!isQuick && (
+            <div className="form-group">
+              <label className="form-label">使用进度：{usagePercent}%</label>
+              <input
+                className="bm-usage-slider"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={usagePercent}
+                style={{ '--usage-value': `${usagePercent}%` }}
+                onChange={e => setUsagePercent(e.target.value)}
+              />
             </div>
           )}
 

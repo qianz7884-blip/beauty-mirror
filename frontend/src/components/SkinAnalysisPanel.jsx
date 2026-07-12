@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { SkinHistoryGallery, SkinHistoryList } from './SkinHistoryViews'
 import { buildMirrorAdviceCards, buildStatusSummary, compressPhoto } from '../utils/skinAnalysisView'
+import mirrorAdviceIllustration from '../assets/illustrations/beauty-mirror-ip/mirror-advice-handmirror.png'
 
 export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, viewHistoryId, forceHistoryMode, autoOpenCamera, onAnalysisComplete }) {
   const [step, setStep] = useState(viewHistoryId || forceHistoryMode ? 'loading' : (photoFile ? 'preview' : 'history'))
@@ -31,9 +32,9 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
   const [currentPreviewUrl, setCurrentPreviewUrl] = useState(previewUrl)
   const [loadingText, setLoadingText] = useState('正在处理照片...')
   const [viewerImage, setViewerImage] = useState(null)
-  const [adviceChoice, setAdviceChoice] = useState('')
   const [feedbackMood, setFeedbackMood] = useState('')
-  const [feedbackSatisfaction, setFeedbackSatisfaction] = useState('')
+  const [saveToDiary, setSaveToDiary] = useState(false)
+  const [analyzedPhotoFile, setAnalyzedPhotoFile] = useState(null)
   const [feedbackSaving, setFeedbackSaving] = useState(false)
   const cameraRef = useRef(null)
   const [cameraKey, setCameraKey] = useState(0)
@@ -113,6 +114,9 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     setStep('preview')
     setResult(null)
     setErrorMsg('')
+    setFeedbackMood('')
+    setSaveToDiary(false)
+    setAnalyzedPhotoFile(null)
     e.target.value = ''
     setCameraKey(k => k + 1)
   }
@@ -124,10 +128,14 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     }
     setStep('loading')
     setErrorMsg('')
+    setFeedbackMood('')
+    setSaveToDiary(false)
+    setAnalyzedPhotoFile(null)
 
     try {
       setLoadingText('正在压缩照片...')
       const compressed = await compressPhoto(currentPhotoFile, 1024)
+      setAnalyzedPhotoFile(compressed)
       console.log(
         `[SkinAnalysis] 照片压缩: ${(currentPhotoFile.size / 1024).toFixed(0)}KB → ${(compressed.size / 1024).toFixed(0)}KB`
       )
@@ -168,7 +176,8 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     setHistorySelectMode(false)
     setSelectedHistoryIds([])
     setFeedbackMood('')
-    setFeedbackSatisfaction('')
+    setSaveToDiary(false)
+    setAnalyzedPhotoFile(null)
   }
 
   const handleDeleteHistory = async (id, e) => {
@@ -236,6 +245,35 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
     || routineData
     || ((displayData?.trend || result?.trend)?.has_history)
   )
+  const canSaveAnalysisToDiary = !historyView && !selectedHistory && !viewHistoryId && !forceHistoryMode && result?.success
+
+  const handleFinish = async () => {
+    if (canSaveAnalysisToDiary && saveToDiary) {
+      setFeedbackSaving(true)
+      try {
+        const formData = new FormData()
+        const analysisId = result?.id || selectedHistory?.id
+        const diaryPhoto = analyzedPhotoFile || currentPhotoFile
+        formData.append('title', `镜前分析记录 - ${new Date().toLocaleDateString('zh-CN')}`)
+        formData.append('mood', feedbackMood || 'stable')
+        formData.append('content', statusSummary || '')
+        formData.append('created_date', new Date().toISOString().slice(0, 10))
+        formData.append('tags', JSON.stringify(['镜前建议']))
+        if (analysisId) formData.append('skin_analysis_id', String(analysisId))
+        if (diaryPhoto) {
+          formData.append('photo', diaryPhoto, diaryPhoto.name || 'mirror-photo.jpg')
+        }
+        await createDiary(formData)
+      } catch (e) {
+        console.error('保存日记失败:', e)
+        setErrorMsg('保存到日记失败，请稍后再试')
+        setFeedbackSaving(false)
+        return
+      }
+      setFeedbackSaving(false)
+    }
+    onClose()
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -294,6 +332,9 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
         {/* 步骤1b：历史入口 */}
         {step === 'history' && (
           <div className="skin-entry-panel">
+            <div className="skin-entry-visual skin-entry-visual-wide">
+              <img src={mirrorAdviceIllustration} alt="" aria-hidden="true" />
+            </div>
             <p className="skin-entry-copy">选择镜前辅助方式，拍照生成当前建议，或回看之前的镜前状态。</p>
             <div className="skin-entry-actions">
               <button className="skin-entry-action primary" type="button" onClick={() => cameraRef.current?.click()}>
@@ -444,17 +485,6 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                         </div>
                       ))}
                     </div>
-                    <div className="mirror-advice-actions">
-                      {['采纳', '忽略', '我喜欢现在这样'].map(label => (
-                        <button
-                          key={label}
-                          className={adviceChoice === label ? 'active' : ''}
-                          onClick={() => setAdviceChoice(label)}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 )}
 
@@ -583,66 +613,48 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
               </div>
             )}
 
-            {/* ── 今日心情 + 满意度（仅新分析，非历史查看） ── */}
-            {!historyView && !viewHistoryId && !forceHistoryMode && result?.success && (
+            {/* ── 保存到日记（仅新分析，非历史查看） ── */}
+            {canSaveAnalysisToDiary && (
               <>
                 <div className="dv-form-section">
-                  <p className="dv-form-section-label">今日心情</p>
-                  <div className="dv-mood-selector">
-                    {MOOD_OPTIONS.map(opt => (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        className={`dv-mood-option${feedbackMood === opt.key ? ' dv-mood-selected' : ''}`}
-                        style={feedbackMood === opt.key ? { borderColor: opt.color, background: opt.color + '0C' } : {}}
-                        onClick={() => setFeedbackMood(opt.key)}
-                      >
-                        <span className="dv-mood-swatch" style={{ background: opt.color }} />
-                        <span className="dv-mood-option-label" style={{ color: feedbackMood === opt.key ? opt.color : '#868685' }}>
-                          {opt.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    className={`skin-diary-save-option${saveToDiary ? ' active' : ''}`}
+                    onClick={() => setSaveToDiary(prev => !prev)}
+                    aria-pressed={saveToDiary}
+                  >
+                    <span className="skin-diary-save-checkbox" aria-hidden="true">
+                      {saveToDiary ? '✓' : ''}
+                    </span>
+                    <span className="skin-diary-save-copy">
+                      <strong>保存到日记</strong>
+                      <small>日记照片会使用刚刚拍的照片</small>
+                    </span>
+                  </button>
                 </div>
 
-                <div className="dv-form-section">
-                  <p className="dv-form-section-label">整体满意度</p>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {[
-                      { key: 'satisfied', label: '满意', color: '#7C9473' },
-                      { key: 'unsatisfied', label: '不满意', color: '#B98791' },
-                    ].map(opt => {
-                      const isSel = feedbackSatisfaction === opt.key
-                      return (
+                {saveToDiary && (
+                  <div className="dv-form-section">
+                    <p className="dv-form-section-label">今日心情</p>
+                    <div className="dv-mood-selector">
+                      {MOOD_OPTIONS.map(opt => (
                         <button
                           key={opt.key}
                           type="button"
-                          onClick={() => setFeedbackSatisfaction(opt.key)}
-                          style={{
-                            flex: 1,
-                            padding: '12px 16px',
-                            borderRadius: 12,
-                            border: isSel ? `2px solid ${opt.color}` : '2px solid #e5e5e0',
-                            background: isSel ? `${opt.color}0C` : '#fff',
-                            fontSize: 15,
-                            fontWeight: isSel ? 600 : 400,
-                            color: isSel ? opt.color : '#868685',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                          }}
+                          className={`dv-mood-option${feedbackMood === opt.key ? ' dv-mood-selected' : ''}`}
+                          style={feedbackMood === opt.key ? { borderColor: opt.color, background: opt.color + '0C' } : {}}
+                          onClick={() => setFeedbackMood(opt.key)}
                         >
-                          {opt.label}
+                          <span className="dv-mood-swatch" style={{ background: opt.color }} />
+                          <span className="dv-mood-option-label" style={{ color: feedbackMood === opt.key ? opt.color : '#868685' }}>
+                            {opt.label}
+                          </span>
                         </button>
-                      )
-                    })}
+                      ))}
+                    </div>
+                    <p className="skin-diary-save-note">不选择心情时，会默认保存为平稳状态。</p>
                   </div>
-                  {feedbackSatisfaction === 'unsatisfied' && (
-                    <p style={{ fontSize: 12, color: '#B98791', marginTop: 8, textAlign: 'center' }}>
-                      不满意则不保存，分析结果将丢失
-                    </p>
-                  )}
-                </div>
+                )}
               </>
             )}
 
@@ -661,29 +673,8 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
               <button
                 className="btn btn-primary"
                 style={{ flex: viewHistoryId || forceHistoryMode ? 2 : 1 }}
-                disabled={
-                  feedbackSaving ||
-                  (!viewHistoryId && !forceHistoryMode && result?.success && (!feedbackMood || !feedbackSatisfaction))
-                }
-                onClick={async () => {
-                  if (!viewHistoryId && !forceHistoryMode && result?.success && feedbackSatisfaction === 'satisfied') {
-                    setFeedbackSaving(true)
-                    try {
-                      const formData = new FormData()
-                      const analysisId = result?.id || selectedHistory?.id
-                      formData.append('title', `镜前分析记录 — ${new Date().toLocaleDateString('zh-CN')}`)
-                      formData.append('mood', feedbackMood)
-                      formData.append('content', '')
-                      formData.append('created_date', new Date().toISOString().slice(0, 10))
-                      if (analysisId) formData.append('skin_analysis_id', String(analysisId))
-                      await createDiary(formData)
-                    } catch (e) {
-                      console.error('自动保存日记失败:', e)
-                    }
-                    setFeedbackSaving(false)
-                  }
-                  onClose()
-                }}
+                disabled={feedbackSaving}
+                onClick={handleFinish}
               >
                 {feedbackSaving ? '保存中...' : viewHistoryId || forceHistoryMode ? '关闭' : '完成'}
               </button>

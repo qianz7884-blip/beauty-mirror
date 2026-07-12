@@ -22,6 +22,14 @@ def _normalize_user_product_source(source):
     return 'gemini' if source == 'knowledge_base' else source
 
 
+def _parse_usage_percent(value, default=0):
+    try:
+        number = int(float(value if value is not None else default))
+    except (TypeError, ValueError):
+        number = default
+    return max(0, min(100, number))
+
+
 @products_bp.route('/products')
 def product_list():
     search = request.args.get('search', '').strip()
@@ -67,6 +75,7 @@ def product_create():
             purchase_date=request.form.get('purchase_date', '').strip(),
             price=price,
             notes=request.form.get('notes', '').strip(),
+            usage_percent=_parse_usage_percent(request.form.get('usage_percent'), 0),
             ingredients=request.form.get('ingredients', '').strip(),
             efficacy=request.form.get('efficacy', '').strip(),
             suitable_skin=request.form.get('suitable_skin', '').strip(),
@@ -114,6 +123,10 @@ def product_update(pid):
         product.purchase_date = request.form.get('purchase_date', '').strip()
         product.price = price
         product.notes = request.form.get('notes', '').strip()
+        product.usage_percent = _parse_usage_percent(
+            request.form.get('usage_percent'),
+            product.usage_percent or 0,
+        )
         product.ingredients = request.form.get('ingredients', product.ingredients).strip()
         product.efficacy = request.form.get('efficacy', product.efficacy).strip()
         product.suitable_skin = request.form.get('suitable_skin', product.suitable_skin).strip()
@@ -140,6 +153,18 @@ def product_update(pid):
         db.session.rollback()
         print(f'[product_update] 更新产品失败: {exc}')
         return error('保存产品失败，请检查图片或输入内容', 500)
+
+
+@products_bp.route('/products/<int:pid>/usage', methods=['PATCH'])
+def product_update_usage(pid):
+    product = _user_products_query().filter(Product.id == pid).first()
+    if not product:
+        return error('产品不存在', 404)
+
+    payload = request.get_json(silent=True) or {}
+    product.usage_percent = _parse_usage_percent(payload.get('usage_percent'), product.usage_percent or 0)
+    db.session.commit()
+    return jsonify(product.to_dict())
 
 
 @products_bp.route('/products/<int:pid>', methods=['DELETE'])

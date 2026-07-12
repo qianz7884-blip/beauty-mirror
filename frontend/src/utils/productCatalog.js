@@ -30,6 +30,7 @@ export function groupByCategory(products) {
 export function getProductStatus(product) {
   const text = `${product.notes || ''} ${product.source || ''}`.toLowerCase()
   if (text.includes('过期')) return '已过期'
+  if (Number(product.usage_percent || 0) >= 80) return '快用完'
   if (text.includes('快用完') || text.includes('空瓶')) return '快用完'
   if (text.includes('备用')) return '备用'
   return '在用'
@@ -48,6 +49,16 @@ export function getUsageEstimate(status) {
   if (status === '快用完') return 82
   if (status === '备用') return 8
   return 38
+}
+
+export function getProductUsagePercent(product, usageRecords = {}) {
+  const saved = Number(product?.usage_percent)
+  if (Number.isFinite(saved) && saved > 0) return Math.max(0, Math.min(100, saved))
+
+  const local = Number(usageRecords?.[product?.id])
+  if (Number.isFinite(local)) return Math.max(0, Math.min(100, local))
+
+  return getUsageEstimate(getProductStatus(product || {}))
 }
 
 export function isHexColor(value) {

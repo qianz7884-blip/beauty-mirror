@@ -32,4 +32,4 @@ ENV MEDIAPIPE_DISABLE_GPU=1 \
     EGL_PLATFORM=surfaceless
 
 # ── 启动（--preload 让 gunicorn 在接收请求前加载 app，启动错误立即可见）─
-CMD gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1 --threads 1
+CMD gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 1 --threads 2

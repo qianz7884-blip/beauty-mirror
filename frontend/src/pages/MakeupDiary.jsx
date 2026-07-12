@@ -10,7 +10,6 @@ import {
 import DiaryCard from '../components/DiaryCard'
 import DiaryForm from '../components/DiaryForm'
 import {
-  BookOpen,
   Camera,
   ChevronLeft,
   ChevronRight,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react'
 import { usePageBackground } from '../utils/backgroundSettings'
 import { MOOD_OPTIONS, getMoodInfo } from '../utils/moods'
+import diaryEmptyIllustration from '../assets/illustrations/beauty-mirror-ip/diary-empty-resting.png'
 
 const HEATMAP_WEEKDAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const HEATMAP_MIN_WEEKS = 24
@@ -434,7 +434,7 @@ export default function MakeupDiary() {
           </div>
         ) : (
           <div className="dv-day-empty">
-            <BookOpen size={22} strokeWidth={1.5} />
+            <img className="dv-day-empty-art" src={diaryEmptyIllustration} alt="" aria-hidden="true" />
             <strong>这一天还没有记录</strong>
             <span>可以补一篇当天的妆容、护肤或产品使用感。</span>
           </div>
