@@ -41,6 +41,14 @@
   object-fit: contain;
   display: block;
   filter: drop-shadow(0 14px 20px rgba(74, 112, 143, 0.10));
+  animation: bm-home-advice-float 6.2s ease-in-out infinite;
+  transform-origin: 50% 72%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skin-entry-visual img {
+    animation: none;
+  }
 }
 
 .skin-entry-visual-wide {

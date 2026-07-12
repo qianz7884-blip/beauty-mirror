@@ -276,9 +276,10 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet skin-analysis-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
+    <>
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-sheet skin-analysis-sheet" onClick={e => e.stopPropagation()}>
+          <div className="modal-header">
           <h3>
             {step === 'preview' && '确认照片'}
             {step === 'loading' && (loadingHistory ? '加载中...' : '正在生成镜前建议...')}
@@ -706,22 +707,23 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
           </div>
         )}
       </div>
-
-      {/* 图片查看器 */}
-      {viewerImage && (
-        <div className="image-viewer-overlay" onClick={() => setViewerImage(null)}>
-          <button className="image-viewer-close" onClick={() => setViewerImage(null)}>
-            ✕
-          </button>
-          <img
-            src={viewerImage}
-            alt="放大查看"
-            className="image-viewer-img"
-            style={{ filter: 'none' }}
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
     </div>
+
+    {/* 图片查看器 — 渲染在 modal-overlay 外部，避免关闭大图时点透触发面板关闭 */}
+    {viewerImage && (
+      <div className="image-viewer-overlay" onClick={(e) => { e.stopPropagation(); setViewerImage(null); }}>
+        <button className="image-viewer-close" onClick={(e) => { e.stopPropagation(); setViewerImage(null); }}>
+          ✕
+        </button>
+        <img
+          src={viewerImage}
+          alt="放大查看"
+          className="image-viewer-img"
+          style={{ filter: 'none' }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    )}
+  </>
   )
 }
