@@ -43,6 +43,8 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
   const [category, setCategory] = useState('其他')
   const [color, setColor] = useState('')
   const [volume, setVolume] = useState('')
+  const [purchaseDate, setPurchaseDate] = useState('')
+  const [expiryDate, setExpiryDate] = useState('')
   const [recognizedMeta, setRecognizedMeta] = useState({})
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -70,6 +72,11 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
           efficacy: result.efficacy || '',
           suitable_skin: result.suitable_skin || '',
           usage_instructions: result.usage_instructions || '',
+          usage_steps: result.usage_steps || '',
+          product_features: result.product_features || '',
+          suitable_regions: result.suitable_regions || '',
+          suitable_scenes: result.suitable_scenes || '',
+          user_feedback: result.user_feedback || '',
           source: result.source || 'gemini',
           confidence: result.confidence || '',
           recognition_mode: result.recognition_mode || '',
@@ -115,10 +122,17 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
       formData.append('category', category)
       formData.append('color', color.trim())
       formData.append('volume', volume.trim())
+      formData.append('purchase_date', purchaseDate)
+      formData.append('expiry_date', expiryDate)
       formData.append('ingredients', recognizedMeta.ingredients || '')
       formData.append('efficacy', recognizedMeta.efficacy || '')
       formData.append('suitable_skin', recognizedMeta.suitable_skin || '')
       formData.append('usage_instructions', recognizedMeta.usage_instructions || '')
+      formData.append('usage_steps', recognizedMeta.usage_steps || '')
+      formData.append('product_features', recognizedMeta.product_features || '')
+      formData.append('suitable_regions', recognizedMeta.suitable_regions || '')
+      formData.append('suitable_scenes', recognizedMeta.suitable_scenes || '')
+      formData.append('user_feedback', recognizedMeta.user_feedback || '')
       formData.append('source', recognizedMeta.source || 'gemini')
       formData.append('photo', photoFile)
       await createProduct(formData)
@@ -213,6 +227,17 @@ export default function RecognizePanel({ photoFile, previewUrl, onClose, onSaved
             <div className="form-group">
               <label className="form-label">色号</label>
               <input className="form-input" value={color} onChange={e => setColor(e.target.value)} placeholder="例如：#FF0000 或 正红色" />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">购买日期</label>
+                <input className="form-input" type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">预计到期</label>
+                <input className="form-input" type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} />
+              </div>
             </div>
 
             {/* 搜索官网图 */}

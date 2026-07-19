@@ -72,6 +72,11 @@ export default function ProductVoiceSheet({ onClose, onResult }) {
         efficacy: result.efficacy || '',
         suitable_skin: result.suitable_skin || '',
         usage_instructions: result.usage_instructions || '',
+        usage_steps: result.usage_steps || '',
+        product_features: result.product_features || '',
+        suitable_regions: result.suitable_regions || '',
+        suitable_scenes: result.suitable_scenes || '',
+        user_feedback: result.user_feedback || '',
         source: result.source || 'voice',
       })
     } catch (error) {

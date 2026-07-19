@@ -2,13 +2,27 @@ import { useState } from 'react'
 import { getPhotoUrl } from '../api'
 import ImageViewer from './ImageViewer'
 import { Edit3, Trash2 } from 'lucide-react'
-import { getProductStatus } from '../utils/productCatalog'
+import { formatProductPrice, getProductExpiryDate, getProductStatus } from '../utils/productCatalog'
+
+function parseTagText(value) {
+  return String(value || '')
+    .split(/[、,，/]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
 
 export default function ProductCard({ product, onEdit, onDelete }) {
   const [viewImage, setViewImage] = useState(null)
 
   const photoUrl = product.photo ? getPhotoUrl(product.photo, 'products') : null
   const status = getProductStatus(product)
+  const expiryDate = getProductExpiryDate(product)
+  const priceText = formatProductPrice(product.price)
+  const recommendationTags = [
+    ...parseTagText(product.product_features),
+    ...parseTagText(product.suitable_regions),
+    ...parseTagText(product.usage_steps),
+  ].slice(0, 3)
 
   return (
     <>
@@ -31,9 +45,16 @@ export default function ProductCard({ product, onEdit, onDelete }) {
           <div className="vault-product-meta">
             {product.color && <span>色号 {product.color}</span>}
             {product.purchase_date && <span>开封/购入 {product.purchase_date}</span>}
+            {expiryDate && <span>到期 {expiryDate}</span>}
             {product.volume && <span>容量 {product.volume}</span>}
-            {product.price > 0 && <span>¥{product.price}</span>}
+            {priceText && <span>¥{priceText}</span>}
           </div>
+
+          {recommendationTags.length > 0 && (
+            <div className="vault-product-rec-tags">
+              {recommendationTags.map(tag => <span key={tag}>{tag}</span>)}
+            </div>
+          )}
 
           {product.color && (
             <span className="vault-swatch" style={{ background: product.color }} />

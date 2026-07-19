@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CalendarDays, Check, ChevronRight, Edit3, Grid2X2, Pencil, PlusCircle, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { fetchProducts, createProduct, updateProduct, updateProductUsage, deleteProduct, getAnonymousUserId, getPhotoUrl } from '../api'
 import ProductCategoryManager from '../components/ProductCategoryManager'
@@ -31,12 +32,14 @@ import placeholderOther from '../assets/illustrations/product-placeholders/other
 import { DEFAULT_CATEGORIES, loadCustomCategories, saveCustomCategories } from '../categories'
 import {
   DEFAULT_SHADE_SWATCHES,
-  addYears,
   getDetailProfile,
+  getProductExpiryDate,
   getProductUsagePercent,
   getProductStatus,
+  formatProductPrice,
   groupByCategory,
   isHexColor,
+  normalizePriceInput,
   loadShadeRecords,
   loadUsageRecords,
   saveShadeRecords,
@@ -52,6 +55,53 @@ let productMemoryCacheUserId = ''
 function normalizeProductList(data) {
   return Array.isArray(data) ? data : []
 }
+
+function parseTagText(value) {
+  return String(value || '')
+    .split(/[、,，/]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function serializeTagText(value) {
+  return parseTagText(value).join('、')
+}
+
+function toggleTagValue(value, option) {
+  const selected = parseTagText(value)
+  const next = selected.includes(option)
+    ? selected.filter(item => item !== option)
+    : [...selected, option]
+  return serializeTagText(next)
+}
+
+const RECOMMENDATION_TAG_FIELDS = [
+  {
+    field: 'usage_steps',
+    label: '适合步骤',
+    options: ['护肤', '妆前', '底妆', '遮瑕', '定妆', '眼妆', '唇妆', '补妆'],
+  },
+  {
+    field: 'product_features',
+    label: '产品特点',
+    options: ['保湿', '清爽', '控油', '修护', '提亮', '遮瑕', '持妆', '舒缓'],
+  },
+  {
+    field: 'suitable_regions',
+    label: '适合区域',
+    options: ['T区', '鼻翼', '眼下', '唇周', '脸颊', '下颌', '全脸'],
+  },
+  {
+    field: 'suitable_scenes',
+    label: '适合场景',
+    options: ['通勤', '办公室', '晚间出门', '拍照', '干燥天气', '潮湿天气'],
+  },
+  {
+    field: 'user_feedback',
+    label: '我的反馈',
+    options: ['好用', '持妆好', '不卡粉', '容易卡粉', '搓泥', '闷痘', '太油', '太干'],
+  },
+]
 
 function readProductCache() {
   const userId = getAnonymousUserId()
@@ -313,6 +363,7 @@ function ProductListSkeleton() {
 
 export default function ProductManage() {
   const pageBackground = usePageBackground('products')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [products, setProducts] = useState(() => readProductCache())
   const [loading, setLoading] = useState(() => readProductCache().length === 0)
   const [loadError, setLoadError] = useState('')
@@ -363,6 +414,35 @@ export default function ProductManage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (searchParams.get('add') !== '1') return
+
+    setSelectedProduct(null)
+    setShowForm(false)
+    setEditingProduct(null)
+    setInitialValues({})
+    setShowSearch(false)
+    setShowAddActions(true)
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('add')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const handleToggleAddActions = () => {
+      setSelectedProduct(null)
+      setShowForm(false)
+      setEditingProduct(null)
+      setInitialValues({})
+      setShowSearch(false)
+      setShowAddActions(value => !value)
+    }
+
+    window.addEventListener('beauty-mirror:toggle-product-add', handleToggleAddActions)
+    return () => window.removeEventListener('beauty-mirror:toggle-product-add', handleToggleAddActions)
+  }, [])
 
   useEffect(() => () => {
     if (petAnimationTimerRef.current) window.clearTimeout(petAnimationTimerRef.current)
@@ -466,6 +546,7 @@ export default function ProductManage() {
     formData.append('color', (values.color ?? baseProduct.color ?? '').trim())
     formData.append('volume', (values.volume ?? baseProduct.volume ?? '').trim())
     formData.append('purchase_date', values.purchase_date ?? baseProduct.purchase_date ?? '')
+    formData.append('expiry_date', values.expiry_date ?? baseProduct.expiry_date ?? '')
     formData.append('price', values.price ?? baseProduct.price ?? 0)
     formData.append('notes', (values.notes ?? baseProduct.notes ?? '').trim())
     formData.append('usage_percent', values.usage_percent ?? baseProduct.usage_percent ?? 0)
@@ -473,6 +554,11 @@ export default function ProductManage() {
     formData.append('efficacy', baseProduct.efficacy || '')
     formData.append('suitable_skin', baseProduct.suitable_skin || '')
     formData.append('usage_instructions', baseProduct.usage_instructions || '')
+    formData.append('usage_steps', values.usage_steps ?? baseProduct.usage_steps ?? '')
+    formData.append('product_features', values.product_features ?? baseProduct.product_features ?? '')
+    formData.append('suitable_regions', values.suitable_regions ?? baseProduct.suitable_regions ?? '')
+    formData.append('suitable_scenes', values.suitable_scenes ?? baseProduct.suitable_scenes ?? '')
+    formData.append('user_feedback', values.user_feedback ?? baseProduct.user_feedback ?? '')
     formData.append('source', baseProduct.source || 'manual')
     return formData
   }
@@ -486,9 +572,15 @@ export default function ProductManage() {
       color: selectedProduct.color || '',
       volume: selectedProduct.volume || '',
       purchase_date: selectedProduct.purchase_date || '',
-      price: selectedProduct.price || '',
+      expiry_date: selectedProduct.expiry_date || '',
+      price: normalizePriceInput(selectedProduct.price),
       notes: selectedProduct.notes || '',
       usage_percent: getProductUsagePercent(selectedProduct, usageRecords),
+      usage_steps: selectedProduct.usage_steps || '',
+      product_features: selectedProduct.product_features || '',
+      suitable_regions: selectedProduct.suitable_regions || '',
+      suitable_scenes: selectedProduct.suitable_scenes || '',
+      user_feedback: selectedProduct.user_feedback || '',
     })
     setDetailEditing(true)
   }
@@ -653,6 +745,11 @@ export default function ProductManage() {
     const photoUrl = product.photo ? getPhotoUrl(product.photo, 'products') : ''
     const usagePercent = getProductUsagePercent(product, usageRecords)
     const displayProduct = { ...product, usage_percent: usagePercent }
+    const recommendationTags = [
+      ...parseTagText(product.product_features),
+      ...parseTagText(product.suitable_regions),
+      ...parseTagText(product.usage_steps),
+    ].slice(0, 3)
 
     return (
       <article key={product.id} className={`bm-product-card ${viewMode === 'grid' ? 'bm-product-grid-card' : ''}`}>
@@ -680,8 +777,13 @@ export default function ProductManage() {
             {product.volume && <span>容量 {product.volume}</span>}
             {product.color && <span>色号 {product.color}</span>}
             {usagePercent > 0 && <span>已用 {usagePercent}%</span>}
-            {product.price > 0 && <span>¥{product.price}</span>}
+            {formatProductPrice(product.price) && <span>¥{formatProductPrice(product.price)}</span>}
           </div>
+          {recommendationTags.length > 0 && (
+            <div className="vault-product-rec-tags">
+              {recommendationTags.map(tag => <span key={tag}>{tag}</span>)}
+            </div>
+          )}
         </button>
         <div className="bm-product-actions">
           <button
@@ -696,9 +798,15 @@ export default function ProductManage() {
                 color: product.color || '',
                 volume: product.volume || '',
                 purchase_date: product.purchase_date || '',
-                price: product.price || '',
+                expiry_date: product.expiry_date || '',
+                price: normalizePriceInput(product.price),
                 notes: product.notes || '',
                 usage_percent: usagePercent,
+                usage_steps: product.usage_steps || '',
+                product_features: product.product_features || '',
+                suitable_regions: product.suitable_regions || '',
+                suitable_scenes: product.suitable_scenes || '',
+                user_feedback: product.user_feedback || '',
               })
               setDetailEditing(true)
             }}
@@ -751,11 +859,18 @@ export default function ProductManage() {
       : usagePercent
     const detailProduct = { ...selectedProduct, usage_percent: detailUsagePercent }
     const status = getProductStatus(detailProduct)
-    const expiryDate = addYears(selectedProduct.purchase_date, 2)
+    const expiryDate = getProductExpiryDate(selectedProduct)
     const colorIsHex = isHexColor(selectedProduct.color)
     const selectedShade = shadeRecords[selectedProduct.id] || (colorIsHex ? selectedProduct.color : DEFAULT_SHADE_SWATCHES[0])
     const detailProfile = getDetailProfile(selectedProduct)
     const showShadeRow = detailProfile.kind === 'shade'
+    const recommendationTags = [
+      { label: '适合步骤', items: parseTagText(selectedProduct.usage_steps) },
+      { label: '产品特点', items: parseTagText(selectedProduct.product_features) },
+      { label: '适合区域', items: parseTagText(selectedProduct.suitable_regions) },
+      { label: '适合场景', items: parseTagText(selectedProduct.suitable_scenes) },
+      { label: '我的反馈', items: parseTagText(selectedProduct.user_feedback) },
+    ].filter(group => group.items.length > 0)
 
     return (
       <div className="bm-screen bm-product-detail-page" style={pageBackground.style}>
@@ -871,11 +986,19 @@ export default function ProductManage() {
               )}
             </div>
             <div>
+              <span>预计到期</span>
+              {detailEditing ? (
+                <input type="date" value={detailDraft.expiry_date || ''} onChange={event => updateDetailDraft('expiry_date', event.target.value)} />
+              ) : (
+                <strong>{selectedProduct.expiry_date || expiryDate || '未记录'}</strong>
+              )}
+            </div>
+            <div>
               <span>价格</span>
               {detailEditing ? (
                 <input type="number" min="0" step="0.01" value={detailDraft.price ?? ''} onChange={event => updateDetailDraft('price', event.target.value)} placeholder="0" />
               ) : (
-                <strong>{selectedProduct.price > 0 ? `¥${selectedProduct.price}` : '未记录'}</strong>
+                <strong>{formatProductPrice(selectedProduct.price) ? `¥${formatProductPrice(selectedProduct.price)}` : '未记录'}</strong>
               )}
             </div>
           </div>
@@ -943,6 +1066,50 @@ export default function ProductManage() {
               }}
               aria-label="调整产品使用进度"
             />
+          </div>
+
+          <div className="bm-detail-panel">
+            <div className="bm-detail-panel-title">
+              <strong>推荐标签</strong>
+              <span>{recommendationTags.length ? '用于镜前建议' : '还未设置'}</span>
+            </div>
+            {detailEditing ? (
+              <div className="bm-detail-tag-edit">
+                {RECOMMENDATION_TAG_FIELDS.map(({ field, label, options }) => {
+                  const selected = parseTagText(detailDraft[field])
+                  return (
+                  <div key={field} className="bm-detail-tag-picker">
+                    <span>{label}</span>
+                    <div className="product-tag-picker">
+                      {options.map(option => (
+                        <button
+                          key={option}
+                          type="button"
+                          className={selected.includes(option) ? 'active' : ''}
+                          onClick={() => updateDetailDraft(field, toggleTagValue(detailDraft[field], option))}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  )
+                })}
+              </div>
+            ) : recommendationTags.length ? (
+              <div className="bm-detail-tag-groups">
+                {recommendationTags.map(group => (
+                  <div key={group.label}>
+                    <span>{group.label}</span>
+                    <div>
+                      {group.items.map(item => <em key={item}>{item}</em>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="bm-detail-field-copy">编辑产品后添加步骤、特点、区域和场景，镜前建议会更容易选到它。</p>
+            )}
           </div>
 
           <div className="bm-detail-list">
@@ -1034,17 +1201,6 @@ export default function ProductManage() {
           <div className="bm-vault-head-actions">
             <button
               type="button"
-              className={showAddActions ? 'active' : ''}
-              onClick={() => {
-                setShowAddActions(value => !value)
-                setShowSearch(false)
-              }}
-              aria-label="添加产品"
-            >
-              <PlusCircle size={21} strokeWidth={1.8} />
-            </button>
-            <button
-              type="button"
               className={showSearch ? 'active' : ''}
               onClick={() => {
                 setShowSearch(value => !value)
@@ -1091,7 +1247,16 @@ export default function ProductManage() {
           ))}
         </div>
 
-        {showAddActions && (
+      </section>
+
+      {showAddActions && (
+        <>
+          <button
+            type="button"
+            className="bm-vault-add-backdrop"
+            aria-label="关闭快速添加"
+            onClick={() => setShowAddActions(false)}
+          />
           <div className="bm-vault-add-popover" role="dialog" aria-label="快速添加产品">
             <ProductRecordActions
               className="bm-vault-add-actions"
@@ -1100,9 +1265,8 @@ export default function ProductManage() {
               onManual={() => openManualForm()}
             />
           </div>
-        )}
-
-      </section>
+        </>
+      )}
 
       {showPetReminder && (
         <section

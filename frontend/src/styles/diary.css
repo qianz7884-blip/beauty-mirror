@@ -6,7 +6,7 @@
 .diary-v2 {
   min-height: 100vh;
   margin: 0 -22px;
-  padding: 0 0 120px;
+  padding: 0 0 calc(var(--tab-h) + var(--safe-bottom) + 24px);
   background:
     linear-gradient(
       180deg,
@@ -118,11 +118,11 @@
 
 .dv-heatmap-shell {
   display: grid;
-  grid-template-columns: 30px max-content;
-  justify-content: center;
-  gap: 7px;
+  grid-template-columns: 36px max-content;
+  justify-content: start;
+  gap: 8px;
   min-width: 0;
-  padding: 0 0 2px;
+  padding: 0 6px 2px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -141,7 +141,7 @@
   color: #718496;
   font-size: 10px;
   line-height: var(--heatmap-cell);
-  text-align: right;
+  text-align: left;
   white-space: nowrap;
 }
 
@@ -231,6 +231,19 @@
   border: 1px solid rgba(255, 255, 255, 0.68);
   border-radius: 2px;
   box-shadow: 0 2px 5px rgba(74, 112, 143, 0.08);
+}
+
+@media (max-width: 420px) {
+  .dv-month-panel {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .dv-heatmap-shell {
+    grid-template-columns: 34px max-content;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
 }
 
 .dv-day-feed {
@@ -467,7 +480,7 @@
 .dv-detail {
   min-height: 100vh;
   margin: 0 -22px;
-  padding: 0 0 120px;
+  padding: 0 0 calc(var(--tab-h) + var(--safe-bottom) + 24px);
   background:
     linear-gradient(
       180deg,

@@ -17,6 +17,92 @@ import { SkinHistoryGallery, SkinHistoryList } from './SkinHistoryViews'
 import { buildMirrorAdviceCards, buildStatusSummary, compressPhoto } from '../utils/skinAnalysisView'
 import mirrorAdviceIllustration from '../assets/illustrations/beauty-mirror-ip/mirror-advice-handmirror.png'
 
+function getLocalDateKey(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const FACE_REGION_TABS = [
+  {
+    id: 'tzone',
+    label: 'T 区',
+    regions: ['前额', '鼻子'],
+    focus: '看额头和鼻部的反光、毛孔和底妆服帖度。',
+    action: '定妆只轻压 T 区，鼻梁和额头不要反复叠粉。',
+  },
+  {
+    id: 'nose',
+    label: '鼻翼',
+    regions: ['鼻子'],
+    focus: '看鼻翼两侧有没有卡粉、泛红或底妆堆积。',
+    action: '先少量按压保湿，再用余粉轻带鼻翼边缘。',
+  },
+  {
+    id: 'under-eye',
+    label: '眼下',
+    regions: ['左眼周', '右眼周'],
+    focus: '看眼下暗沉、干纹和遮瑕边界是否明显。',
+    action: '遮瑕少量点按，边缘用指腹拍开，不要大面积厚涂。',
+  },
+  {
+    id: 'mouth',
+    label: '唇周',
+    regions: ['唇周'],
+    focus: '看唇周暗沉、起皮和底妆边界是否干净。',
+    action: '唇周先薄修色，再用口红或润唇产品补气色。',
+  },
+  {
+    id: 'jaw',
+    label: '下颌边缘',
+    regions: ['下巴', '左脸颊', '右脸颊'],
+    focus: '看下颌、脸颊外侧和脖子之间有没有明显色差。',
+    action: '底妆向下轻扫过渡，修容只放在边缘，不要压暗面中。',
+  },
+]
+
+const FACE_DIM_LABELS = {
+  hydration: '水润度',
+  smoothness: '平整度',
+  brightness: '光泽度',
+  pores: '毛孔细腻度',
+  evenness: '均匀度',
+}
+
+function buildFaceRegionInsight(regionScores, regionGuide) {
+  if (!regionScores || !regionGuide) {
+    return '当前先按区域重点观察，后续可结合分区数据继续细化。'
+  }
+
+  const values = regionGuide.regions
+    .map(region => regionScores[region])
+    .filter(Boolean)
+
+  if (!values.length) {
+    return '该区域暂无独立分区数据，可先参考总图和镜前建议。'
+  }
+
+  const dims = Object.keys(FACE_DIM_LABELS)
+  const averages = dims.map(dim => {
+    const nums = values
+      .map(score => Number(score?.[dim]))
+      .filter(value => Number.isFinite(value))
+    if (!nums.length) return null
+    return {
+      dim,
+      value: Math.round(nums.reduce((sum, value) => sum + value, 0) / nums.length),
+    }
+  }).filter(Boolean)
+
+  if (!averages.length) {
+    return '该区域暂无可读分区指标，可先参考总图和镜前建议。'
+  }
+
+  const weakest = averages.sort((a, b) => a.value - b.value)[0]
+  return `${FACE_DIM_LABELS[weakest.dim]}相对更需要关注。`
+}
+
 export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, viewHistoryId, forceHistoryMode, autoOpenCamera, onAnalysisComplete }) {
   const [step, setStep] = useState(viewHistoryId || forceHistoryMode ? 'loading' : (photoFile ? 'preview' : 'history'))
   const [result, setResult] = useState(null)
@@ -36,6 +122,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
   const [saveToDiary, setSaveToDiary] = useState(false)
   const [analyzedPhotoFile, setAnalyzedPhotoFile] = useState(null)
   const [feedbackSaving, setFeedbackSaving] = useState(false)
+  const [activeFaceRegion, setActiveFaceRegion] = useState(FACE_REGION_TABS[0].id)
   const cameraRef = useRef(null)
   const [cameraKey, setCameraKey] = useState(0)
 
@@ -236,6 +323,8 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
   const mirrorAdvice = buildMirrorAdviceCards(displayData)
   const statusSummary = buildStatusSummary(displayData)
   const faceReferenceImage = displayData?.heatmap_image || result?.heatmap_base64
+  const activeRegionGuide = FACE_REGION_TABS.find(region => region.id === activeFaceRegion) || FACE_REGION_TABS[0]
+  const activeRegionInsight = buildFaceRegionInsight(displayData?.region_scores, activeRegionGuide)
   const routineData = displayData?.today_routine || result?.today_routine
   const hasLongTermCare = Boolean(
     displayData?.summary
@@ -257,7 +346,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
         formData.append('title', `镜前分析记录 - ${new Date().toLocaleDateString('zh-CN')}`)
         formData.append('mood', feedbackMood || 'stable')
         formData.append('content', statusSummary || '')
-        formData.append('created_date', new Date().toISOString().slice(0, 10))
+        formData.append('created_date', getLocalDateKey())
         formData.append('tags', JSON.stringify(['镜前建议']))
         if (analysisId) formData.append('skin_analysis_id', String(analysisId))
         if (diaryPhoto) {
@@ -480,7 +569,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                       {mirrorAdvice.map((advice, i) => (
                         <div key={i} className="mirror-advice-card">
                           <p><span>位置</span>{advice.area}</p>
-                          <p><span>产品</span>{advice.product}</p>
+                          {advice.product && <p><span>产品</span>{advice.product}</p>}
                           <p><span>动作</span>{advice.action}</p>
                           <p><span>原因</span>{advice.reason}</p>
                         </div>
@@ -497,9 +586,25 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                     </summary>
                     <div className="skin-heatmap-container">
                       <div className="face-region-tags">
-                        {['T 区', '鼻翼', '眼下', '唇周', '下颌边缘'].map(region => (
-                          <span key={region}>{region}</span>
+                        {FACE_REGION_TABS.map(region => (
+                          <button
+                            key={region.id}
+                            type="button"
+                            className={activeFaceRegion === region.id ? 'active' : ''}
+                            aria-pressed={activeFaceRegion === region.id}
+                            onClick={() => setActiveFaceRegion(region.id)}
+                          >
+                            {region.label}
+                          </button>
                         ))}
+                      </div>
+                      <div className="face-region-detail">
+                        <div>
+                          <strong>{activeRegionGuide.label}重点</strong>
+                          <span>{activeRegionInsight}</span>
+                        </div>
+                        <p>{activeRegionGuide.focus}</p>
+                        <p>{activeRegionGuide.action}</p>
                       </div>
                       <img
                         src={faceReferenceImage}

@@ -41,7 +41,7 @@ export function buildMirrorAdviceCards(data) {
   if (Array.isArray(data.mirror_advice) && data.mirror_advice.length > 0) {
     return data.mirror_advice.slice(0, 3).map((item) => ({
       area: item.area || item.region || item.position || '局部区域',
-      product: item.product || item.recommended_product || '已有适合当前步骤的产品',
+      product: item.product || item.recommended_product || '',
       action: item.action || item.suggestion || '少量按压，保持轻薄',
       reason: item.reason || '该区域会影响当前妆感，轻微处理即可',
     }))
@@ -69,8 +69,8 @@ export function buildMirrorAdviceCards(data) {
       return {
         area: isObject ? (item.area || item.region || item.position || fallbackAreas[index]) : fallbackAreas[index],
         product: isObject
-          ? (item.product || item.recommended_product || (index === 0 ? '已有保湿或舒缓产品' : '已有底妆 / 定妆产品'))
-          : (index === 0 ? '已有保湿或舒缓产品' : '已有底妆 / 定妆产品'),
+          ? (item.product || item.recommended_product || '')
+          : '',
         action: isObject
           ? (item.action || item.suggestion || fallbackActions[index])
           : (recommendations[index] && recommendations[index].length <= 34 ? recommendations[index] : fallbackActions[index]),

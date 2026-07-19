@@ -1,33 +1,34 @@
-import { useEffect, useRef, useState } from 'react'
-import { Bell, Camera, ChevronRight, ChevronUp, ClipboardList, Clock3, HelpCircle, Minus, Palette, Plus, RotateCcw, Settings, ShieldCheck, SlidersHorizontal, Trash2, Upload } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import {
-  BACKGROUND_PAGES,
-  DEFAULT_BACKGROUND_VISIBILITY,
-  GLOBAL_BACKGROUND_KEY,
-  getBackgroundImageRecord,
-  readBackgroundSettings,
-  removeBackgroundImage,
-  saveBackgroundImage,
-  saveBackgroundSettings,
-  subscribeBackgroundSettings,
-  usePageBackground,
-} from '../utils/backgroundSettings'
+  Bell,
+  Camera,
+  Check,
+  ChevronRight,
+  ChevronUp,
+  MessageSquare,
+  Paintbrush,
+  Palette,
+  Settings,
+  ShieldCheck,
+  SlidersHorizontal,
+  Trash2,
+} from 'lucide-react'
+import { fetchProducts } from '../api'
+import {
+  THEME_PRESETS,
+  getActiveTheme,
+  readThemeSettings,
+  saveThemeSettings,
+  subscribeThemeSettings,
+} from '../utils/themeSettings'
+import { buildProductReminders } from '../utils/productReminders'
 import profileIpSticker from '../assets/illustrations/beauty-mirror-ip/ip-avatar-only.png'
 
 const SKIN_TYPES = ['干性', '油性', '混合', '敏感', '中性']
 const SKIN_TYPE_KEY = 'beauty_mirror_skin_type'
 const PROFILE_IMAGE_KEY = 'beauty_mirror_profile_image'
-const BACKGROUND_VISIBILITY_STEP = 5
-const MIN_BACKGROUND_VISIBILITY = 35
-const MAX_BACKGROUND_VISIBILITY = 100
-const BACKGROUND_PAGE_ICONS = {
-  [GLOBAL_BACKGROUND_KEY]: Palette,
-  home: Clock3,
-  products: Palette,
-  diary: ClipboardList,
-  tutorial: ShieldCheck,
-  profile: Settings,
-}
+const REMINDER_KEY = 'beauty_mirror_reminder'
+const REMINDER_SETTINGS_KEY = 'beauty_mirror_product_reminder_settings_v1'
 
 function MenuItem({ icon: Icon, label, desc, badge, onClick }) {
   return (
@@ -43,184 +44,158 @@ function MenuItem({ icon: Icon, label, desc, badge, onClick }) {
   )
 }
 
-function formatFileSize(size) {
-  if (!size) return ''
-  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
+function readReminderSettings() {
+  try {
+    const raw = localStorage.getItem(REMINDER_SETTINGS_KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    return {
+      expiringWithinDays: Number(parsed.expiringWithinDays || 30),
+      lowRemainingPercent: Number(parsed.lowRemainingPercent || 30),
+    }
+  } catch {
+    return {
+      expiringWithinDays: 30,
+      lowRemainingPercent: 30,
+    }
+  }
 }
 
-function clampBackgroundVisibility(value) {
-  return Math.max(MIN_BACKGROUND_VISIBILITY, Math.min(MAX_BACKGROUND_VISIBILITY, Math.round(value)))
+function saveReminderSettings(settings) {
+  localStorage.setItem(REMINDER_SETTINGS_KEY, JSON.stringify(settings))
+  return settings
 }
 
-function BackgroundSettingRow({ page, preview, visibility, onUpload, onVisibilityChange, onReset }) {
-  const Icon = BACKGROUND_PAGE_ICONS[page.id] || Palette
-  const previewLabel = preview?.name ? `${preview.name}${preview.size ? ` · ${formatFileSize(preview.size)}` : ''}` : '未设置背景'
-  const decreaseVisibility = () => {
-    onVisibilityChange(clampBackgroundVisibility(visibility - BACKGROUND_VISIBILITY_STEP))
-  }
-  const increaseVisibility = () => {
-    onVisibilityChange(clampBackgroundVisibility(visibility + BACKGROUND_VISIBILITY_STEP))
-  }
-
+function ReminderToggle({ checked, icon: Icon, title, desc, onChange }) {
   return (
-    <div className="bm-bg-setting-row">
-      <div className="bm-bg-setting-label">
-        <span className="bm-bg-setting-icon"><Icon size={18} strokeWidth={1.7} /></span>
-        <strong>{page.label}</strong>
-      </div>
-      <div
-        className={`bm-bg-preview ${preview?.url ? 'has-image' : ''}`}
-        style={preview?.url ? { backgroundImage: `url(${preview.url})` } : undefined}
-        title={previewLabel}
-        aria-label={previewLabel}
-      >
-        {!preview?.url ? <span>默认</span> : null}
-      </div>
-      <div className="bm-bg-visibility-stepper" aria-label={`${page.label}背景可见度`}>
-        <button
-          type="button"
-          onClick={decreaseVisibility}
-          disabled={visibility <= MIN_BACKGROUND_VISIBILITY}
-          aria-label={`降低${page.label}背景可见度`}
-        >
-          <Minus size={15} strokeWidth={1.8} />
-        </button>
-        <strong>{visibility}%</strong>
-        <button
-          type="button"
-          onClick={increaseVisibility}
-          disabled={visibility >= MAX_BACKGROUND_VISIBILITY}
-          aria-label={`提高${page.label}背景可见度`}
-        >
-          <Plus size={15} strokeWidth={1.8} />
-        </button>
-      </div>
-      <label className="bm-bg-setting-action">
-        <Upload size={18} strokeWidth={1.7} />
-        <span>上传</span>
-        <input type="file" accept="image/*" onChange={event => onUpload(event)} />
-      </label>
-      <button type="button" className="bm-bg-setting-action" onClick={onReset}>
-        <RotateCcw size={18} strokeWidth={1.7} />
-        <span>重置</span>
-      </button>
-      <input
-        className="bm-bg-row-range"
-        type="range"
-        min={MIN_BACKGROUND_VISIBILITY}
-        max={MAX_BACKGROUND_VISIBILITY}
-        step="1"
-        value={visibility}
-        aria-label={`${page.label}背景可见度滑块`}
-        onChange={event => onVisibilityChange(Number(event.target.value))}
-      />
-    </div>
+    <label className="bm-reminder-toggle">
+      <span className="bm-reminder-toggle-icon"><Icon size={17} strokeWidth={1.8} /></span>
+      <span>
+        <strong>{title}</strong>
+        <small>{desc}</small>
+      </span>
+      <span className="bm-bg-toggle-control">
+        <input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} />
+        <span aria-hidden="true" />
+      </span>
+    </label>
   )
 }
 
-function BackgroundRows({
-  useGlobalImage,
-  backgroundSettings,
-  backgroundPreviews,
-  onUpload,
-  onGlobalVisibilityChange,
-  onPageVisibilityChange,
-  onReset,
-}) {
-  if (useGlobalImage) {
+function ReminderPreview({ reminders, reminderOn }) {
+  if (!reminderOn) {
     return (
-      <div className="bm-bg-setting-list compact">
-        <BackgroundSettingRow
-          page={{ id: GLOBAL_BACKGROUND_KEY, label: '全部页面' }}
-          preview={backgroundPreviews[GLOBAL_BACKGROUND_KEY]}
-          visibility={backgroundSettings.globalVisibility}
-          onUpload={event => onUpload(GLOBAL_BACKGROUND_KEY, event)}
-          onVisibilityChange={onGlobalVisibilityChange}
-          onReset={() => onReset(GLOBAL_BACKGROUND_KEY)}
-        />
+      <div className="bm-sms-empty">
+        <MessageSquare size={18} strokeWidth={1.8} />
+        <span>护理提醒已关闭，开启后这里会显示短信提醒。</span>
+      </div>
+    )
+  }
+
+  if (reminders.length === 0) {
+    return (
+      <div className="bm-sms-empty">
+        <Check size={18} strokeWidth={1.8} />
+        <span>当前没有临期或低余量产品。</span>
       </div>
     )
   }
 
   return (
-    <div className="bm-bg-setting-list">
-      {BACKGROUND_PAGES.map(page => (
-        <BackgroundSettingRow
-          key={page.id}
-          page={page}
-          preview={backgroundPreviews[page.id]}
-          visibility={backgroundSettings.pageVisibility[page.id] ?? DEFAULT_BACKGROUND_VISIBILITY}
-          onUpload={event => onUpload(page.id, event)}
-          onVisibilityChange={value => onPageVisibilityChange(page.id, value)}
-          onReset={() => onReset(page.id)}
-        />
+    <div className="bm-sms-list" aria-label="短信形式的护肤提醒">
+      {reminders.slice(0, 6).map(item => (
+        <article className={`bm-sms-bubble ${item.level === 'urgent' ? 'urgent' : ''}`} key={item.id}>
+          <span className="bm-sms-avatar"><Bell size={15} strokeWidth={1.8} /></span>
+          <div>
+            <strong>{item.title}</strong>
+            <p>{item.message}</p>
+          </div>
+        </article>
       ))}
     </div>
   )
 }
 
+function ReminderPanel({
+  reminderOn,
+  reminderSettings,
+  reminders,
+  onReminderOnChange,
+  onSettingsChange,
+}) {
+  return (
+    <div className="bm-reminder-panel">
+      <ReminderToggle
+        checked={reminderOn}
+        icon={Bell}
+        title="开启提醒"
+        desc={`临期 ${reminderSettings.expiringWithinDays} 天内、剩余低于 ${reminderSettings.lowRemainingPercent}% 时提醒`}
+        onChange={onReminderOnChange}
+      />
+
+      <div className="bm-reminder-controls">
+        <label>
+          <span>临期天数</span>
+          <input
+            type="number"
+            min="1"
+            max="180"
+            value={reminderSettings.expiringWithinDays}
+            onChange={event => onSettingsChange({ expiringWithinDays: Number(event.target.value || 30) })}
+          />
+        </label>
+        <label>
+          <span>剩余提醒线</span>
+          <input
+            type="number"
+            min="1"
+            max="90"
+            value={reminderSettings.lowRemainingPercent}
+            onChange={event => onSettingsChange({ lowRemainingPercent: Number(event.target.value || 30) })}
+          />
+        </label>
+      </div>
+
+      <ReminderPreview reminders={reminders} reminderOn={reminderOn} />
+    </div>
+  )
+}
+
 export default function Profile() {
-  const pageBackground = usePageBackground('profile')
   const [skinType, setSkinType] = useState(() => localStorage.getItem(SKIN_TYPE_KEY) || '')
-  const [reminderOn, setReminderOn] = useState(() => localStorage.getItem('beauty_mirror_reminder') === 'true')
+  const [reminderOn, setReminderOn] = useState(() => localStorage.getItem(REMINDER_KEY) === 'true')
+  const [reminderSettings, setReminderSettings] = useState(readReminderSettings)
   const [profileImage, setProfileImage] = useState(() => localStorage.getItem(PROFILE_IMAGE_KEY) || '')
-  const [backgroundSettings, setBackgroundSettings] = useState(readBackgroundSettings)
-  const [backgroundPreviews, setBackgroundPreviews] = useState({})
+  const [themeSettings, setThemeSettings] = useState(readThemeSettings)
+  const [products, setProducts] = useState([])
   const [showSkinPicker, setShowSkinPicker] = useState(false)
+  const [showReminderPanel, setShowReminderPanel] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const backgroundPreviewUrlsRef = useRef({})
+
+  const activeTheme = getActiveTheme(themeSettings)
 
   useEffect(() => {
     let cancelled = false
-
-    const revokePreviews = () => {
-      Object.values(backgroundPreviewUrlsRef.current).forEach(item => {
-        if (item?.url) URL.revokeObjectURL(item.url)
+    fetchProducts()
+      .then(data => {
+        if (!cancelled) setProducts(Array.isArray(data) ? data : [])
       })
-    }
-
-    const refreshBackgroundPanel = async () => {
-      const settings = readBackgroundSettings()
-      const keys = [GLOBAL_BACKGROUND_KEY, ...BACKGROUND_PAGES.map(page => page.id)]
-      const entries = await Promise.all(keys.map(async key => {
-        try {
-          const record = await getBackgroundImageRecord(key)
-          return [key, record]
-        } catch {
-          return [key, null]
-        }
-      }))
-
-      if (cancelled) return
-
-      const previews = {}
-      entries.forEach(([key, record]) => {
-        if (record?.blob) {
-          previews[key] = {
-            name: record.name,
-            size: record.size,
-            url: URL.createObjectURL(record.blob),
-          }
-        }
+      .catch(() => {
+        if (!cancelled) setProducts([])
       })
-
-      revokePreviews()
-      backgroundPreviewUrlsRef.current = previews
-      setBackgroundSettings(settings)
-      setBackgroundPreviews(previews)
-    }
-
-    refreshBackgroundPanel()
-    const unsubscribe = subscribeBackgroundSettings(refreshBackgroundPanel)
-
     return () => {
       cancelled = true
-      unsubscribe()
-      revokePreviews()
-      backgroundPreviewUrlsRef.current = {}
     }
   }, [])
+
+  useEffect(() => {
+    const refresh = () => setThemeSettings(readThemeSettings())
+    return subscribeThemeSettings(refresh)
+  }, [])
+
+  const activeReminders = useMemo(() => {
+    if (!reminderOn) return []
+    return buildProductReminders(products, reminderSettings)
+  }, [products, reminderSettings])
 
   const handleSkinChange = (type) => {
     setSkinType(type)
@@ -228,10 +203,17 @@ export default function Profile() {
     setShowSkinPicker(false)
   }
 
-  const handleReminderToggle = () => {
-    const next = !reminderOn
-    setReminderOn(next)
-    localStorage.setItem('beauty_mirror_reminder', String(next))
+  const handleReminderOnChange = (checked) => {
+    setReminderOn(checked)
+    localStorage.setItem(REMINDER_KEY, String(checked))
+  }
+
+  const updateReminderSettings = (patch) => {
+    setReminderSettings(prev => saveReminderSettings({ ...prev, ...patch }))
+  }
+
+  const updateThemeSettings = (next) => {
+    setThemeSettings(saveThemeSettings(next))
   }
 
   const handleProfileImageChange = (event) => {
@@ -253,62 +235,45 @@ export default function Profile() {
     localStorage.removeItem(PROFILE_IMAGE_KEY)
   }
 
-  const updateBackgroundSettings = (next) => {
-    setBackgroundSettings(saveBackgroundSettings(next))
-  }
-
-  const handleBackgroundUpload = async (key, event) => {
+  const handleThemeImageChange = (event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      alert('请选择图片文件')
-      return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      updateThemeSettings({
+        ...themeSettings,
+        presetId: 'custom',
+        customImage: String(reader.result || ''),
+      })
     }
-    await saveBackgroundImage(key, file)
+    reader.readAsDataURL(file)
   }
 
-  const handleGlobalVisibilityChange = (visibility) => {
-    updateBackgroundSettings({
-      ...backgroundSettings,
-      globalVisibility: visibility,
+  const handleThemeImageRemove = () => {
+    updateThemeSettings({
+      ...themeSettings,
+      presetId: 'blue',
+      customImage: '',
     })
-  }
-
-  const handlePageVisibilityChange = (pageId, visibility) => {
-    updateBackgroundSettings({
-      ...backgroundSettings,
-      pageVisibility: {
-        ...backgroundSettings.pageVisibility,
-        [pageId]: visibility,
-      },
-    })
-  }
-
-  const resetBackgroundRow = async (key) => {
-    await removeBackgroundImage(key)
-    if (key === GLOBAL_BACKGROUND_KEY) {
-      handleGlobalVisibilityChange(DEFAULT_BACKGROUND_VISIBILITY)
-      return
-    }
-    handlePageVisibilityChange(key, DEFAULT_BACKGROUND_VISIBILITY)
   }
 
   const profileHighlights = [
     { icon: SlidersHorizontal, label: '肤质', value: skinType || '未设' },
-    { icon: Bell, label: '提醒', value: reminderOn ? '已开' : '已关' },
+    { icon: Bell, label: '提醒', value: reminderOn ? `${activeReminders.length} 条` : '已关' },
     { icon: Camera, label: '头像', value: profileImage ? '已设' : '未设' },
-    { icon: Palette, label: '外观', value: backgroundSettings.useGlobalImage ? '统一' : '分页' },
+    { icon: Palette, label: '主题', value: activeTheme.label },
     { icon: ShieldCheck, label: '隐私', value: '本地' },
   ]
 
   return (
-    <div className="bm-screen bm-profile" style={pageBackground.style}>
+    <div className="bm-screen bm-profile">
       <section className="bm-hero bm-profile-hero">
         <div className="bm-profile-hero-main">
           <div>
             <h1>我的</h1>
-            <p className="bm-subtitle">管理状态、偏好和隐私。</p>
+            <p className="bm-subtitle">管理肤质、提醒、主题和本地偏好。</p>
           </div>
           <div className="bm-profile-avatar-wrap">
             <div className={`bm-profile-avatar bm-profile-avatar-static ${profileImage ? 'has-image' : ''}`} aria-label="个人头像">
@@ -353,6 +318,7 @@ export default function Profile() {
             </div>
           </div>
         </div>
+
         {showSkinPicker && (
           <div className="bm-skin-picker">
             {SKIN_TYPES.map(type => (
@@ -367,27 +333,39 @@ export default function Profile() {
             ))}
           </div>
         )}
+
         <div className="bm-menu-card">
           <MenuItem
             icon={SlidersHorizontal}
             label="肤质偏好"
-            desc="设置个人偏好"
+            desc="设置个人肤质偏好"
             badge={skinType || '未设置'}
             onClick={() => setShowSkinPicker(!showSkinPicker)}
           />
           <MenuItem
             icon={Bell}
             label="护理提醒"
-            desc="管理提醒开关"
-            badge={reminderOn ? '已开启' : '已关闭'}
-            onClick={handleReminderToggle}
+            desc="临期、低余量产品提醒"
+            badge={reminderOn ? `${activeReminders.length} 条` : '已关闭'}
+            onClick={() => setShowReminderPanel(!showReminderPanel)}
           />
+          {showReminderPanel && (
+            <ReminderPanel
+              reminderOn={reminderOn}
+              reminderSettings={reminderSettings}
+              reminders={activeReminders}
+              onReminderOnChange={handleReminderOnChange}
+              onSettingsChange={updateReminderSettings}
+            />
+          )}
           <MenuItem
             icon={Settings}
             label="设置"
-            desc="账号与偏好设置"
+            desc="个人资料与主题"
+            badge={activeTheme.label}
             onClick={() => setShowSettings(!showSettings)}
           />
+
           {showSettings && (
             <div className="bm-settings-panel">
               <div className="bm-settings-sheet">
@@ -395,7 +373,7 @@ export default function Profile() {
                 <div className="bm-settings-sheet-head">
                   <div>
                     <h2>设置</h2>
-                    <p>账号与外观偏好</p>
+                    <p>个人资料和主题。</p>
                   </div>
                   <button type="button" className="bm-settings-collapse" onClick={() => setShowSettings(false)} aria-label="收起设置">
                     <ChevronUp size={20} strokeWidth={1.8} />
@@ -441,48 +419,98 @@ export default function Profile() {
 
                 <section className="bm-setting-group">
                   <div className="bm-setting-group-head">
-                    <span className="bm-setting-group-icon"><Palette size={18} strokeWidth={1.8} /></span>
+                    <span className="bm-setting-group-icon"><Paintbrush size={18} strokeWidth={1.8} /></span>
                     <div>
-                      <strong>页面外观</strong>
-                      <small>背景与可见度</small>
+                      <strong>主题</strong>
+                      <small>统一五个页面的色调和玻璃模块透明度</small>
                     </div>
                   </div>
 
-                  <label className="bm-bg-toggle-card">
-                    <span className="bm-bg-toggle-copy">
-                      <strong>使用同一张背景</strong>
-                      <HelpCircle size={16} strokeWidth={1.8} aria-hidden="true" />
-                    </span>
-                    <span className="bm-bg-toggle-control">
-                      <input
-                        type="checkbox"
-                        checked={backgroundSettings.useGlobalImage}
-                        onChange={event => updateBackgroundSettings({
-                          ...backgroundSettings,
-                          useGlobalImage: event.target.checked,
-                        })}
+                  <div className="bm-theme-grid" role="listbox" aria-label="主题颜色">
+                    {THEME_PRESETS.map(theme => (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        className={themeSettings.presetId === theme.id ? 'active' : ''}
+                        onClick={() => updateThemeSettings({ ...themeSettings, presetId: theme.id })}
+                      >
+                        <span className="bm-theme-swatch" style={{ background: theme.primary }} />
+                        <strong>{theme.label}</strong>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={themeSettings.presetId === 'custom' ? 'active' : ''}
+                      onClick={() => updateThemeSettings({ ...themeSettings, presetId: 'custom' })}
+                    >
+                      <span
+                        className={`bm-theme-swatch custom ${themeSettings.customImage ? 'has-image' : ''}`}
+                        style={themeSettings.customImage ? { backgroundImage: `url(${themeSettings.customImage})` } : undefined}
                       />
-                      <span aria-hidden="true" />
-                    </span>
-                  </label>
-                  <BackgroundRows
-                    useGlobalImage={backgroundSettings.useGlobalImage}
-                    backgroundSettings={backgroundSettings}
-                    backgroundPreviews={backgroundPreviews}
-                    onUpload={handleBackgroundUpload}
-                    onGlobalVisibilityChange={handleGlobalVisibilityChange}
-                    onPageVisibilityChange={handlePageVisibilityChange}
-                    onReset={resetBackgroundRow}
-                  />
+                      <strong>自定义</strong>
+                    </button>
+                  </div>
+
+                  <div className="bm-custom-theme-row">
+                    {[
+                      ['primary', '主色'],
+                      ['deep', '深色'],
+                      ['accent', '辅助'],
+                      ['wash', '底色'],
+                    ].map(([key, label]) => (
+                      <label key={key}>
+                        <span>{label}</span>
+                        <input
+                          type="color"
+                          value={themeSettings.custom[key]}
+                          onChange={event => updateThemeSettings({
+                            ...themeSettings,
+                            presetId: 'custom',
+                            custom: {
+                              ...themeSettings.custom,
+                              [key]: event.target.value,
+                            },
+                          })}
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="bm-custom-theme-upload">
+                    <div
+                      className={`bm-theme-image-preview ${themeSettings.customImage ? 'has-image' : ''}`}
+                      style={themeSettings.customImage ? { backgroundImage: `url(${themeSettings.customImage})` } : undefined}
+                    >
+                      {themeSettings.customImage ? null : <Camera size={20} strokeWidth={1.7} />}
+                    </div>
+                    <div className="bm-theme-upload-copy">
+                      <strong>自定义背景图</strong>
+                      <small>上传后作为五个页面的统一主题背景。</small>
+                    </div>
+                    <div className="bm-settings-actions">
+                      <label className="bm-settings-action">
+                        <Camera size={15} strokeWidth={1.8} />
+                        <span>{themeSettings.customImage ? '更换' : '上传'}</span>
+                        <input type="file" accept="image/*" onChange={handleThemeImageChange} />
+                      </label>
+                      {themeSettings.customImage ? (
+                        <button type="button" className="bm-settings-action danger" onClick={handleThemeImageRemove}>
+                          <Trash2 size={15} strokeWidth={1.8} />
+                          <span>移除</span>
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
                 </section>
               </div>
             </div>
           )}
+
           <MenuItem
             icon={ShieldCheck}
             label="隐私设置"
             desc="查看图像使用说明"
-            onClick={() => alert('面部图像默认本地处理，建议仅用于当前妆容辅助。')}
+            onClick={() => alert('面部图像默认本地处理；产品、日记和头像偏好只保存在当前设备或你的本地后端。')}
           />
         </div>
       </section>

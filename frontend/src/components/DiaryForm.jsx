@@ -6,6 +6,13 @@ import { MOOD_OPTIONS, LEGACY_MOOD_MAP } from '../utils/moods'
 /* ── 预设标签 ── */
 const PRESET_TAGS = ['补水', '敏感肌', '熬夜', '换季', '控油', '美白']
 
+function getLocalDateKey(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function DiaryForm({ diary, products, onSubmit, onClose }) {
   const isEdit = !!diary?.id
 
@@ -17,7 +24,7 @@ export default function DiaryForm({ diary, products, onSubmit, onClose }) {
     return LEGACY_MOOD_MAP[m] || 'stable'
   })
   const [createdDate, setCreatedDate] = useState(
-    diary?.created_date || new Date().toISOString().slice(0, 10)
+    diary?.created_date || getLocalDateKey()
   )
   const [selectedProductIds, setSelectedProductIds] = useState(diary?.product_ids || [])
   const [selectedTags, setSelectedTags] = useState(diary?.tags || [])

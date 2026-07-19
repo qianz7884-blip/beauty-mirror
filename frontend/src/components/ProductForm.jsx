@@ -1,9 +1,55 @@
 import { useState, useRef } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import { getPhotoUrl } from '../api'
+import { normalizePriceInput } from '../utils/productCatalog'
 import ImageViewer from './ImageViewer'
 
 const DEFAULT_CATEGORIES = ['面霜', '精华', '面膜', '洁面', '防晒', '其他']
+const STEP_OPTIONS = ['护肤', '妆前', '底妆', '遮瑕', '定妆', '眼妆', '唇妆', '补妆']
+const FEATURE_OPTIONS = ['保湿', '清爽', '控油', '修护', '提亮', '遮瑕', '持妆', '舒缓']
+const REGION_OPTIONS = ['T区', '鼻翼', '眼下', '唇周', '脸颊', '下颌', '全脸']
+const SCENE_OPTIONS = ['通勤', '办公室', '晚间出门', '拍照', '干燥天气', '潮湿天气']
+const FEEDBACK_OPTIONS = ['好用', '持妆好', '不卡粉', '容易卡粉', '搓泥', '闷痘', '太油', '太干']
+
+function parseTags(value) {
+  if (Array.isArray(value)) return value.filter(Boolean)
+  return String(value || '')
+    .split(/[、,，/]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function serializeTags(value) {
+  return parseTags(value).join('、')
+}
+
+function TagPicker({ label, value, options, onChange }) {
+  const selected = parseTags(value)
+  const toggle = (option) => {
+    const next = selected.includes(option)
+      ? selected.filter(item => item !== option)
+      : [...selected, option]
+    onChange(serializeTags(next))
+  }
+
+  return (
+    <div className="form-group product-tag-group">
+      <label className="form-label">{label}</label>
+      <div className="product-tag-picker">
+        {options.map(option => (
+          <button
+            key={option}
+            type="button"
+            className={selected.includes(option) ? 'active' : ''}
+            onClick={() => toggle(option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function ProductForm({ product, onSubmit, onClose, mode = 'full', initialPhoto = null, initialValues = {}, categories }) {
   const CATEGORIES = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES
@@ -13,8 +59,14 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
   const [color, setColor] = useState(product?.color || initialValues.color || '')
   const [volume, setVolume] = useState(product?.volume || initialValues.volume || '')
   const [purchaseDate, setPurchaseDate] = useState(product?.purchase_date || initialValues.purchase_date || '')
-  const [price, setPrice] = useState(product?.price || initialValues.price || '')
+  const [expiryDate, setExpiryDate] = useState(product?.expiry_date || initialValues.expiry_date || '')
+  const [price, setPrice] = useState(normalizePriceInput(product?.price ?? initialValues.price ?? ''))
   const [notes, setNotes] = useState(product?.notes || initialValues.notes || '')
+  const [usageSteps, setUsageSteps] = useState(product?.usage_steps || initialValues.usage_steps || '')
+  const [productFeatures, setProductFeatures] = useState(product?.product_features || initialValues.product_features || '')
+  const [suitableRegions, setSuitableRegions] = useState(product?.suitable_regions || initialValues.suitable_regions || '')
+  const [suitableScenes, setSuitableScenes] = useState(product?.suitable_scenes || initialValues.suitable_scenes || '')
+  const [userFeedback, setUserFeedback] = useState(product?.user_feedback || initialValues.user_feedback || '')
   const [usagePercent, setUsagePercent] = useState(product?.usage_percent ?? initialValues.usage_percent ?? 0)
   const [photo, setPhoto] = useState(initialPhoto?.file || null)
   const [photoPreview, setPhotoPreview] = useState(
@@ -73,6 +125,7 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
     formData.append('color', color.trim())
     formData.append('volume', volume.trim())
     formData.append('purchase_date', purchaseDate)
+    formData.append('expiry_date', expiryDate)
     formData.append('price', price || 0)
     formData.append('notes', notes.trim())
     formData.append('usage_percent', usagePercent || 0)
@@ -80,6 +133,11 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
     formData.append('efficacy', initialValues.efficacy || product?.efficacy || '')
     formData.append('suitable_skin', initialValues.suitable_skin || product?.suitable_skin || '')
     formData.append('usage_instructions', initialValues.usage_instructions || product?.usage_instructions || '')
+    formData.append('usage_steps', serializeTags(usageSteps))
+    formData.append('product_features', serializeTags(productFeatures))
+    formData.append('suitable_regions', serializeTags(suitableRegions))
+    formData.append('suitable_scenes', serializeTags(suitableScenes))
+    formData.append('user_feedback', serializeTags(userFeedback))
     formData.append('source', initialValues.source || product?.source || 'manual')
     if (photo) {
       formData.append('photo', photo)
@@ -178,6 +236,15 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
                 <input className="form-input" type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
               </div>
               <div className="form-group" style={{ flex: 1 }}>
+                <label className="form-label">预计到期</label>
+                <input className="form-input" type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {!isQuick && (
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div className="form-group" style={{ flex: 1 }}>
                 <label className="form-label">价格 ¥</label>
                 <input className="form-input" type="number" step="0.01" min="0" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" />
               </div>
@@ -189,6 +256,16 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
               <label className="form-label">备注</label>
               <textarea className="form-input" value={notes} onChange={e => setNotes(e.target.value)} placeholder="使用感受、适合肤质..." />
             </div>
+          )}
+
+          {!isQuick && (
+            <>
+              <TagPicker label="适合步骤" value={usageSteps} options={STEP_OPTIONS} onChange={setUsageSteps} />
+              <TagPicker label="产品特点" value={productFeatures} options={FEATURE_OPTIONS} onChange={setProductFeatures} />
+              <TagPicker label="适合区域" value={suitableRegions} options={REGION_OPTIONS} onChange={setSuitableRegions} />
+              <TagPicker label="适合场景" value={suitableScenes} options={SCENE_OPTIONS} onChange={setSuitableScenes} />
+              <TagPicker label="我的反馈" value={userFeedback} options={FEEDBACK_OPTIONS} onChange={setUserFeedback} />
+            </>
           )}
 
           {!isQuick && (

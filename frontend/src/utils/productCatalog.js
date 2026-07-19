@@ -9,6 +9,39 @@ const SKINCARE_CATEGORIES = ['洁面', '爽肤水', '精华', '乳液', '面霜'
 
 export const DEFAULT_SHADE_SWATCHES = ['#b42335', '#a94842', '#bd6257', '#8f4144', '#c77a70', '#d59586']
 
+function parseDate(value) {
+  if (!value) return null
+  const [year, month, day] = String(value).split('-').map(Number)
+  if (!year || !month || !day) return null
+  const date = new Date(year, month - 1, day)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function formatDateKey(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function formatProductPrice(value) {
+  const number = Number(value)
+  if (!Number.isFinite(number) || number <= 0) return ''
+  return Number.isInteger(number) ? String(number) : String(Number(number.toFixed(2)))
+}
+
+export function normalizePriceInput(value) {
+  if (value === null || value === undefined || value === '') return ''
+  const number = Number(value)
+  if (!Number.isFinite(number)) return String(value)
+  return Number.isInteger(number) ? String(number) : String(Number(number.toFixed(2)))
+}
+
+export function getProductExpiryDate(product) {
+  if (product?.expiry_date) return product.expiry_date
+  return addYears(product?.purchase_date, 2)
+}
+
 export function groupByCategory(products) {
   const map = {}
   products.forEach(product => {
@@ -28,6 +61,12 @@ export function groupByCategory(products) {
 }
 
 export function getProductStatus(product) {
+  const expiry = parseDate(product?.expiry_date)
+  if (expiry) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (expiry.getTime() < today.getTime()) return '已过期'
+  }
   const text = `${product.notes || ''} ${product.source || ''}`.toLowerCase()
   if (text.includes('过期')) return '已过期'
   if (Number(product.usage_percent || 0) >= 80) return '快用完'
@@ -38,10 +77,10 @@ export function getProductStatus(product) {
 
 export function addYears(dateText, years) {
   if (!dateText) return ''
-  const date = new Date(dateText)
-  if (Number.isNaN(date.getTime())) return ''
+  const date = parseDate(dateText)
+  if (!date) return ''
   date.setFullYear(date.getFullYear() + years)
-  return date.toISOString().slice(0, 10)
+  return formatDateKey(date)
 }
 
 export function getUsageEstimate(status) {

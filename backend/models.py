@@ -18,6 +18,7 @@ class Product(db.Model):
     color = db.Column(db.String(50), default='')
     volume = db.Column(db.String(50), default='')         # 规格容量，如 "60ml"
     purchase_date = db.Column(db.String(20), default='')
+    expiry_date = db.Column(db.String(20), default='')
     price = db.Column(db.Float, default=0.0)
     photo = db.Column(db.String(200), default='')
     notes = db.Column(db.Text, default='')
@@ -28,11 +29,19 @@ class Product(db.Model):
     efficacy = db.Column(db.Text, default='')              # 功效描述
     suitable_skin = db.Column(db.String(50), default='')   # 适合肤质：油性/干性/混合性/中性/敏感性/所有
     usage_instructions = db.Column(db.Text, default='')    # 使用方法
+    usage_steps = db.Column(db.Text, default='')            # 适合步骤：妆前/底妆/遮瑕/定妆...
+    product_features = db.Column(db.Text, default='')       # 产品特点：保湿/控油/提亮/持妆...
+    suitable_regions = db.Column(db.Text, default='')       # 适合区域：T区/鼻翼/眼下...
+    suitable_scenes = db.Column(db.Text, default='')        # 适合场景：通勤/晚间/干燥天气...
+    user_feedback = db.Column(db.Text, default='')          # 用户反馈：好用/搓泥/太油...
     source = db.Column(db.String(20), default='manual')   # 数据来源：gemini / manual / knowledge_base
 
     created_at = db.Column(db.DateTime, default=datetime.now)
 
     def to_dict(self):
+        price = self.price or 0
+        if isinstance(price, float) and price.is_integer():
+            price = int(price)
         return {
             'id': self.id,
             'name': self.name,
@@ -41,7 +50,8 @@ class Product(db.Model):
             'color': self.color,
             'volume': self.volume,
             'purchase_date': self.purchase_date,
-            'price': self.price,
+            'expiry_date': self.expiry_date,
+            'price': price,
             'photo': self.photo,
             'notes': self.notes,
             'usage_percent': self.usage_percent or 0,
@@ -50,6 +60,11 @@ class Product(db.Model):
             'efficacy': self.efficacy,
             'suitable_skin': self.suitable_skin,
             'usage_instructions': self.usage_instructions,
+            'usage_steps': self.usage_steps,
+            'product_features': self.product_features,
+            'suitable_regions': self.suitable_regions,
+            'suitable_scenes': self.suitable_scenes,
+            'user_feedback': self.user_feedback,
             'source': self.source,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
         }

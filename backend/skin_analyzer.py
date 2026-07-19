@@ -491,19 +491,19 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
 - 肯定用户已经做对的地方，温和地指出可以关注的地方
 - 用「你」来拉近距离
 - 建议要具体、可执行
-- 如果【分析数据】里的 product_guidance.owned_products 或 suitable 有可用产品，recommendations 和 mirror_advice 要优先自然写入这些已有产品名；没有匹配产品时再使用泛化品类名
+- 如果【分析数据】里的 product_guidance.owned_products 或 suitable 有明确适合的已有产品，recommendations 和 mirror_advice 可以自然写入这些已有产品名；没有明确匹配时不要硬推荐产品，mirror_advice.product 留空字符串
 - 不要推荐购买新产品，缺失品类只能温和提醒
 
 【分析数据】
 {ctx_json}
 
 请严格只返回一行 JSON（不要 markdown 标记）：
-{{"summary":"一段温暖的护肤总结（60-100字），像朋友聊天一样，包含今天的皮肤整体印象+核心护理方向，不使用任何数字","recommendations":["温和具体的建议1（自然融入产品名或成分，不编号）","建议2","建议3","建议4","建议5"],"mirror_advice":[{{"area":"鼻翼两侧","product":"优先使用用户已有产品名；没有合适产品时写已有保湿或舒缓产品","action":"镜前马上能做的动作，不超过20字","reason":"基于 ROI 观察、RAG 知识和产品库的简短原因"}}]}}
+{{"summary":"一段温暖的护肤总结（60-100字），像朋友聊天一样，包含今天的皮肤整体印象+核心护理方向，不使用任何数字","recommendations":["温和具体的建议1（可以自然融入明确适合的已有产品名，不编号）","建议2","建议3","建议4","建议5"],"mirror_advice":[{{"area":"鼻翼两侧","product":"明确适合的已有产品名；没有合适产品时留空字符串","action":"镜前马上能做的动作，不超过20字","reason":"基于 ROI 观察、RAG 知识和产品库的简短原因"}}]}}
 
 mirror_advice 要求：
 - 只返回 1-3 条，必须来自分析数据、分区 ROI、产品库和知识参考，不要凭空添加严重结论
 - 每条固定包含 area / product / action / reason
-- 优先使用用户已有产品，不引导购买，不做医学诊断
+- 有明确匹配时优先使用用户已有产品；没有明确匹配时 product 留空，不引导购买，不做医学诊断
 - 文案克制，避免“问题、缺陷、严重、必须、警告、扣分”
 
 注意：recommendations 中的每条建议都应该是一句完整、自然的话，像朋友分享护肤心得一样。"""
@@ -634,7 +634,7 @@ def _normalize_mirror_advice(cards, fallback_cards=None):
         action = str(item.get('action') or item.get('suggestion') or '').strip()
         reason = str(item.get('reason') or '').strip()
         text = area + product + action + reason
-        if not area or not product or not action or not reason:
+        if not area or not action or not reason:
             continue
         if any(word in text for word in forbidden):
             continue
@@ -827,7 +827,7 @@ def _fallback_mirror_advice(feature_json):
     if any(c in concerns for c in ['干燥脱皮', '水油失衡', '面部泛红']):
         cards.append({
             'area': '鼻翼两侧',
-            'product': '已有保湿或舒缓产品',
+            'product': '',
             'action': '少量按压，等待 10 秒后再上底妆',
             'reason': '鼻翼区域更容易干燥，提前按压能让底妆更服帖',
         })
@@ -835,7 +835,7 @@ def _fallback_mirror_advice(feature_json):
     if '黑眼圈' in concerns:
         cards.append({
             'area': '眼下区域',
-            'product': '已有底妆 / 定妆产品',
+            'product': '',
             'action': '薄薄补一层，轻拍提亮',
             'reason': '眼周肤色略偏暗时，轻薄叠加更自然',
         })
@@ -843,7 +843,7 @@ def _fallback_mirror_advice(feature_json):
     if '肤色不均' in concerns:
         cards.append({
             'area': '唇周边缘',
-            'product': '已有底妆 / 定妆产品',
+            'product': '',
             'action': '轻薄修饰边缘，让整体更干净',
             'reason': '局部肤色不够均匀，会影响整体清爽感',
         })
@@ -851,7 +851,7 @@ def _fallback_mirror_advice(feature_json):
     if not cards:
         cards.append({
             'area': '鼻翼两侧',
-            'product': '已有保湿或舒缓产品',
+            'product': '',
             'action': '少量按压，等待 10 秒后再上底妆',
             'reason': '局部先做轻微保湿，后续底妆更容易贴合',
         })

@@ -73,6 +73,7 @@ def product_create():
             color=request.form.get('color', '').strip(),
             volume=request.form.get('volume', '').strip(),
             purchase_date=request.form.get('purchase_date', '').strip(),
+            expiry_date=request.form.get('expiry_date', '').strip(),
             price=price,
             notes=request.form.get('notes', '').strip(),
             usage_percent=_parse_usage_percent(request.form.get('usage_percent'), 0),
@@ -80,6 +81,11 @@ def product_create():
             efficacy=request.form.get('efficacy', '').strip(),
             suitable_skin=request.form.get('suitable_skin', '').strip(),
             usage_instructions=request.form.get('usage_instructions', '').strip(),
+            usage_steps=request.form.get('usage_steps', '').strip(),
+            product_features=request.form.get('product_features', '').strip(),
+            suitable_regions=request.form.get('suitable_regions', '').strip(),
+            suitable_scenes=request.form.get('suitable_scenes', '').strip(),
+            user_feedback=request.form.get('user_feedback', '').strip(),
             source=_normalize_user_product_source(request.form.get('source', 'manual')),
         )
 
@@ -121,6 +127,7 @@ def product_update(pid):
         product.color = request.form.get('color', '').strip()
         product.volume = request.form.get('volume', '').strip()
         product.purchase_date = request.form.get('purchase_date', '').strip()
+        product.expiry_date = request.form.get('expiry_date', '').strip()
         product.price = price
         product.notes = request.form.get('notes', '').strip()
         product.usage_percent = _parse_usage_percent(
@@ -134,6 +141,11 @@ def product_update(pid):
             'usage_instructions',
             product.usage_instructions,
         ).strip()
+        product.usage_steps = request.form.get('usage_steps', product.usage_steps).strip()
+        product.product_features = request.form.get('product_features', product.product_features).strip()
+        product.suitable_regions = request.form.get('suitable_regions', product.suitable_regions).strip()
+        product.suitable_scenes = request.form.get('suitable_scenes', product.suitable_scenes).strip()
+        product.user_feedback = request.form.get('user_feedback', product.user_feedback).strip()
 
         photo_file = request.files.get('photo')
         if photo_file and photo_file.filename:

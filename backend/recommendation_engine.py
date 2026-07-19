@@ -906,8 +906,16 @@ class RecommendationEngine:
                 p.ingredients or '',
                 p.efficacy or '',
                 p.usage_instructions or '',
+                p.usage_steps or '',
+                p.product_features or '',
+                p.suitable_regions or '',
+                p.suitable_scenes or '',
                 p.notes or '',
             ])
+            negative_feedback = p.user_feedback or ''
+            if any(word in negative_feedback for word in ['闷痘', '搓泥', '容易卡粉', '太油', '太干', '不好用']):
+                continue
+
             category_match = self._category_matches(p.category or '', categories)
             score = 0
             if category_match:
@@ -917,6 +925,11 @@ class RecommendationEngine:
             for keyword in keywords:
                 if keyword and keyword in text:
                     score += 12
+                if keyword and keyword in (p.user_feedback or ''):
+                    score += 4
+            for field in (p.usage_steps, p.product_features, p.suitable_regions, p.suitable_scenes):
+                if field and any(keyword and keyword in field for keyword in keywords):
+                    score += 10
             if p.suitable_skin and ('所有' in p.suitable_skin):
                 score += 3
             if score > 0:
@@ -937,20 +950,7 @@ class RecommendationEngine:
         product = self._find_product(products, categories, keywords, require_category=require_category)
         if product:
             return self._product_display_name(product)
-
-        fallback_by_category = {
-            '面霜': '已有保湿或舒缓产品',
-            '精华': '已有保湿或修护产品',
-            '底妆': '已有底妆 / 定妆产品',
-            '彩妆': '已有底妆 / 定妆产品',
-            '防晒': '已有防晒或提亮产品',
-            '爽肤水': '已有清爽型护肤产品',
-            '眼霜': '已有眼部护理产品',
-        }
-        for category in categories:
-            if category in fallback_by_category:
-                return fallback_by_category[category]
-        return '已有适合当前步骤的产品'
+        return ''
 
     def _make_mirror_card(self, area, product, action, reason, priority):
         return {

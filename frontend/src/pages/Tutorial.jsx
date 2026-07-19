@@ -40,13 +40,13 @@ const SCENES = [
 
 function pickProductItem(products, categories, fallback) {
   const found = products.find(product => categories.includes(product.category))
-  return found ? { id: found.id, name: found.name } : { id: null, name: fallback }
+  return found ? { id: found.id, name: found.name, matched: true } : { id: null, name: fallback, matched: false }
 }
 
 function uniqueProductItems(list) {
   const seen = new Set()
   return list.filter(item => {
-    if (!item?.name) return false
+    if (!item?.name || item.matched === false) return false
     const key = item.id ? `id:${item.id}` : `name:${item.name}`
     if (seen.has(key)) return false
     seen.add(key)
@@ -199,7 +199,11 @@ function buildGuide(timeId, sceneId, products) {
 }
 
 function getTodayString() {
-  return new Date().toISOString().slice(0, 10)
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function buildDiaryContent(guide) {
@@ -219,6 +223,15 @@ function buildDiaryContent(guide) {
     '收尾检查：',
     guide.check,
   ].join('\n')
+}
+
+function getStepDurationText(guide, stepIndex) {
+  const hint = guide?.hints?.[stepIndex] || ''
+  const explicitSeconds = hint.match(/(\d+)\s*秒/)
+  if (explicitSeconds) return `${explicitSeconds[1]} 秒`
+
+  const seconds = Math.max(20, Math.round((guide.minutes * 60) / guide.steps.length / 10) * 10)
+  return `${seconds} 秒`
 }
 
 export default function Tutorial() {
@@ -262,6 +275,12 @@ export default function Tutorial() {
     [timeId, sceneId, products],
   )
   const Icon = activeGuide?.icon
+  const productChips = activeGuide?.products.slice(0, 4) || []
+  const extraProductCount = activeGuide ? Math.max(activeGuide.products.length - productChips.length, 0) : 0
+  const currentDuration = activeGuide ? getStepDurationText(activeGuide, currentStep) : ''
+  const currentStepProduct = activeGuide?.stepProducts[currentStep] || ''
+  const showCurrentStepProduct = activeGuide?.products.some(product => currentStepProduct.includes(product))
+  const progressValue = activeGuide ? `${((currentStep + 1) / activeGuide.steps.length) * 100}%` : '0%'
 
   const changeTime = (id) => {
     setTimeId(id)
@@ -399,7 +418,7 @@ export default function Tutorial() {
           </section>
         ) : (
           <>
-            <section className="bm-routine-card bm-flow-routine">
+            <section className="bm-routine-card bm-flow-routine bm-flow-routine-compact">
               <div className="bm-routine-head">
                 <span className="bm-soft-icon"><Icon size={21} strokeWidth={1.6} /></span>
                 <div>
@@ -409,10 +428,17 @@ export default function Tutorial() {
                 <span className="bm-time-chip"><Clock3 size={14} />{activeGuide.time}</span>
               </div>
 
-              <div className="bm-product-strip">
-                <span><Package size={15} /> 本次优先使用</span>
-                <strong>{activeGuide.products.join(' / ')}</strong>
+              {productChips.length > 0 && (
+              <div className="bm-product-strip bm-flow-product-strip">
+                <span className="bm-flow-product-label"><Package size={15} /> 优先使用</span>
+                <div className="bm-flow-product-chips">
+                  {productChips.map(product => (
+                    <span key={product}>{product}</span>
+                  ))}
+                  {extraProductCount > 0 && <span>+{extraProductCount}</span>}
+                </div>
               </div>
+              )}
             </section>
 
             <section className="bm-step-card bm-flow-current bm-step-no-art">
@@ -420,20 +446,33 @@ export default function Tutorial() {
                 <p className="bm-step-count">{String(currentStep + 1).padStart(2, '0')} / {String(activeGuide.steps.length).padStart(2, '0')}</p>
                 <span><Sparkles size={14} strokeWidth={1.8} /> 跟镜中</span>
               </div>
+              <div className="bm-flow-progress" style={{ '--bm-step-progress': progressValue }}>
+                <span />
+              </div>
               <h2>{activeGuide.steps[currentStep]}</h2>
               <p>{activeGuide.hints[currentStep] || activeGuide.check}</p>
 
-              <div className="bm-step-product-hint">
-                <Package size={15} strokeWidth={1.8} />
-                <span>使用：{activeGuide.stepProducts[currentStep]}</span>
+              <div className="bm-step-support-row">
+                {showCurrentStepProduct && (
+                <div className="bm-step-product-hint">
+                  <Package size={15} strokeWidth={1.8} />
+                  <span>使用：{activeGuide.stepProducts[currentStep]}</span>
+                </div>
+                )}
+                <span className="bm-step-duration"><Clock3 size={14} strokeWidth={1.8} /> {currentDuration}</span>
               </div>
 
-              <div className="bm-step-actions">
+              <div className={`bm-step-actions${currentStep < activeGuide.steps.length - 1 ? ' bm-step-actions-split' : ''}`}>
                 {currentStep < activeGuide.steps.length - 1 ? (
-                  <button type="button" className="bm-btn-primary" onClick={handleNextStep}>
-                    <span>下一步</span>
-                    <ArrowRight size={17} strokeWidth={2} />
-                  </button>
+                  <>
+                    <button type="button" className="bm-btn-secondary" onClick={handleNextStep}>
+                      跳过
+                    </button>
+                    <button type="button" className="bm-btn-primary" onClick={handleNextStep}>
+                      <span>完成这一步</span>
+                      <ArrowRight size={17} strokeWidth={2} />
+                    </button>
+                  </>
                 ) : (
                   <button
                     type="button"
@@ -545,7 +584,10 @@ export default function Tutorial() {
             )}
 
             <section className="bm-flow-steps-card">
-              <div className="bm-flow-section-title">步骤列表</div>
+              <div className="bm-flow-section-head">
+                <div className="bm-flow-section-title">今天流程</div>
+                <span>已到 {currentStep + 1} / {activeGuide.steps.length}</span>
+              </div>
               <div className="bm-step-list">
                 {activeGuide.steps.map((step, index) => (
                   <button

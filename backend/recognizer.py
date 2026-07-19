@@ -117,6 +117,12 @@ def _as_bool(value):
     return bool(value)
 
 
+def _clean_tag_text(value, max_len=160):
+    if isinstance(value, list):
+        value = '、'.join(_clean(item, 24) for item in value if _clean(item, 24))
+    return _clean(value, max_len)
+
+
 def _parse_json_object(text):
     text = (text or '').strip()
     if not text:
@@ -244,12 +250,14 @@ def recognize_product(image_bytes):
 3. category 必须从这些中文分类中选择一个：洁面、爽肤水、精华、乳液、面霜、眼霜、防晒、面膜、底妆、遮瑕、定妆、眉眼、唇妆、腮红修容、工具、香氛、小样、其他。
 4. 彩妆如果能看到色号或颜色名，填入 color；否则留空。
 5. 不做功效评价或成分推测，packaging_text 只摘录照片中能看到的关键文字。
-6. confidence 只能是 high、medium、low。文字清楚且能读出品牌/品名时用 high；主要靠外观判断时用 low。
-7. recognition_mode 只能是 text、visual、mixed、unknown。
-8. 如果照片不是产品或完全无法判断，name 留空，category 写“其他”，recognition_mode 写“unknown”。
+6. 可以根据包装可见文字和品类，保守推断轻标签：usage_steps、product_features、suitable_regions、suitable_scenes。无法判断就留空，不要为了凑字段乱猜。
+7. 轻标签可从这些词里选：usage_steps=护肤/妆前/底妆/遮瑕/定妆/眼妆/唇妆/补妆；product_features=保湿/清爽/控油/修护/提亮/遮瑕/持妆/舒缓；suitable_regions=T区/鼻翼/眼下/唇周/脸颊/下颌/全脸；suitable_scenes=通勤/办公室/晚间出门/拍照/干燥天气/潮湿天气。
+8. confidence 只能是 high、medium、low。文字清楚且能读出品牌/品名时用 high；主要靠外观判断时用 low。
+9. recognition_mode 只能是 text、visual、mixed、unknown。
+10. 如果照片不是产品或完全无法判断，name 留空，category 写“其他”，recognition_mode 写“unknown”。
 
 请严格只返回一行 JSON，不要加解释、markdown 或额外文字：
-{"brand":"","name":"","category":"其他","volume":"","color":"","packaging_text":"","recognition_mode":"unknown","confidence":"low","needs_review":true}"""
+{"brand":"","name":"","category":"其他","volume":"","color":"","packaging_text":"","usage_steps":"","product_features":"","suitable_regions":"","suitable_scenes":"","recognition_mode":"unknown","confidence":"low","needs_review":true}"""
 
         response = client.models.generate_content(
             model=model_name,
@@ -305,6 +313,10 @@ def recognize_product(image_bytes):
             'volume': _clean(result.get('volume'), 50),
             'color': _clean(result.get('color'), 50),
             'packaging_text': packaging_text,
+            'usage_steps': _clean_tag_text(result.get('usage_steps')),
+            'product_features': _clean_tag_text(result.get('product_features')),
+            'suitable_regions': _clean_tag_text(result.get('suitable_regions')),
+            'suitable_scenes': _clean_tag_text(result.get('suitable_scenes')),
             'recognition_mode': recognition_mode,
             'confidence': confidence,
             'needs_review': needs_review or confidence == 'low' or name.startswith('疑似'),
@@ -350,11 +362,12 @@ def recognize_product_voice(audio_bytes, mime_type='audio/webm'):
 5. color：色号或颜色；没说就留空。
 6. notes：适合放进备注的补充信息；没有就留空。
 7. transcript：完整转写原话。
-8. confidence：high、medium、low。
-9. needs_review：如果字段不完整或可能听错，设为 true。
+8. usage_steps / product_features / suitable_regions / suitable_scenes：如果用户提到用途、特点、区域或场景，按这些轻标签提取；没说就留空。可用标签同照片识别。
+9. confidence：high、medium、low。
+10. needs_review：如果字段不完整或可能听错，设为 true。
 
 请严格只返回一行 JSON：
-{"brand":"","name":"","category":"其他","volume":"","color":"","notes":"","transcript":"","confidence":"low","needs_review":true}"""
+{"brand":"","name":"","category":"其他","volume":"","color":"","notes":"","usage_steps":"","product_features":"","suitable_regions":"","suitable_scenes":"","transcript":"","confidence":"low","needs_review":true}"""
 
         response = client.models.generate_content(
             model=model_name,
@@ -400,6 +413,10 @@ def recognize_product_voice(audio_bytes, mime_type='audio/webm'):
             'volume': _clean(parsed.get('volume'), 50) or fallback['volume'],
             'color': _clean(parsed.get('color'), 50) or fallback['color'],
             'notes': notes,
+            'usage_steps': _clean_tag_text(parsed.get('usage_steps')),
+            'product_features': _clean_tag_text(parsed.get('product_features')),
+            'suitable_regions': _clean_tag_text(parsed.get('suitable_regions')),
+            'suitable_scenes': _clean_tag_text(parsed.get('suitable_scenes')),
             'transcript': transcript,
             'recognition_mode': 'voice',
             'confidence': confidence,
