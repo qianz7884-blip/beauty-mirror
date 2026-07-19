@@ -124,14 +124,13 @@ def _migrate_database():
 
 
 def _seed_product_knowledge():
-    """Seed product knowledge when the product table is empty."""
+    """Seed or refresh bundled product knowledge."""
     try:
         from product_knowledge import ProductKnowledge
 
-        if Product.query.count() == 0:
-            count = ProductKnowledge(db.session).seed_knowledge_base()
-            if count > 0:
-                print(f'[app] 产品知识库初始化完成: {count} 条种子数据')
+        count = ProductKnowledge(db.session).seed_knowledge_base(force=True)
+        if count > 0:
+            print(f'[app] 产品知识库同步完成: {count} 条种子数据')
     except Exception as exc:
         print(f'[app] 种子知识写入失败: {exc}')
 

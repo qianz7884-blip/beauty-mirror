@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image
 from io import BytesIO
 from scipy.ndimage import uniform_filter, sobel, label as ndi_label, gaussian_filter
-from scipy.ndimage import binary_erosion, generate_binary_structure
+from scipy.ndimage import generate_binary_structure
 
 
 DEBUG_ROI = os.environ.get('DEBUG_ROI', '').lower() in ('1', 'true', 'yes', 'on')
@@ -741,6 +741,7 @@ class FeatureExtractor:
             pores_score * self.SCORE_WEIGHTS['pores'] +
             evenness * self.SCORE_WEIGHTS['evenness']
         )
+        overall = max(0.0, min(100.0, overall))
 
         return {
             'hydration': round(hydration),
@@ -905,7 +906,12 @@ class FeatureExtractor:
         if skin_type == '混合性':
             concerns.append('水油失衡')
 
-        return concerns[:6]
+        deduped = []
+        for concern in concerns:
+            if concern not in deduped:
+                deduped.append(concern)
+
+        return deduped[:6]
 
     # ============================================================
     # 特征聚合（全脸平均原始特征）

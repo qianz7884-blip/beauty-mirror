@@ -874,11 +874,15 @@ def _fallback_routine(feature_json):
 
     if any(c in concerns for c in ['T区出油', '毛孔粗大']):
         evening.insert(2, '控油棉片轻擦T区')
+    if '面部泛红' in concerns:
+        evening.insert(2, '红感位置薄涂舒缓修护产品')
 
     morning.append('防晒（护肤中很重要的一步 ✨）')
 
     weekly = ['保湿面膜 1-2次']
-    if any(c in concerns for c in ['T区出油', '毛孔粗大']):
+    if any(c in concerns for c in ['T区出油', '毛孔粗大']) and '面部泛红' not in concerns:
         weekly = ['清洁泥膜 1次（T区重点）', '保湿面膜 1-2次']
+    elif any(c in concerns for c in ['T区出油', '毛孔粗大']):
+        weekly = ['先暂停强清洁，等红感稳定后再做T区清洁护理', '保湿舒缓面膜 1次']
 
     return {'morning': morning, 'evening': evening, 'weekly': weekly}

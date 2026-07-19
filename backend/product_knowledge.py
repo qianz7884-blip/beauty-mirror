@@ -423,6 +423,10 @@ class ProductKnowledge:
                 'efficacy': p.efficacy,
                 'suitable_skin': p.suitable_skin,
                 'usage_instructions': p.usage_instructions,
+                'usage_steps': p.usage_steps,
+                'product_features': p.product_features,
+                'suitable_regions': p.suitable_regions,
+                'suitable_scenes': p.suitable_scenes,
                 'source': p.source,
             }
             for p in products
@@ -435,15 +439,35 @@ class ProductKnowledge:
 
     def seed_knowledge_base(self, force=False):
         """
-        将种子知识写入数据库（仅当数据库中没有同名同品牌产品时）。
+        将种子知识写入或更新到数据库（只同步系统知识库产品）。
 
         Args:
             force: 为 True 时强制全部写入
 
         Returns:
-            int: 新写入的记录数
+            int: 新写入或更新的记录数
         """
         count = 0
+        legacy_cards = self.Product.query.filter(
+            self.Product.source == 'knowledge_base',
+            self.Product.brand == 'Mirror Mate 成分库',
+        ).all()
+        for product in legacy_cards:
+            self.db.delete(product)
+            count += 1
+
+        seed_fields = [
+            'category',
+            'volume',
+            'ingredients',
+            'efficacy',
+            'suitable_skin',
+            'usage_instructions',
+            'usage_steps',
+            'product_features',
+            'suitable_regions',
+            'suitable_scenes',
+        ]
         for seed in SEED_KNOWLEDGE:
             existing = self.Product.query.filter(
                 self.Product.name == seed['name'],
@@ -452,8 +476,18 @@ class ProductKnowledge:
             ).first()
 
             if existing:
-                if force and not existing.ingredients:
-                    # 强制模式：补充知识字段
+                if force:
+                    updated = False
+                    for field in seed_fields:
+                        next_value = seed.get(field, '')
+                        if next_value and getattr(existing, field, '') != next_value:
+                            setattr(existing, field, next_value)
+                            updated = True
+                    if updated:
+                        existing.category = seed.get('category', existing.category)
+                        existing.source = 'knowledge_base'
+                        count += 1
+                elif not existing.ingredients:
                     existing.ingredients = seed.get('ingredients', '')
                     existing.efficacy = seed.get('efficacy', '')
                     existing.suitable_skin = seed.get('suitable_skin', '')
@@ -472,6 +506,10 @@ class ProductKnowledge:
                 efficacy=seed.get('efficacy', ''),
                 suitable_skin=seed.get('suitable_skin', ''),
                 usage_instructions=seed.get('usage_instructions', ''),
+                usage_steps=seed.get('usage_steps', ''),
+                product_features=seed.get('product_features', ''),
+                suitable_regions=seed.get('suitable_regions', ''),
+                suitable_scenes=seed.get('suitable_scenes', ''),
                 source='knowledge_base',
             )
             self.db.add(product)
@@ -479,7 +517,7 @@ class ProductKnowledge:
 
         if count > 0:
             self.db.commit()
-            print(f'[product_knowledge] 种子知识写入完成: {count} 条')
+            print(f'[product_knowledge] 种子知识同步/清理完成: {count} 条')
 
         return count
 

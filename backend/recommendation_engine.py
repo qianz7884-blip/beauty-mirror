@@ -28,6 +28,8 @@ from collections import defaultdict
 
 from sqlalchemy import or_
 
+from ingredient_knowledge import match_ingredient_rules
+
 
 # ============================================================
 # 皮肤问题 → 护理方向映射
@@ -369,13 +371,6 @@ class RecommendationEngine:
         skin_type = feature_json.get('skin_type', '')
         concerns = feature_json.get('concerns', [])
 
-        # 中文区域名映射
-        region_name_cn = {
-            '前额': '前额', '鼻子': '鼻子', '下巴': '下巴',
-            '左脸颊': '左脸颊', '右脸颊': '右脸颊',
-            '左眼周': '左眼周', '右眼周': '右眼周', '唇周': '唇周',
-        }
-
         # --- T区（前额+鼻子）分析 ---
         t_zone_regions = ['前额', '鼻子']
         t_gloss_vals = []
@@ -621,7 +616,6 @@ class RecommendationEngine:
         """
         skin_type = feature_json.get('skin_type', '')
         concerns = feature_json.get('concerns', [])
-        scores = feature_json.get('scores', {})
 
         try:
             all_products = self._user_products_query().order_by(self.Product.created_at.desc()).all()
@@ -670,20 +664,20 @@ class RecommendationEngine:
                     reasons.append('能满足当前护肤需求')
 
             # 成分关键词匹配
-            ingredient_text = (p.ingredients or '') + (p.efficacy or '')
-            kw_map = {
-                '保湿': 'hydration', '补水': 'hydration',
-                '控油': 'pores', '收敛': 'pores', '水杨酸': 'pores',
-                '维生素C': 'brightness', '提亮': 'brightness',
-                '修护': 'evenness', '舒缓': 'smoothness',
-                '神经酰胺': 'hydration', '玻尿酸': 'hydration',
-                '烟酰胺': 'evenness', '防晒': 'brightness',
-            }
-            for kw, dim in kw_map.items():
-                if kw in ingredient_text and scores.get(dim, 100) < 60:
-                    match_score += 5
-                    if f'含{kw}' not in '；'.join(reasons):
-                        reasons.append(f'含有{kw}，适合当前需求')
+            ingredient_text = ''.join([
+                p.ingredients or '',
+                p.efficacy or '',
+                p.product_features or '',
+                p.suitable_scenes or '',
+                p.usage_instructions or '',
+                p.notes or '',
+            ])
+            ingredient_matches = match_ingredient_rules(ingredient_text, feature_json)
+            for match in ingredient_matches:
+                match_score += 6
+                keywords = '、'.join(match.get('keywords') or [])
+                if keywords:
+                    reasons.append(f'含{keywords}，{match["reason"]}')
 
             match_score = min(100, match_score)
 
@@ -745,11 +739,23 @@ class RecommendationEngine:
             area = obs.get('area', '')
             finding = obs.get('finding', '')
             text = f'{area}{finding}{obs.get("description", "")}'
-            if area in ('鼻翼', '鼻子') or '鼻翼' in text:
+            if '红感' in text or '泛红' in text:
+                candidates.append(self._make_mirror_card(
+                    area=area if area and area != '局部区域' else '局部区域',
+                    product=self._pick_product(
+                        products,
+                        ['面霜', '精华'],
+                        ['舒缓', '修护', '泛醇', '积雪草', '神经酰胺', '尿囊素', 'β-葡聚糖'],
+                    ),
+                    action='少量按压，先不叠加刺激活性',
+                    reason='红感明显时先稳住屏障，减少摩擦会更适合当前状态',
+                    priority=96,
+                ))
+            elif area in ('鼻翼', '鼻子') or '鼻翼' in text:
                 if '泛红' in text:
                     candidates.append(self._make_mirror_card(
                         area='鼻翼两侧',
-                        product=self._pick_product(products, ['面霜', '精华'], ['舒缓', '修护', '保湿']),
+                        product=self._pick_product(products, ['面霜', '精华'], ['舒缓', '修护', '保湿', '泛醇', '积雪草']),
                         action='少量按压，避开来回摩擦',
                         reason='鼻翼区域较容易受清洁和摩擦影响，轻压能让后续妆面更平整',
                         priority=95,
@@ -1096,6 +1102,7 @@ class RecommendationEngine:
         sunscreen = self._select_product_name(products, ['防晒'], ['防晒', '隔离', 'SPF'])
         remover = self._select_product_name(products, ['卸妆'], ['卸妆', '清洁油', '卸妆水', '卸妆膏'])
         oil_control = self._select_product_name(products, ['爽肤水', '精华'], ['控油', '清爽', '水杨酸', '收敛'])
+        calming_care = self._select_product_name(products, ['面霜', '精华'], ['舒缓', '修护', '泛醇', '积雪草', '神经酰胺', '尿囊素', 'β-葡聚糖'])
         hydrating_mask = self._select_product_name(products, ['面膜'], ['面膜', '保湿', '补水', '舒缓'])
         cleansing_mask = self._select_product_name(products, ['面膜'], ['泥膜', '清洁', '控油', '毛孔'])
 
@@ -1121,10 +1128,16 @@ class RecommendationEngine:
 
         # 晚上针对 T区出油/毛孔问题
         has_tzone_issues = any(c in concerns for c in ['T区出油', '毛孔粗大'])
+        has_redness_issues = '面部泛红' in concerns
         if has_tzone_issues:
             evening.append(
                 f'用{oil_control}轻擦T区（前额+鼻子），帮助清理多余油脂'
                 if oil_control else '用控油棉片轻擦T区（前额+鼻子），帮助清理多余油脂'
+            )
+        if has_redness_issues:
+            evening.append(
+                f'用{calming_care}薄涂红感区域，先暂停刺激活性'
+                if calming_care else '红感区域薄涂舒缓修护产品，先暂停刺激活性'
             )
 
         evening.append(f'轻拍{toner}做基础补水' if toner else '爽肤水')
@@ -1133,11 +1146,13 @@ class RecommendationEngine:
         evening.append(f'最后用{moisturizer}锁水修护' if moisturizer else '面霜')
 
         weekly = []
-        if has_tzone_issues:
+        if has_tzone_issues and not has_redness_issues:
             weekly.append(
                 f'每周用{cleansing_mask}做一次T区清洁护理'
                 if cleansing_mask else '做一次清洁泥膜，重点敷在T区，帮助深层清洁毛孔'
             )
+        elif has_tzone_issues:
+            weekly.append('这周先不做强清洁，等红感稳定后再恢复T区清洁护理')
         if skin_type in ('干性', '敏感性'):
             weekly.append(
                 f'敷1-2次{hydrating_mask}，给皮肤补充水分'
