@@ -1,4 +1,5 @@
 from flask import Blueprint, current_app, jsonify, request
+from datetime import datetime
 
 from models import Product, db
 from recognizer import recognize_product, recognize_product_voice
@@ -83,6 +84,44 @@ def _parse_usage_percent(value, default=0):
     return max(0, min(100, number))
 
 
+def _parse_shelf_life_months(value, default=0):
+    try:
+        number = int(float(value if value is not None else default))
+    except (TypeError, ValueError):
+        number = default
+    return max(0, min(240, number))
+
+
+def _add_months(date_text, months):
+    if not date_text or not months:
+        return ''
+    try:
+        date = datetime.strptime(date_text, '%Y-%m-%d')
+    except ValueError:
+        return ''
+
+    month_index = date.month - 1 + months
+    year = date.year + month_index // 12
+    month = month_index % 12 + 1
+    day = min(date.day, _days_in_month(year, month))
+    return datetime(year, month, day).strftime('%Y-%m-%d')
+
+
+def _days_in_month(year, month):
+    if month == 12:
+        next_month = datetime(year + 1, 1, 1)
+    else:
+        next_month = datetime(year, month + 1, 1)
+    return (next_month - datetime(year, month, 1)).days
+
+
+def _resolve_expiry_date(expiry_date, production_date, shelf_life_months):
+    expiry_date = (expiry_date or '').strip()
+    if expiry_date:
+        return expiry_date
+    return _add_months(production_date, shelf_life_months)
+
+
 @products_bp.route('/products')
 def product_list():
     search = request.args.get('search', '').strip()
@@ -146,6 +185,8 @@ def catalog_product_add_to_cabinet(catalog_id):
     payload = request.get_json(silent=True) or {}
     if not isinstance(payload, dict):
         payload = {}
+    production_date = _clean_payload_text(payload, 'production_date')
+    shelf_life_months = _parse_shelf_life_months(payload.get('shelf_life_months'), 0)
     product = Product(
         user_id=get_current_user_id(),
         name=catalog_product.name,
@@ -153,8 +194,14 @@ def catalog_product_add_to_cabinet(catalog_id):
         category=catalog_product.category,
         color=_clean_payload_text(payload, 'color', catalog_product.color),
         volume=_clean_payload_text(payload, 'volume', catalog_product.volume),
+        production_date=production_date,
+        shelf_life_months=shelf_life_months,
         purchase_date=_clean_payload_text(payload, 'purchase_date'),
-        expiry_date=_clean_payload_text(payload, 'expiry_date'),
+        expiry_date=_resolve_expiry_date(
+            _clean_payload_text(payload, 'expiry_date'),
+            production_date,
+            shelf_life_months,
+        ),
         price=_parse_price(payload.get('price'), catalog_product.price or 0),
         photo=catalog_product.photo,
         notes=_clean_payload_text(payload, 'notes'),
@@ -214,8 +261,14 @@ def product_create():
             category=request.form.get('category', '其他').strip() or '其他',
             color=request.form.get('color', '').strip(),
             volume=request.form.get('volume', '').strip(),
+            production_date=request.form.get('production_date', '').strip(),
+            shelf_life_months=_parse_shelf_life_months(request.form.get('shelf_life_months'), 0),
             purchase_date=request.form.get('purchase_date', '').strip(),
-            expiry_date=request.form.get('expiry_date', '').strip(),
+            expiry_date=_resolve_expiry_date(
+                request.form.get('expiry_date', '').strip(),
+                request.form.get('production_date', '').strip(),
+                _parse_shelf_life_months(request.form.get('shelf_life_months'), 0),
+            ),
             price=price,
             notes=request.form.get('notes', '').strip(),
             usage_percent=_parse_usage_percent(request.form.get('usage_percent'), 0),
@@ -268,8 +321,14 @@ def product_update(pid):
         product.category = request.form.get('category', '其他').strip() or '其他'
         product.color = request.form.get('color', '').strip()
         product.volume = request.form.get('volume', '').strip()
+        product.production_date = request.form.get('production_date', '').strip()
+        product.shelf_life_months = _parse_shelf_life_months(request.form.get('shelf_life_months'), 0)
         product.purchase_date = request.form.get('purchase_date', '').strip()
-        product.expiry_date = request.form.get('expiry_date', '').strip()
+        product.expiry_date = _resolve_expiry_date(
+            request.form.get('expiry_date', '').strip(),
+            product.production_date,
+            product.shelf_life_months,
+        )
         product.price = price
         product.notes = request.form.get('notes', '').strip()
         product.usage_percent = _parse_usage_percent(

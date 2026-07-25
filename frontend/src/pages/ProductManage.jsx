@@ -40,6 +40,7 @@ import {
   formatProductPrice,
   groupByCategory,
   isHexColor,
+  addMonthsToDate,
   normalizePriceInput,
   loadShadeRecords,
   loadUsageRecords,
@@ -562,8 +563,16 @@ export default function ProductManage() {
     formData.append('category', values.category ?? baseProduct.category ?? '其他')
     formData.append('color', (values.color ?? baseProduct.color ?? '').trim())
     formData.append('volume', (values.volume ?? baseProduct.volume ?? '').trim())
+    formData.append('production_date', values.production_date ?? baseProduct.production_date ?? '')
+    formData.append('shelf_life_months', values.shelf_life_months ?? baseProduct.shelf_life_months ?? 0)
     formData.append('purchase_date', values.purchase_date ?? baseProduct.purchase_date ?? '')
-    formData.append('expiry_date', values.expiry_date ?? baseProduct.expiry_date ?? '')
+    formData.append(
+      'expiry_date',
+      values.expiry_date
+        || baseProduct.expiry_date
+        || addMonthsToDate(values.production_date ?? baseProduct.production_date, values.shelf_life_months ?? baseProduct.shelf_life_months)
+        || '',
+    )
     formData.append('price', values.price ?? baseProduct.price ?? 0)
     formData.append('notes', (values.notes ?? baseProduct.notes ?? '').trim())
     formData.append('usage_percent', values.usage_percent ?? baseProduct.usage_percent ?? 0)
@@ -588,6 +597,8 @@ export default function ProductManage() {
       category: selectedProduct.category || '其他',
       color: selectedProduct.color || '',
       volume: selectedProduct.volume || '',
+      production_date: selectedProduct.production_date || '',
+      shelf_life_months: selectedProduct.shelf_life_months || '',
       purchase_date: selectedProduct.purchase_date || '',
       expiry_date: selectedProduct.expiry_date || '',
       price: normalizePriceInput(selectedProduct.price),
@@ -603,7 +614,14 @@ export default function ProductManage() {
   }
 
   const updateDetailDraft = (field, value) => {
-    setDetailDraft(prev => ({ ...prev, [field]: value }))
+    setDetailDraft(prev => {
+      const next = { ...prev, [field]: value }
+      if (field === 'production_date' || field === 'shelf_life_months') {
+        const nextExpiry = addMonthsToDate(next.production_date, next.shelf_life_months)
+        if (nextExpiry) next.expiry_date = nextExpiry
+      }
+      return next
+    })
   }
 
   const cancelDetailEdit = () => {
@@ -1008,6 +1026,22 @@ export default function ProductManage() {
                 <input value={detailDraft.color || ''} onChange={event => updateDetailDraft('color', event.target.value)} placeholder="色号" />
               ) : (
                 <strong>{selectedProduct.color || '未记录'}</strong>
+              )}
+            </div>
+            <div>
+              <span>生产日期</span>
+              {detailEditing ? (
+                <input type="date" value={detailDraft.production_date || ''} onChange={event => updateDetailDraft('production_date', event.target.value)} />
+              ) : (
+                <strong>{selectedProduct.production_date || '未记录'}</strong>
+              )}
+            </div>
+            <div>
+              <span>保质期（月）</span>
+              {detailEditing ? (
+                <input type="number" min="0" max="240" step="1" value={detailDraft.shelf_life_months || ''} onChange={event => updateDetailDraft('shelf_life_months', event.target.value)} placeholder="36" />
+              ) : (
+                <strong>{selectedProduct.shelf_life_months ? `${selectedProduct.shelf_life_months}个月` : '未记录'}</strong>
               )}
             </div>
             <div>

@@ -39,6 +39,8 @@ export function normalizePriceInput(value) {
 
 export function getProductExpiryDate(product) {
   if (product?.expiry_date) return product.expiry_date
+  const shelfExpiry = addMonthsToDate(product?.production_date, product?.shelf_life_months)
+  if (shelfExpiry) return shelfExpiry
   return addYears(product?.purchase_date, 2)
 }
 
@@ -61,7 +63,7 @@ export function groupByCategory(products) {
 }
 
 export function getProductStatus(product) {
-  const expiry = parseDate(product?.expiry_date)
+  const expiry = parseDate(getProductExpiryDate(product))
   if (expiry) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -81,6 +83,18 @@ export function addYears(dateText, years) {
   if (!date) return ''
   date.setFullYear(date.getFullYear() + years)
   return formatDateKey(date)
+}
+
+export function addMonthsToDate(dateText, months) {
+  if (!dateText || !months) return ''
+  const date = parseDate(dateText)
+  const monthCount = Number(months)
+  if (!date || !Number.isFinite(monthCount) || monthCount <= 0) return ''
+  const targetMonthIndex = date.getMonth() + Math.floor(monthCount)
+  const year = date.getFullYear() + Math.floor(targetMonthIndex / 12)
+  const month = ((targetMonthIndex % 12) + 12) % 12
+  const lastDay = new Date(year, month + 1, 0).getDate()
+  return formatDateKey(new Date(year, month, Math.min(date.getDate(), lastDay)))
 }
 
 export function getUsageEstimate(status) {

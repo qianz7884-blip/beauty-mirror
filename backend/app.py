@@ -88,6 +88,8 @@ def _migrate_database():
             product_columns = _column_names(inspector, 'products')
             _add_column(conn, product_columns, 'products', 'user_id', f"user_id VARCHAR(80) DEFAULT '{DEFAULT_DEMO_USER_ID}'")
             _add_column(conn, product_columns, 'products', 'volume', "volume VARCHAR(50) DEFAULT ''")
+            _add_column(conn, product_columns, 'products', 'production_date', "production_date VARCHAR(20) DEFAULT ''")
+            _add_column(conn, product_columns, 'products', 'shelf_life_months', "shelf_life_months INTEGER DEFAULT 0")
             _add_column(conn, product_columns, 'products', 'expiry_date', "expiry_date VARCHAR(20) DEFAULT ''")
             _add_column(conn, product_columns, 'products', 'usage_percent', "usage_percent INTEGER DEFAULT 0")
             _add_column(conn, product_columns, 'products', 'ingredients', "ingredients TEXT DEFAULT ''")

@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import { getPhotoUrl } from '../api'
-import { normalizePriceInput } from '../utils/productCatalog'
+import { addMonthsToDate, normalizePriceInput } from '../utils/productCatalog'
 import ImageViewer from './ImageViewer'
 
 const DEFAULT_CATEGORIES = ['面霜', '精华', '面膜', '洁面', '防晒', '其他']
@@ -58,6 +58,8 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
   const [category, setCategory] = useState(product?.category || initialValues.category || '其他')
   const [color, setColor] = useState(product?.color || initialValues.color || '')
   const [volume, setVolume] = useState(product?.volume || initialValues.volume || '')
+  const [productionDate, setProductionDate] = useState(product?.production_date || initialValues.production_date || '')
+  const [shelfLifeMonths, setShelfLifeMonths] = useState(product?.shelf_life_months || initialValues.shelf_life_months || '')
   const [purchaseDate, setPurchaseDate] = useState(product?.purchase_date || initialValues.purchase_date || '')
   const [expiryDate, setExpiryDate] = useState(product?.expiry_date || initialValues.expiry_date || '')
   const [price, setPrice] = useState(normalizePriceInput(product?.price ?? initialValues.price ?? ''))
@@ -124,8 +126,10 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
     formData.append('category', category)
     formData.append('color', color.trim())
     formData.append('volume', volume.trim())
+    formData.append('production_date', productionDate)
+    formData.append('shelf_life_months', shelfLifeMonths || 0)
     formData.append('purchase_date', purchaseDate)
-    formData.append('expiry_date', expiryDate)
+    formData.append('expiry_date', expiryDate || addMonthsToDate(productionDate, shelfLifeMonths))
     formData.append('price', price || 0)
     formData.append('notes', notes.trim())
     formData.append('usage_percent', usagePercent || 0)
@@ -152,6 +156,21 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const updateShelfLifeExpiry = (nextProductionDate, nextShelfLifeMonths) => {
+    const nextExpiryDate = addMonthsToDate(nextProductionDate, nextShelfLifeMonths)
+    if (nextExpiryDate) setExpiryDate(nextExpiryDate)
+  }
+
+  const handleProductionDateChange = (value) => {
+    setProductionDate(value)
+    updateShelfLifeExpiry(value, shelfLifeMonths)
+  }
+
+  const handleShelfLifeMonthsChange = (value) => {
+    setShelfLifeMonths(value)
+    updateShelfLifeExpiry(productionDate, value)
   }
 
   return (
@@ -226,6 +245,19 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
                     aria-hidden="true"
                   />
                 )}
+              </div>
+            </div>
+          )}
+
+          {!isQuick && (
+            <div className="product-form-row">
+              <div className="form-group">
+                <label className="form-label">生产日期</label>
+                <input className="form-input" type="date" value={productionDate} onChange={e => handleProductionDateChange(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">保质期（月）</label>
+                <input className="form-input" type="number" min="0" max="240" step="1" value={shelfLifeMonths} onChange={e => handleShelfLifeMonthsChange(e.target.value)} placeholder="36" />
               </div>
             </div>
           )}

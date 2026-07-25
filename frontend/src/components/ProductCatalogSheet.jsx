@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, Loader2, PlusCircle, Search, X } from 'lucide-react'
 import { addCatalogProductToCabinet, fetchCatalogProducts, getPhotoUrl } from '../api'
+import { addMonthsToDate } from '../utils/productCatalog'
 import ProductRecordActions from './ProductRecordActions'
 
 const ALL_CATEGORY = '全部'
@@ -67,6 +68,8 @@ function getCatalogDetailDraft(product) {
   return {
     color: product?.color || '',
     volume: product?.volume || '',
+    production_date: product?.production_date || '',
+    shelf_life_months: product?.shelf_life_months || '',
     purchase_date: todayDateKey(),
     expiry_date: product?.expiry_date || '',
     price: normalizePriceInput(product?.price),
@@ -162,14 +165,23 @@ export default function ProductCatalogSheet({
   }
 
   const updateDetailDraft = (field, value) => {
-    setDetailDraft(prev => ({ ...prev, [field]: value }))
+    setDetailDraft(prev => {
+      const next = { ...prev, [field]: value }
+      if (field === 'production_date' || field === 'shelf_life_months') {
+        const nextExpiry = addMonthsToDate(next.production_date, next.shelf_life_months)
+        if (nextExpiry) next.expiry_date = nextExpiry
+      }
+      return next
+    })
   }
 
   const buildDetailAddPayload = () => ({
     color: detailDraft.color || '',
     volume: detailDraft.volume || '',
+    production_date: detailDraft.production_date || '',
+    shelf_life_months: detailDraft.shelf_life_months || 0,
     purchase_date: detailDraft.purchase_date || '',
-    expiry_date: detailDraft.expiry_date || '',
+    expiry_date: detailDraft.expiry_date || addMonthsToDate(detailDraft.production_date, detailDraft.shelf_life_months),
     price: detailDraft.price || 0,
     notes: detailDraft.notes || '',
     usage_percent: Math.max(0, Math.min(100, Number(detailDraft.usage_percent) || 0)),
@@ -270,6 +282,28 @@ export default function ProductCatalogSheet({
               value={detailDraft.color || ''}
               onChange={event => updateDetailDraft('color', event.target.value)}
               placeholder="如 EM05"
+              disabled={alreadyInCabinet}
+            />
+          </div>
+          <div>
+            <span>生产日期</span>
+            <input
+              type="date"
+              value={detailDraft.production_date || ''}
+              onChange={event => updateDetailDraft('production_date', event.target.value)}
+              disabled={alreadyInCabinet}
+            />
+          </div>
+          <div>
+            <span>保质期（月）</span>
+            <input
+              type="number"
+              min="0"
+              max="240"
+              step="1"
+              value={detailDraft.shelf_life_months || ''}
+              onChange={event => updateDetailDraft('shelf_life_months', event.target.value)}
+              placeholder="如 36"
               disabled={alreadyInCabinet}
             />
           </div>

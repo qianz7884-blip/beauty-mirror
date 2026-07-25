@@ -25,6 +25,8 @@ class Product(db.Model):
     category = db.Column(db.String(50), default='其他')
     color = db.Column(db.String(50), default='')
     volume = db.Column(db.String(50), default='')         # 规格容量，如 "60ml"
+    production_date = db.Column(db.String(20), default='')
+    shelf_life_months = db.Column(db.Integer, default=0)
     purchase_date = db.Column(db.String(20), default='')
     expiry_date = db.Column(db.String(20), default='')
     price = db.Column(db.Float, default=0.0)
@@ -57,6 +59,8 @@ class Product(db.Model):
             'category': self.category,
             'color': self.color,
             'volume': self.volume,
+            'production_date': self.production_date,
+            'shelf_life_months': self.shelf_life_months or 0,
             'purchase_date': self.purchase_date,
             'expiry_date': self.expiry_date,
             'price': price,
