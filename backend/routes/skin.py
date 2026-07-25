@@ -44,7 +44,11 @@ def face_ratio_analysis():
 
     from face_ratio_analyzer import analyze_face_ratios
 
-    face_ratio = analyze_face_ratios(face_info['landmarks'], face_info['image_size'])
+    face_ratio = analyze_face_ratios(
+        face_info['landmarks'],
+        face_info['image_size'],
+        image_bytes=image_bytes,
+    )
     face_data = face_info.get('face_data', {})
     if isinstance(face_data, dict):
         face_data['face_ratio'] = face_ratio

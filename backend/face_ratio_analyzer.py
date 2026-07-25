@@ -12,7 +12,7 @@
 from math import hypot
 
 
-VERSION = 'face_ratio_v1'
+VERSION = 'face_ratio_v2'
 
 BROW_INDICES = [70, 63, 105, 66, 107, 300, 293, 334, 296, 336]
 NOSE_BASE_INDICES = [2, 94, 97, 164, 326, 327]
@@ -126,6 +126,30 @@ def _feature_focus_label(feature_center_ratio):
     return '五官重心居中'
 
 
+def _load_image_rgb(image_bytes):
+    if not image_bytes:
+        return None
+    try:
+        import numpy as np
+        from face_regions import load_image
+
+        return np.array(load_image(image_bytes).convert('RGB'), dtype=np.uint8)
+    except Exception as exc:
+        print(f'[face_ratio] load image for hairline failed: {exc}')
+        return None
+
+
+def _estimate_hairline(landmarks, image_size, image_bytes=None, image_rgb=None):
+    try:
+        from face_parsing import estimate_hairline
+
+        rgb = image_rgb if image_rgb is not None else _load_image_rgb(image_bytes)
+        return estimate_hairline(landmarks, image_size, image_rgb=rgb)
+    except Exception as exc:
+        print(f'[face_ratio] hairline estimation skipped: {exc}')
+        return {'available': False, 'reason': 'hairline_estimation_failed'}
+
+
 def _quality_flags(points, face_height, face_width):
     left_eye_outer = points['left_eye_outer']
     right_eye_outer = points['right_eye_outer']
@@ -234,7 +258,7 @@ def _confidence(quality_flags, face_height, face_width):
     return 'high'
 
 
-def analyze_face_ratios(landmarks, image_size):
+def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None):
     """
     分析面部比例倾向。
 
@@ -270,7 +294,7 @@ def analyze_face_ratios(landmarks, image_size):
 
     try:
         points = {
-            'forehead_top': _point(landmarks, 10, image_size),
+            'mesh_forehead_top': _point(landmarks, 10, image_size),
             'chin': _point(landmarks, 152, image_size),
             'face_left': _point(landmarks, 234, image_size),
             'face_right': _point(landmarks, 454, image_size),
@@ -285,6 +309,20 @@ def analyze_face_ratios(landmarks, image_size):
             'nose_base': _mean_point(landmarks, NOSE_BASE_INDICES, image_size),
             'mouth_center': _mean_point(landmarks, MOUTH_CENTER_INDICES, image_size),
         }
+
+        hairline = _estimate_hairline(
+            landmarks,
+            image_size,
+            image_bytes=image_bytes,
+            image_rgb=image_rgb,
+        )
+        hairline_available = bool(isinstance(hairline, dict) and hairline.get('available'))
+        if hairline_available:
+            points['forehead_top'] = (points['nose_tip'][0], float(hairline['y']))
+            upper_source = 'face_parsing_hairline'
+        else:
+            points['forehead_top'] = points['mesh_forehead_top']
+            upper_source = 'mediapipe_forehead_approx'
 
         face_height = abs(points['chin'][1] - points['forehead_top'][1])
         face_width = _horizontal(points['face_left'], points['face_right'])
@@ -324,8 +362,9 @@ def analyze_face_ratios(landmarks, image_size):
             face_height,
         )
 
+        upper_status = _segment_label('上庭', upper_norm) if hairline_available else '发际线不可见，暂不判断'
         primary_tags = [
-            _segment_label('上庭', upper_norm),
+            *([upper_status] if hairline_available else []),
             _segment_label('中庭', middle_norm),
             _segment_label('下庭', lower_norm),
             _eye_spacing_label(eye_spacing_ratio),
@@ -371,28 +410,35 @@ def analyze_face_ratios(landmarks, image_size):
             'confidence': _confidence(quality_flags, face_height, face_width),
             'quality_flags': quality_flags,
             'measurement_notes': [
-                '三庭为 MediaPipe 关键点近似结果，无法真实识别发际线',
+                '发际线清晰时，上庭使用 skin / hair 分割边界估算',
+                '发际线不可见、刘海遮挡或模型不可用时，上庭不参与强判断',
                 '结果适合用于妆容教程推荐，不代表绝对脸型或审美评价',
             ],
             'measurements': {
                 'three_part': {
                     'upper': {
-                        'label': '上庭近似',
+                        'label': '上庭' if hairline_available else '额上部近似',
                         'pixels': _round(upper, 1),
                         'share': _round(_safe_ratio(upper, three_total)),
                         'normalized': _round(upper_norm),
+                        'status': upper_status,
+                        'source': upper_source,
+                        'hairline_available': hairline_available,
+                        'usable_for_ratio': hairline_available,
                     },
                     'middle': {
                         'label': '中庭近似',
                         'pixels': _round(middle, 1),
                         'share': _round(_safe_ratio(middle, three_total)),
                         'normalized': _round(middle_norm),
+                        'status': _segment_label('中庭', middle_norm),
                     },
                     'lower': {
                         'label': '下庭近似',
                         'pixels': _round(lower, 1),
                         'share': _round(_safe_ratio(lower, three_total)),
                         'normalized': _round(lower_norm),
+                        'status': _segment_label('下庭', lower_norm),
                     },
                 },
                 'five_eye': {
@@ -407,6 +453,7 @@ def analyze_face_ratios(landmarks, image_size):
                     'jaw_cheek_ratio': _round(jaw_cheek_ratio),
                     'feature_center_ratio': _round(feature_center_ratio),
                 },
+                'hairline': hairline,
                 'pose': pose_metrics,
             },
         }

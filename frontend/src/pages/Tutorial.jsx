@@ -149,13 +149,14 @@ function buildRatioReferenceRows(faceRatio) {
     ['lower', '下庭', '下庭均衡'],
   ].map(([key, label, fallback]) => {
     const item = threePart[key] || {}
+    const isUsable = item.usable_for_ratio !== false
     return {
       id: `three-${key}`,
       group: '三庭',
-      label,
+      label: item.label || label,
       value: `${formatRatioPercent(item.share)} · ${formatRatioNumber(item.normalized)}x`,
-      reference: '约 33.3% · 0.88-1.12x',
-      status: getPrimaryRatioTag(faceRatio, tag => tag.startsWith(label), fallback),
+      reference: isUsable ? '约 33.3% · 0.88-1.12x' : '需清晰发际线',
+      status: item.status || getPrimaryRatioTag(faceRatio, tag => tag.startsWith(label), fallback),
     }
   })
 

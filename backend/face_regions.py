@@ -950,13 +950,72 @@ def build_improved_face_skin_mask(
     face_mask = np.zeros((h, w), dtype=np.uint8)
     face_mask = _draw_poly(face_mask, contour, 255)
     face_mask = _blur_and_threshold(face_mask, sigma=1.25, threshold=96)
+    geometry_face_mask = face_mask.copy()
 
     exclusion_mask = _build_exclusion_mask(
         landmarks,
         image_size,
         max(metrics['face_width'], 1),
     )
-    skin_mask = np.where((face_mask > 0) & (exclusion_mask == 0), 255, 0).astype(np.uint8)
+    skin_mask_source = 'mediapipe_geometry'
+    semantic_skin_mask = None
+    semantic_hair_mask = None
+    hairline_info = None
+
+    if image_rgb is not None:
+        try:
+            from face_parsing import estimate_hairline, parse_face
+
+            face_parse = parse_face(image_rgb)
+            if face_parse and face_parse.get('ok'):
+                raw_skin = np.asarray(face_parse.get('skin_mask'), dtype=np.uint8)
+                raw_hair = np.asarray(face_parse.get('hair_mask'), dtype=np.uint8)
+                if raw_skin.shape == (h, w):
+                    face_left, face_top, face_right, face_bottom = metrics['face_bbox']
+                    face_width = max(float(face_right - face_left), 1.0)
+                    face_height = max(float(face_bottom - face_top), 1.0)
+                    support_left = int(max(0, face_left - face_width * 0.18))
+                    support_right = int(min(w, face_right + face_width * 0.18))
+                    support_top = int(max(0, face_top - face_height * 0.45))
+                    support_bottom = int(min(h, face_bottom + face_height * 0.05))
+                    support_mask = np.zeros((h, w), dtype=np.uint8)
+                    support_mask[support_top:support_bottom, support_left:support_right] = 255
+
+                    semantic_skin = np.where((raw_skin > 0) & (support_mask > 0), 255, 0).astype(np.uint8)
+                    semantic_skin = _dilate_mask(semantic_skin, radius_px=1)
+                    semantic_skin = _blur_and_threshold(semantic_skin, sigma=0.55, threshold=96)
+                    semantic_skin = np.where((semantic_skin > 0) & (exclusion_mask == 0), 255, 0).astype(np.uint8)
+
+                    semantic_area = int(np.sum(semantic_skin > 0))
+                    semantic_bbox = _bbox_from_mask(semantic_skin)
+                    if semantic_area >= ROI_MIN_VALID_PIXELS * 8 and semantic_bbox:
+                        skin_mask = semantic_skin
+                        face_mask = semantic_skin.copy()
+                        semantic_skin_mask = semantic_skin
+                        semantic_hair_mask = raw_hair if raw_hair.shape == (h, w) else None
+                        skin_mask_source = face_parse.get('source') or 'face_parsing'
+                        metrics['face_bbox'] = semantic_bbox
+                        metrics['semantic_face_bbox'] = semantic_bbox
+                        metrics['semantic_skin_area'] = semantic_area
+                        metrics['semantic_hair_area'] = int(np.sum(raw_hair > 0)) if raw_hair.shape == (h, w) else 0
+                        metrics['semantic_model_path'] = face_parse.get('model_path', '')
+                        hairline_info = estimate_hairline(
+                            landmarks,
+                            image_size,
+                            image_rgb=image_rgb,
+                            face_parse=face_parse,
+                        )
+                        metrics['hairline'] = hairline_info
+                        print(
+                            '[face_regions] semantic skin mask enabled: '
+                            f'bbox={semantic_bbox}, area={semantic_area}, '
+                            f'hairline={hairline_info.get("available") if isinstance(hairline_info, dict) else None}'
+                        )
+        except Exception as exc:
+            print(f'[face_regions] semantic face parsing unavailable, using geometry mask: {exc}')
+
+    if skin_mask_source == 'mediapipe_geometry':
+        skin_mask = np.where((face_mask > 0) & (exclusion_mask == 0), 255, 0).astype(np.uint8)
 
     skin_area = int(np.sum(skin_mask > 0))
     face_area = int(np.sum(face_mask > 0))
@@ -966,6 +1025,7 @@ def build_improved_face_skin_mask(
         'face_mask_area': face_area,
         'skin_mask_area': skin_area,
         'skin_mask_ratio': float(skin_area / max(w * h, 1)),
+        'skin_mask_source': skin_mask_source,
     })
 
     print(
@@ -986,8 +1046,12 @@ def build_improved_face_skin_mask(
         'improved_contour': contour,
         'forehead_arc': forehead_arc,
         'face_mask': face_mask,
+        'geometry_face_mask': geometry_face_mask,
         'exclusion_mask': exclusion_mask,
         'skin_mask': skin_mask,
+        'semantic_skin_mask': semantic_skin_mask,
+        'semantic_hair_mask': semantic_hair_mask,
+        'hairline': hairline_info,
         'metrics': metrics,
         'debug_prefix': debug_prefix,
     }

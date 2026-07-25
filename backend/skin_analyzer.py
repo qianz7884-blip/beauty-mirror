@@ -367,7 +367,7 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
     try:
         from face_ratio_analyzer import analyze_face_ratios
 
-        face_ratio = analyze_face_ratios(landmarks, img_size)
+        face_ratio = analyze_face_ratios(landmarks, img_size, image_bytes=analysis_image_bytes)
         if isinstance(face_data, dict):
             face_data['face_ratio'] = face_ratio
         print(f'[skin_analyzer] 面部比例分析完成: {face_ratio.get("ratio_tags", []) if isinstance(face_ratio, dict) else []}')
