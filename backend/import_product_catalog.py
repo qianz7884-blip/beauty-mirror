@@ -6,7 +6,6 @@ import xml.etree.ElementTree as ET
 from io import BytesIO
 from pathlib import Path
 
-from app import app
 from config import Config
 from models import Product, db
 from upload_utils import save_photo_bytes
@@ -136,48 +135,51 @@ def import_catalog(path=WORKBOOK_PATH):
     created = 0
     updated = 0
 
-    with app.app_context():
-        for record in rows:
-            brand = record['brand']
-            name = record['name']
-            product = Product.query.filter(
-                Product.source == 'knowledge_base',
-                Product.brand == brand,
-                Product.name == name,
-            ).first()
-            if not product:
-                product = Product(source='knowledge_base', brand=brand, name=name)
-                db.session.add(product)
-                created += 1
-            else:
-                updated += 1
+    for record in rows:
+        brand = record['brand']
+        name = record['name']
+        product = Product.query.filter(
+            Product.source == 'knowledge_base',
+            Product.brand == brand,
+            Product.name == name,
+        ).first()
+        if not product:
+            product = Product(source='knowledge_base', brand=brand, name=name)
+            db.session.add(product)
+            created += 1
+        else:
+            updated += 1
 
-            photo = product.photo or _save_local_image(record.get('image_file'))
-            product.brand = brand
-            product.name = name
-            product.category = _normalize_category(record.get('category'))
-            product.volume = _clean(record.get('volume'))
-            product.photo = photo
-            product.ingredients = _clean(record.get('ingredients'))
-            product.efficacy = _clean(record.get('efficacy'))
-            product.suitable_skin = _clean(record.get('suitable_skin'))
-            product.usage_instructions = _clean(record.get('usage_instructions'))
-            product.usage_steps = _clean(record.get('usage_steps'))
-            product.product_features = _clean(record.get('product_features'))
-            product.suitable_regions = _clean(record.get('suitable_regions'))
-            product.suitable_scenes = _clean(record.get('suitable_scenes'))
-            product.notes = _notes_with_source(record)
-            product.user_id = ''
+        photo = product.photo or _save_local_image(record.get('image_file'))
+        product.brand = brand
+        product.name = name
+        product.category = _normalize_category(record.get('category'))
+        product.volume = _clean(record.get('volume'))
+        product.photo = photo
+        product.ingredients = _clean(record.get('ingredients'))
+        product.efficacy = _clean(record.get('efficacy'))
+        product.suitable_skin = _clean(record.get('suitable_skin'))
+        product.usage_instructions = _clean(record.get('usage_instructions'))
+        product.usage_steps = _clean(record.get('usage_steps'))
+        product.product_features = _clean(record.get('product_features'))
+        product.suitable_regions = _clean(record.get('suitable_regions'))
+        product.suitable_scenes = _clean(record.get('suitable_scenes'))
+        product.notes = _notes_with_source(record)
+        product.user_id = ''
 
-        db.session.commit()
+    db.session.commit()
 
-        total = Product.query.filter(Product.source == 'knowledge_base').count()
-        return {'ready_rows': len(rows), 'created': created, 'updated': updated, 'catalog_total': total}
+    total = Product.query.filter(Product.source == 'knowledge_base').count()
+    return {'ready_rows': len(rows), 'created': created, 'updated': updated, 'catalog_total': total}
 
 
 if __name__ == '__main__':
     workbook = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else WORKBOOK_PATH
     if not workbook.exists():
         raise SystemExit(f'找不到表格：{workbook}')
-    result = import_catalog(workbook)
+    os.environ['BEAUTY_MIRROR_SKIP_CATALOG_AUTOSYNC'] = '1'
+    from app import app
+
+    with app.app_context():
+        result = import_catalog(workbook)
     print(result)

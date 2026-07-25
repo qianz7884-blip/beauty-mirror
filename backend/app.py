@@ -156,14 +156,39 @@ def _seed_product_knowledge():
     try:
         from product_knowledge import ProductKnowledge
 
-        if Product.query.filter(Product.source == 'knowledge_base').count() > 0:
-            return
-
-        count = ProductKnowledge(db.session).seed_knowledge_base(force=True)
-        if count > 0:
-            print(f'[app] 产品知识库同步完成: {count} 条种子数据')
+        if Product.query.filter(Product.source == 'knowledge_base').count() == 0:
+            count = ProductKnowledge(db.session).seed_knowledge_base(force=True)
+            if count > 0:
+                print(f'[app] 产品知识库同步完成: {count} 条种子数据')
     except Exception as exc:
         print(f'[app] 种子知识写入失败: {exc}')
+
+    _sync_product_catalog_workbook()
+
+
+def _sync_product_catalog_workbook():
+    """Upsert products marked ready in the bundled workbook."""
+    if os.environ.get('BEAUTY_MIRROR_SKIP_CATALOG_AUTOSYNC') == '1':
+        return
+    if not _is_database_writable():
+        print('[app] 产品库表格同步跳过: 数据库不可写')
+        return
+
+    try:
+        from import_product_catalog import WORKBOOK_PATH, import_catalog
+
+        if not WORKBOOK_PATH.exists():
+            return
+
+        result = import_catalog(WORKBOOK_PATH)
+        if result.get('ready_rows', 0) > 0:
+            print(
+                '[app] 产品库表格同步完成: '
+                f"{result['ready_rows']} 行, 新增 {result['created']} 条, 更新 {result['updated']} 条"
+            )
+    except Exception as exc:
+        db.session.rollback()
+        print(f'[app] 产品库表格同步失败: {exc}')
 
 
 app = create_app()
