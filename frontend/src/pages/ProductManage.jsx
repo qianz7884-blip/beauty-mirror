@@ -1397,7 +1397,7 @@ export default function ProductManage() {
         ref={cameraInputRef}
         type="file"
         accept="image/*"
-        style={{ display: 'none' }}
+        className="bm-hidden-file"
         onChange={handlePhotoPick}
       />
 

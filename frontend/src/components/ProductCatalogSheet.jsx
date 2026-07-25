@@ -395,7 +395,6 @@ export default function ProductCatalogSheet({
           <label className="bm-catalog-search">
             <Search size={18} strokeWidth={1.8} />
             <input
-              autoFocus
               value={search}
               onChange={event => {
                 setSearch(event.target.value)

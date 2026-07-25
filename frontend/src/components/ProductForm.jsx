@@ -217,25 +217,26 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
           {!isQuick && (
             <div className="form-group">
               <label className="form-label">颜色</label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input className="form-input" value={color} onChange={e => setColor(e.target.value)} placeholder="例如：#FF0000 或 正红色" style={{ flex: 1 }} />
+              <div className="product-form-inline product-color-field">
+                <input className="form-input" value={color} onChange={e => setColor(e.target.value)} placeholder="例如：#FF0000 或 正红色" />
                 {color && (
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    background: color, border: '2px solid #ddd', flexShrink: 0
-                  }} />
+                  <div
+                    className="product-color-preview"
+                    style={{ background: color }}
+                    aria-hidden="true"
+                  />
                 )}
               </div>
             </div>
           )}
 
           {!isQuick && (
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div className="form-group" style={{ flex: 1 }}>
+            <div className="product-form-row">
+              <div className="form-group">
                 <label className="form-label">购买日期</label>
                 <input className="form-input" type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
               </div>
-              <div className="form-group" style={{ flex: 1 }}>
+              <div className="form-group">
                 <label className="form-label">预计到期</label>
                 <input className="form-input" type="date" value={expiryDate} onChange={e => setExpiryDate(e.target.value)} />
               </div>
@@ -243,8 +244,8 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
           )}
 
           {!isQuick && (
-            <div style={{ display: 'flex', gap: 10 }}>
-              <div className="form-group" style={{ flex: 1 }}>
+            <div className="product-form-row product-form-row-single">
+              <div className="form-group">
                 <label className="form-label">价格 ¥</label>
                 <input className="form-input" type="number" step="0.01" min="0" value={price} onChange={e => setPrice(e.target.value)} placeholder="0" />
               </div>
@@ -286,16 +287,21 @@ export default function ProductForm({ product, onSubmit, onClose, mode = 'full',
 
           <div className="form-group">
             <label className="form-label">照片</label>
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange} style={{ fontSize: 13 }} />
+            <input ref={fileRef} type="file" accept="image/*" className="bm-hidden-file" onChange={handleFileChange} />
+            <div className="product-photo-upload">
+              <button type="button" className="product-photo-pick" onClick={() => fileRef.current?.click()}>
+                选择照片
+              </button>
+              <span>{photo?.name || (photoPreview ? '已选择图片' : '支持拍照或相册')}</span>
+            </div>
             {(!product || isQuick) && (
               <>
-                <p style={{ fontSize: 12, color: '#aaa', margin: '6px 0' }}>— 或粘贴图片链接 —</p>
+                <p className="product-photo-url-label">或粘贴图片链接</p>
                 <input
                   className="form-input"
                   value={photoUrl}
                   onChange={handleUrlChange}
                   placeholder="https://... 品牌官网图片地址"
-                  style={{ fontSize: 12 }}
                 />
               </>
             )}
