@@ -536,6 +536,105 @@ body {
   white-space: nowrap;
 }
 
+.bm-face-ratio-reference {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(111, 151, 180, 0.16);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.56);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.bm-face-ratio-reference-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bm-face-ratio-reference-head strong {
+  color: #243747;
+  font-size: 13px;
+  font-weight: 780;
+}
+
+.bm-face-ratio-reference-head span {
+  color: #758898;
+  font-size: 11px;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.bm-face-ratio-reference-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.bm-face-ratio-reference-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  min-height: 54px;
+  padding: 8px 9px;
+  border: 1px solid rgba(126, 153, 174, 0.12);
+  border-radius: 12px;
+  background: rgba(237, 246, 251, 0.62);
+}
+
+.bm-face-ratio-reference-row > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  min-height: 22px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255, 247, 225, 0.86);
+  color: #8a6a25;
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.bm-face-ratio-reference-row strong {
+  min-width: 0;
+  color: #243747;
+  font-size: 13px;
+  font-weight: 780;
+  line-height: 1.2;
+}
+
+.bm-face-ratio-reference-row b {
+  min-width: 0;
+  color: #5d7b62;
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.bm-face-ratio-reference-row em,
+.bm-face-ratio-reference-row small {
+  grid-column: 2 / span 2;
+  min-width: 0;
+  font-style: normal;
+  line-height: 1.25;
+}
+
+.bm-face-ratio-reference-row em {
+  color: #315f84;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.bm-face-ratio-reference-row small {
+  color: #7a8b98;
+  font-size: 11px;
+}
+
 .bm-face-ratio-tips {
   display: grid;
   gap: 6px;
@@ -4233,5 +4332,236 @@ body {
 
   .bm-catalog-add {
     width: 42px;
+  }
+}
+
+/* Product page mobile readability pass */
+@media (max-width: 480px) {
+  .bm-vault {
+    --bm-glass-alpha: 0.86;
+    --bm-glass-strong-alpha: 0.93;
+    --bm-product-mobile-surface: rgba(255, 255, 255, 0.94);
+    --bm-product-mobile-tint: rgba(240, 248, 253, 0.88);
+    --bm-product-mobile-border: rgba(255, 255, 255, 0.88);
+    background:
+      linear-gradient(180deg, rgba(247, 252, 255, 0.90), rgba(242, 249, 253, 0.78) 42%, rgba(239, 248, 242, 0.84) 100%),
+      var(--bm-page-image, var(--bm-page-gradient));
+    background-size: cover;
+    background-position: center top;
+    background-color: var(--bm-page-base, #edf6fb);
+  }
+
+  .bm-vault-simple-head {
+    margin: -18px 0 10px;
+    padding: 40px 12px 12px;
+    background:
+      linear-gradient(180deg, rgba(248, 252, 255, 0.94), rgba(248, 252, 255, 0.74) 74%, rgba(248, 252, 255, 0)) !important;
+  }
+
+  .bm-vault-title-row h1,
+  .bm-vault-title-row p {
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.88);
+  }
+
+  .bm-vault-head-actions button,
+  .bm-vault-search-inline,
+  .bm-vault-tabs button,
+  .bm-category-head {
+    border-color: var(--bm-product-mobile-border) !important;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(244, 250, 254, 0.86)) !important;
+    box-shadow: 0 10px 24px rgba(74, 112, 143, 0.10) !important;
+    backdrop-filter: blur(18px) saturate(1.06) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.06) !important;
+  }
+
+  .bm-vault-tabs button.active,
+  .bm-vault-head-actions button.active {
+    background:
+      linear-gradient(135deg, rgba(255, 226, 142, 0.92), rgba(255, 248, 224, 0.84)) !important;
+    color: #24445e !important;
+  }
+
+  .bm-vault .bm-category {
+    padding: 0 12px;
+  }
+
+  .bm-category-head {
+    position: relative;
+    z-index: 1;
+  }
+
+  .bm-category-stack {
+    gap: 10px;
+  }
+
+  .bm-product-list {
+    gap: 9px;
+  }
+
+  .bm-product-card {
+    grid-template-columns: 70px minmax(0, 1fr) 32px !important;
+    gap: 9px;
+    min-height: 92px;
+    padding: 8px;
+    border-color: var(--bm-product-mobile-border) !important;
+    background:
+      linear-gradient(135deg, var(--bm-product-mobile-surface), var(--bm-product-mobile-tint)) !important;
+    background-color: var(--bm-product-mobile-surface) !important;
+    box-shadow: 0 14px 30px rgba(74, 112, 143, 0.12) !important;
+    backdrop-filter: blur(18px) saturate(1.06) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.06) !important;
+  }
+
+  .bm-product-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .bm-product-card::after {
+    opacity: 0.10;
+  }
+
+  .bm-product-photo {
+    display: grid;
+    place-items: center;
+    height: 74px;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    border-color: rgba(255, 255, 255, 0.86);
+    background-color: rgba(238, 247, 252, 0.94) !important;
+    background-size: cover !important;
+    background-position: center !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.76),
+      0 8px 16px rgba(70, 122, 164, 0.12);
+  }
+
+  .bm-product-photo.is-placeholder {
+    background:
+      radial-gradient(circle at 26% 18%, rgba(255, 255, 255, 0.94), transparent 22%),
+      radial-gradient(circle at 78% 82%, rgba(255, 190, 56, 0.22), transparent 34%),
+      linear-gradient(135deg, rgba(255, 248, 229, 0.94), rgba(221, 238, 249, 0.84)) !important;
+  }
+
+  .bm-product-info {
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 14px;
+    color: #1f3447;
+  }
+
+  .bm-product-info h3 {
+    color: #1f3447;
+    -webkit-line-clamp: 2;
+  }
+
+  .bm-product-info p {
+    color: #5f7282;
+  }
+
+  .bm-product-info p,
+  .bm-product-tags,
+  .vault-product-rec-tags {
+    min-width: 0;
+  }
+
+  .bm-product-tags span,
+  .vault-product-rec-tags span {
+    background: rgba(229, 241, 249, 0.94);
+    color: #4f7592;
+  }
+
+  .bm-product-actions {
+    align-content: center;
+    gap: 7px;
+  }
+
+  .bm-product-actions button {
+    width: 32px;
+    height: 32px;
+    border-color: rgba(255, 255, 255, 0.84);
+    background: rgba(255, 255, 255, 0.84);
+    color: #315f84;
+    box-shadow: 0 8px 16px rgba(74, 112, 143, 0.10);
+  }
+
+  .bm-product-grid {
+    gap: 10px;
+  }
+
+  .bm-product-grid-card {
+    grid-template-columns: 1fr !important;
+    gap: 7px;
+    padding: 8px;
+  }
+
+  .bm-product-grid-card .bm-product-info {
+    padding: 1px 1px 0;
+  }
+
+  .bm-product-grid-card .bm-product-photo {
+    height: auto;
+    min-height: 108px;
+    aspect-ratio: 1.12;
+    max-height: none;
+  }
+
+  .bm-product-grid-card .bm-product-actions {
+    grid-template-columns: repeat(2, 32px);
+  }
+
+  .bm-skeleton-card {
+    grid-template-columns: 70px minmax(0, 1fr) 32px;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.90), rgba(240, 248, 253, 0.82)) !important;
+  }
+
+  .bm-product-empty {
+    margin: 12px 12px 0;
+    padding: 18px 14px 12px;
+    border-radius: 22px;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(240, 248, 253, 0.86)) !important;
+    background-color: rgba(255, 255, 255, 0.94) !important;
+  }
+
+  .vault-product-card {
+    border-color: var(--bm-product-mobile-border) !important;
+    background:
+      linear-gradient(135deg, var(--bm-product-mobile-surface), var(--bm-product-mobile-tint)) !important;
+    background-color: var(--bm-product-mobile-surface) !important;
+  }
+
+  .vault-product-photo {
+    background-color: rgba(238, 247, 252, 0.94) !important;
+  }
+
+  .vault-product-info,
+  .vault-product-info h3,
+  .vault-product-brand,
+  .vault-product-meta,
+  .vault-product-note {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 380px) {
+  .bm-product-card {
+    grid-template-columns: 66px minmax(0, 1fr) 30px !important;
+  }
+
+  .bm-product-photo {
+    height: 70px;
+  }
+
+  .bm-product-grid-card .bm-product-photo {
+    min-height: 100px;
+  }
+
+  .bm-product-actions button {
+    width: 30px;
+    height: 30px;
   }
 }

@@ -118,6 +118,80 @@ function buildVideoRecommendations(faceRatio, guide) {
   ]
 }
 
+function formatRatioNumber(value, digits = 2) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '--'
+  return number.toFixed(digits).replace(/\.?0+$/, '')
+}
+
+function formatRatioPercent(value) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '--'
+  return `${formatRatioNumber(number * 100, 1)}%`
+}
+
+function getPrimaryRatioTag(faceRatio, matcher, fallback) {
+  const tags = faceRatio?.primary_tags || []
+  return tags.find(matcher) || fallback
+}
+
+function buildRatioReferenceRows(faceRatio) {
+  if (!faceRatio?.ok) return []
+
+  const measurements = faceRatio.measurements || {}
+  const threePart = measurements.three_part || {}
+  const fiveEye = measurements.five_eye || {}
+  const contour = measurements.contour || {}
+
+  const threeRows = [
+    ['upper', '上庭', '上庭均衡'],
+    ['middle', '中庭', '中庭均衡'],
+    ['lower', '下庭', '下庭均衡'],
+  ].map(([key, label, fallback]) => {
+    const item = threePart[key] || {}
+    return {
+      id: `three-${key}`,
+      group: '三庭',
+      label,
+      value: `${formatRatioPercent(item.share)} · ${formatRatioNumber(item.normalized)}x`,
+      reference: '约 33.3% · 0.88-1.12x',
+      status: getPrimaryRatioTag(faceRatio, tag => tag.startsWith(label), fallback),
+    }
+  })
+
+  return [
+    ...threeRows,
+    {
+      id: 'five-eye-count',
+      group: '五眼',
+      label: '脸宽折算',
+      value: `${formatRatioNumber(fiveEye.face_eye_count)} 个眼宽`,
+      reference: '4.45-5.55 个眼宽',
+      status: getPrimaryRatioTag(
+        faceRatio,
+        tag => tag.includes('五眼') || tag.includes('横向'),
+        '五眼比例基本均衡',
+      ),
+    },
+    {
+      id: 'eye-spacing',
+      group: '五眼',
+      label: '眼距 / 眼宽',
+      value: `${formatRatioNumber(fiveEye.eye_spacing_ratio)}x`,
+      reference: '0.86-1.16x',
+      status: getPrimaryRatioTag(faceRatio, tag => tag.startsWith('眼距'), '眼距基本均衡'),
+    },
+    {
+      id: 'face-height-width',
+      group: '辅助',
+      label: '脸长 / 脸宽',
+      value: `${formatRatioNumber(contour.face_height_width_ratio)}x`,
+      reference: '1.18-1.46x',
+      status: getPrimaryRatioTag(faceRatio, tag => tag.startsWith('面部'), '面部长宽比例均衡'),
+    },
+  ]
+}
+
 export default function Tutorial() {
   const pageBackground = usePageBackground('tutorial')
   const [products, setProducts] = useState([])
@@ -150,6 +224,7 @@ export default function Tutorial() {
   const Icon = activeGuide.icon
   const displayedRatioTags = (getUsefulRatioTags(faceRatio).length ? getUsefulRatioTags(faceRatio) : faceRatio?.ratio_tags || []).slice(0, 5)
   const ratioTips = faceRatio?.makeup_tips?.slice(0, 3) || []
+  const ratioReferenceRows = useMemo(() => buildRatioReferenceRows(faceRatio), [faceRatio])
   const videoRecommendations = useMemo(
     () => buildVideoRecommendations(faceRatio, activeGuide),
     [faceRatio, activeGuide],
@@ -319,6 +394,25 @@ export default function Tutorial() {
                       {displayedRatioTags.map(tag => (
                         <span key={tag}>{tag}</span>
                       ))}
+                    </div>
+                  )}
+                  {ratioReferenceRows.length > 0 && (
+                    <div className="bm-face-ratio-reference" aria-label="三庭五眼参考数据">
+                      <div className="bm-face-ratio-reference-head">
+                        <strong>参考数据</strong>
+                        <span>本次值 / 常见参考</span>
+                      </div>
+                      <div className="bm-face-ratio-reference-grid">
+                        {ratioReferenceRows.map(row => (
+                          <div className="bm-face-ratio-reference-row" key={row.id}>
+                            <span>{row.group}</span>
+                            <strong>{row.label}</strong>
+                            <b>{row.status}</b>
+                            <em>{row.value}</em>
+                            <small>参考 {row.reference}</small>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                   {ratioTips.length > 0 && (
