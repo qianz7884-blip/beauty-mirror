@@ -4,6 +4,7 @@ from .diary import diary_bp
 from .products import products_bp
 from .skin import skin_bp
 from .uploads import uploads_bp
+from .user import user_bp
 
 
 def register_routes(app):
@@ -13,3 +14,4 @@ def register_routes(app):
     app.register_blueprint(diary_bp)
     app.register_blueprint(skin_bp)
     app.register_blueprint(uploads_bp)
+    app.register_blueprint(user_bp)

@@ -402,8 +402,8 @@ export default function Dashboard() {
         <div className="bm-home-secondary-grid">
           <TodayAction
             icon={Wand2}
-            title="生成今天流程"
-            desc="按场景、时间生成步骤。"
+            title="找今天教程"
+            desc="按比例、场景和时间预算推荐视频。"
             onClick={() => navigate('/tutorial')}
           />
           <TodayAction

@@ -4,7 +4,7 @@ export const BACKGROUND_PAGES = [
   { id: 'home', label: '今日' },
   { id: 'products', label: '产品' },
   { id: 'diary', label: '日记' },
-  { id: 'tutorial', label: '流程' },
+  { id: 'tutorial', label: '教程' },
   { id: 'profile', label: '我的' },
 ]
 

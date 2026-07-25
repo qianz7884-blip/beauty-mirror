@@ -4,7 +4,7 @@ import threading
 from flask import Blueprint, current_app, jsonify, request
 
 from models import SkinAnalysis, db
-from skin_analyzer import analyze_skin
+from skin_analyzer import analyze_skin, detect_face
 from upload_utils import delete_photo, save_photo_bytes
 
 from .common import error, get_current_user_id
@@ -25,6 +25,36 @@ _skin_analysis_slots = threading.BoundedSemaphore(_SKIN_ANALYSIS_CONCURRENCY)
 
 def _user_skin_analyses_query(user_id=None):
     return SkinAnalysis.query.filter(SkinAnalysis.user_id == (user_id or get_current_user_id()))
+
+
+@skin_bp.route('/face-ratio-analysis', methods=['POST'])
+def face_ratio_analysis():
+    photo_file = request.files.get('photo')
+    if not photo_file or not photo_file.filename:
+        return error('请上传一张正面面部照片')
+
+    image_bytes = photo_file.read()
+    has_face, face_info = detect_face(image_bytes)
+    if not has_face:
+        return jsonify({
+            'success': False,
+            'reason': 'no_face',
+            'message': face_info,
+        }), 422
+
+    from face_ratio_analyzer import analyze_face_ratios
+
+    face_ratio = analyze_face_ratios(face_info['landmarks'], face_info['image_size'])
+    face_data = face_info.get('face_data', {})
+    if isinstance(face_data, dict):
+        face_data['face_ratio'] = face_ratio
+
+    return jsonify({
+        'success': bool(face_ratio.get('ok')),
+        'face_ratio': face_ratio,
+        'face_data': face_data,
+        'image_size': face_info.get('image_size'),
+    })
 
 
 @skin_bp.route('/skin-analysis', methods=['POST'])

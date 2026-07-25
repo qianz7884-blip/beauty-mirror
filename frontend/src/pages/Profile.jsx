@@ -5,15 +5,25 @@ import {
   Check,
   ChevronRight,
   ChevronUp,
+  Copy,
+  Database,
+  Download,
   MessageSquare,
   Paintbrush,
   Palette,
+  RefreshCw,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
-import { fetchProducts } from '../api'
+import {
+  exportUserData,
+  fetchProducts,
+  fetchUserSession,
+  getAnonymousUserId,
+  resetAnonymousUserId,
+} from '../api'
 import {
   THEME_PRESETS,
   getActiveTheme,
@@ -29,6 +39,11 @@ const SKIN_TYPE_KEY = 'beauty_mirror_skin_type'
 const PROFILE_IMAGE_KEY = 'beauty_mirror_profile_image'
 const REMINDER_KEY = 'beauty_mirror_reminder'
 const REMINDER_SETTINGS_KEY = 'beauty_mirror_product_reminder_settings_v1'
+
+function formatLocalUserId(userId) {
+  if (!userId) return '读取中'
+  return userId.length > 14 ? `${userId.slice(0, 6)}...${userId.slice(-6)}` : userId
+}
 
 function MenuItem({ icon: Icon, label, desc, badge, onClick }) {
   return (
@@ -160,6 +175,76 @@ function ReminderPanel({
   )
 }
 
+function UserDataPanel({
+  session,
+  userId,
+  message,
+  onCopy,
+  onExport,
+  onReset,
+  onRefresh,
+}) {
+  const counts = session?.counts || {}
+  const database = session?.database || {}
+
+  return (
+    <div className="bm-user-panel">
+      <div className="bm-user-panel-head">
+        <span className="bm-reminder-toggle-icon"><Database size={17} strokeWidth={1.8} /></span>
+        <div>
+          <strong>本地数据</strong>
+          <small>{session?.last_activity_at ? `最近记录 ${session.last_activity_at}` : '当前浏览器身份'}</small>
+        </div>
+        <button type="button" onClick={onRefresh} aria-label="刷新本地数据">
+          <RefreshCw size={16} strokeWidth={1.8} />
+        </button>
+      </div>
+
+      <div className="bm-user-id-line">
+        <span>当前身份</span>
+        <code>{formatLocalUserId(userId)}</code>
+      </div>
+
+      <div className="bm-user-stat-grid">
+        <span>
+          <strong>{counts.products ?? 0}</strong>
+          <small>产品</small>
+        </span>
+        <span>
+          <strong>{counts.diaries ?? 0}</strong>
+          <small>日记</small>
+        </span>
+        <span>
+          <strong>{counts.skin_analyses ?? 0}</strong>
+          <small>肤况</small>
+        </span>
+      </div>
+
+      <div className={`bm-user-db ${database.writable === false ? 'warning' : 'ok'}`}>
+        <Database size={16} strokeWidth={1.7} />
+        <span>{database.message || '数据库状态读取中'}</span>
+      </div>
+
+      <div className="bm-user-actions">
+        <button type="button" onClick={onExport}>
+          <Download size={15} strokeWidth={1.8} />
+          <span>备份</span>
+        </button>
+        <button type="button" onClick={onCopy}>
+          <Copy size={15} strokeWidth={1.8} />
+          <span>复制ID</span>
+        </button>
+        <button type="button" className="danger" onClick={onReset}>
+          <RefreshCw size={15} strokeWidth={1.8} />
+          <span>换新身份</span>
+        </button>
+      </div>
+
+      {message ? <p className="bm-user-message">{message}</p> : null}
+    </div>
+  )
+}
+
 export default function Profile() {
   const [skinType, setSkinType] = useState(() => localStorage.getItem(SKIN_TYPE_KEY) || '')
   const [reminderOn, setReminderOn] = useState(() => localStorage.getItem(REMINDER_KEY) === 'true')
@@ -167,11 +252,30 @@ export default function Profile() {
   const [profileImage, setProfileImage] = useState(() => localStorage.getItem(PROFILE_IMAGE_KEY) || '')
   const [themeSettings, setThemeSettings] = useState(readThemeSettings)
   const [products, setProducts] = useState([])
+  const [userId, setUserId] = useState(() => getAnonymousUserId())
+  const [userSession, setUserSession] = useState(null)
+  const [userMessage, setUserMessage] = useState('')
   const [showSkinPicker, setShowSkinPicker] = useState(false)
   const [showReminderPanel, setShowReminderPanel] = useState(false)
+  const [showUserPanel, setShowUserPanel] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
 
   const activeTheme = getActiveTheme(themeSettings)
+
+  const refreshUserSession = () => {
+    const currentUserId = getAnonymousUserId()
+    setUserId(currentUserId)
+    return fetchUserSession()
+      .then(data => {
+        setUserSession(data)
+        setUserId(data?.user_id || currentUserId)
+        return data
+      })
+      .catch(() => {
+        setUserMessage('本地数据状态读取失败，请确认后端服务正在运行')
+        return null
+      })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -181,6 +285,25 @@ export default function Profile() {
       })
       .catch(() => {
         if (!cancelled) setProducts([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const currentUserId = getAnonymousUserId()
+    setUserId(currentUserId)
+    fetchUserSession()
+      .then(data => {
+        if (!cancelled) {
+          setUserSession(data)
+          setUserId(data?.user_id || currentUserId)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setUserMessage('本地数据状态读取失败，请确认后端服务正在运行')
       })
     return () => {
       cancelled = true
@@ -256,6 +379,60 @@ export default function Profile() {
       ...themeSettings,
       presetId: 'blue',
       customImage: '',
+    })
+  }
+
+  const handleCopyUserId = () => {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(userId)
+        .then(() => setUserMessage('当前本地身份 ID 已复制'))
+        .catch(() => setUserMessage('复制失败，可以手动长按 ID 复制'))
+      return
+    }
+    setUserMessage('当前浏览器不支持自动复制')
+  }
+
+  const handleExportUserData = () => {
+    setUserMessage('正在准备当前本地身份的数据备份')
+    exportUserData()
+      .then(data => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: 'application/json;charset=utf-8',
+        })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        const date = new Date().toISOString().slice(0, 10)
+        link.href = url
+        link.download = `mirror-mate-${data.user_id || userId}-${date}.json`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(url)
+        setUserMessage('已导出当前本地身份的数据备份')
+      })
+      .catch(() => {
+        setUserMessage('导出失败，请确认后端服务正在运行')
+      })
+  }
+
+  const handleResetUserId = () => {
+    const confirmed = window.confirm('切换后会进入一个新的空白本地身份，旧数据不会删除。建议先备份当前数据，再确认切换。')
+    if (!confirmed) return
+
+    const nextUserId = resetAnonymousUserId()
+    setUserId(nextUserId)
+    setUserSession(null)
+    setUserMessage('已切换到新的本地身份，旧数据仍保留在数据库里')
+    fetchProducts()
+      .then(data => setProducts(Array.isArray(data) ? data : []))
+      .catch(() => setProducts([]))
+    refreshUserSession()
+  }
+
+  const handleRefreshUserSession = () => {
+    setUserMessage('')
+    refreshUserSession().then(data => {
+      if (data) setUserMessage('本地数据状态已刷新')
     })
   }
 
@@ -356,6 +533,24 @@ export default function Profile() {
               reminders={activeReminders}
               onReminderOnChange={handleReminderOnChange}
               onSettingsChange={updateReminderSettings}
+            />
+          )}
+          <MenuItem
+            icon={Database}
+            label="本地数据"
+            desc="查看当前身份、数据库状态和备份"
+            badge={`${userSession?.counts?.total_records ?? 0} 条`}
+            onClick={() => setShowUserPanel(!showUserPanel)}
+          />
+          {showUserPanel && (
+            <UserDataPanel
+              session={userSession}
+              userId={userId}
+              message={userMessage}
+              onCopy={handleCopyUserId}
+              onExport={handleExportUserData}
+              onReset={handleResetUserId}
+              onRefresh={handleRefreshUserSession}
             />
           )}
           <MenuItem

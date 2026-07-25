@@ -9,6 +9,7 @@ frontend/src/assets/page-backgrounds/*
 .venv/
 *.log
 backend/test_*.png
+backend/test_*.jpg
 backend/debug_roi/
 backend/debug_heatmap/
 backend/knowledge_base/chroma_data/

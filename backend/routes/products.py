@@ -8,6 +8,17 @@ from .common import error, get_current_user_id
 
 products_bp = Blueprint('products', __name__, url_prefix='/api')
 
+CATALOG_COPY_FIELDS = (
+    'ingredients',
+    'efficacy',
+    'suitable_skin',
+    'usage_instructions',
+    'usage_steps',
+    'product_features',
+    'suitable_regions',
+    'suitable_scenes',
+)
+
 
 def _user_products_query(user_id=None):
     user_id = user_id or get_current_user_id()
@@ -17,9 +28,51 @@ def _user_products_query(user_id=None):
     )
 
 
+def _catalog_products_query():
+    return Product.query.filter(Product.source == 'knowledge_base')
+
+
+def _fill_missing_catalog_knowledge(product):
+    if product.source != 'catalog':
+        return False
+    catalog_product = _catalog_products_query().filter(
+        Product.brand == product.brand,
+        Product.name == product.name,
+    ).first()
+    if not catalog_product:
+        return False
+
+    changed = False
+    for field in CATALOG_COPY_FIELDS:
+        if not getattr(product, field, None) and getattr(catalog_product, field, None):
+            setattr(product, field, getattr(catalog_product, field))
+            changed = True
+    return changed
+
+
+def _fill_missing_catalog_knowledge_many(products):
+    changed = False
+    for product in products:
+        changed = _fill_missing_catalog_knowledge(product) or changed
+    if changed:
+        db.session.commit()
+
+
 def _normalize_user_product_source(source):
     source = (source or 'manual').strip() or 'manual'
     return 'gemini' if source == 'knowledge_base' else source
+
+
+def _clean_payload_text(payload, field, default=''):
+    value = payload.get(field, default)
+    return str(value or '').strip()
+
+
+def _parse_price(value, default=0):
+    try:
+        return float(value if value is not None else default)
+    except (TypeError, ValueError):
+        return default
 
 
 def _parse_usage_percent(value, default=0):
@@ -42,7 +95,94 @@ def product_list():
         query = query.filter(Product.category == category)
 
     products = query.order_by(Product.created_at.desc()).all()
+    _fill_missing_catalog_knowledge_many(products)
     return jsonify([p.to_dict() for p in products])
+
+
+@products_bp.route('/catalog-products')
+def catalog_product_list():
+    """Public product catalog only. This never returns the user's cabinet items."""
+    search = request.args.get('search', '').strip()
+    category = request.args.get('category', '').strip()
+    skin_type = request.args.get('skin_type', '').strip()
+
+    query = _catalog_products_query()
+    if search:
+        query = query.filter(db.or_(
+            Product.name.contains(search),
+            Product.brand.contains(search),
+            Product.ingredients.contains(search),
+            Product.efficacy.contains(search),
+            Product.product_features.contains(search),
+        ))
+    if category and category != '全部':
+        query = query.filter(Product.category == category)
+    if skin_type:
+        query = query.filter(Product.suitable_skin.contains(skin_type))
+
+    products = query.order_by(Product.brand.asc(), Product.name.asc()).all()
+    return jsonify({
+        'results': [p.to_dict() for p in products],
+        'total': len(products),
+        'source': 'knowledge_base',
+    })
+
+
+@products_bp.route('/catalog-products/<int:catalog_id>')
+def catalog_product_detail(catalog_id):
+    product = _catalog_products_query().filter(Product.id == catalog_id).first()
+    if not product:
+        return error('产品库产品不存在', 404)
+    return jsonify(product.to_dict())
+
+
+@products_bp.route('/catalog-products/<int:catalog_id>/add-to-cabinet', methods=['POST'])
+def catalog_product_add_to_cabinet(catalog_id):
+    """Copy one catalog product into the current user's cabinet."""
+    catalog_product = _catalog_products_query().filter(Product.id == catalog_id).first()
+    if not catalog_product:
+        return error('产品库产品不存在', 404)
+
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    product = Product(
+        user_id=get_current_user_id(),
+        name=catalog_product.name,
+        brand=catalog_product.brand,
+        category=catalog_product.category,
+        color=_clean_payload_text(payload, 'color', catalog_product.color),
+        volume=_clean_payload_text(payload, 'volume', catalog_product.volume),
+        purchase_date=_clean_payload_text(payload, 'purchase_date'),
+        expiry_date=_clean_payload_text(payload, 'expiry_date'),
+        price=_parse_price(payload.get('price'), catalog_product.price or 0),
+        photo=catalog_product.photo,
+        notes=_clean_payload_text(payload, 'notes'),
+        usage_percent=_parse_usage_percent(payload.get('usage_percent'), 0),
+        ingredients=catalog_product.ingredients,
+        efficacy=catalog_product.efficacy,
+        suitable_skin=catalog_product.suitable_skin,
+        usage_instructions=catalog_product.usage_instructions,
+        usage_steps=catalog_product.usage_steps,
+        product_features=catalog_product.product_features,
+        suitable_regions=catalog_product.suitable_regions,
+        suitable_scenes=catalog_product.suitable_scenes,
+        user_feedback=_clean_payload_text(payload, 'user_feedback'),
+        source='catalog',
+    )
+
+    try:
+        db.session.add(product)
+        db.session.commit()
+        return jsonify({
+            'added_to_cabinet': True,
+            'catalog_product_id': catalog_product.id,
+            'product': product.to_dict(),
+        }), 201
+    except Exception as exc:
+        db.session.rollback()
+        print(f'[catalog_product_add_to_cabinet] 加入化妆柜失败: {exc}')
+        return error('加入化妆柜失败，请稍后重试', 500)
 
 
 @products_bp.route('/products/<int:pid>')
@@ -50,6 +190,8 @@ def product_detail(pid):
     product = _user_products_query().filter(Product.id == pid).first()
     if not product:
         return error('产品不存在', 404)
+    if _fill_missing_catalog_knowledge(product):
+        db.session.commit()
     return jsonify(product.to_dict())
 
 

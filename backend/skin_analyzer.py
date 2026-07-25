@@ -364,6 +364,16 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
     landmarks = face_info['landmarks']
     img_size = face_info['image_size']
 
+    try:
+        from face_ratio_analyzer import analyze_face_ratios
+
+        face_ratio = analyze_face_ratios(landmarks, img_size)
+        if isinstance(face_data, dict):
+            face_data['face_ratio'] = face_ratio
+        print(f'[skin_analyzer] 面部比例分析完成: {face_ratio.get("ratio_tags", []) if isinstance(face_ratio, dict) else []}')
+    except Exception as exc:
+        print(f'[skin_analyzer] 面部比例分析失败，跳过: {exc}')
+
     # Step 1.5: ROI 本地分析（只执行一次；超出预算则不注入 Gemini prompt）
     from feature_extractor import FeatureExtractor
     extractor = FeatureExtractor()
@@ -663,6 +673,7 @@ def _build_response(feature_json, gemini_result, ui_modules, heatmap_b64, face_d
         'recommendations': gemini_result.get('recommendations', []),
         'heatmap_base64': heatmap_b64,
         'face_data': face_data if isinstance(face_data, dict) else None,
+        'face_ratio': face_data.get('face_ratio') if isinstance(face_data, dict) else None,
         'feature_json': feature_json,
         # 保留旧字段以兼容数据库存储，但前端不再使用
         'overall_score': feature_json['overall_score'],
@@ -735,6 +746,7 @@ def _build_fallback_response(feature_json, ui_modules, heatmap_b64, face_data):
         'recommendations': recommendations,
         'heatmap_base64': heatmap_b64,
         'face_data': face_data if isinstance(face_data, dict) else None,
+        'face_ratio': face_data.get('face_ratio') if isinstance(face_data, dict) else None,
         'feature_json': feature_json,
         'overall_score': feature_json['overall_score'],
         'scores': feature_json['scores'],

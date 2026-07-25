@@ -4,7 +4,7 @@ import { useThemeSettings } from '../utils/themeSettings'
 
 const TABS = [
   { path: '/', icon: Sparkles, label: '今日' },
-  { path: '/tutorial', icon: BookOpenCheck, label: '流程' },
+  { path: '/tutorial', icon: BookOpenCheck, label: '教程' },
   { path: '/products', to: '/products?add=1', icon: Plus, label: '产品', variant: 'tab-item-action', iconSize: 30 },
   { path: '/diary', icon: BookOpen, label: '日记' },
   { path: '/profile', icon: User, label: '我的' },

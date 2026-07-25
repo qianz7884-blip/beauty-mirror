@@ -21,6 +21,7 @@ def create_app():
     with app.app_context():
         db.create_all()
         _migrate_database()
+        _backfill_user_ids()
         _seed_product_knowledge()
 
     return app
@@ -51,13 +52,28 @@ def _add_column(conn, existing_columns, table_name, column_name, ddl):
         conn.execute(text(f'ALTER TABLE {table_name} ADD COLUMN {ddl}'))
 
 
+def _is_database_writable():
+    try:
+        if not db.engine.url.drivername.startswith('sqlite'):
+            return True
+        database = db.engine.url.database
+        if not database:
+            return True
+        database_path = os.path.abspath(database)
+        if os.path.exists(database_path):
+            return os.access(database_path, os.W_OK)
+        return os.access(os.path.dirname(database_path), os.W_OK)
+    except Exception:
+        return True
+
+
 def _migrate_database():
     """Small compatibility migrations for existing local SQLite databases."""
     try:
-        from sqlalchemy import inspect, text
+        from sqlalchemy import inspect
 
         inspector = inspect(db.engine)
-        with db.engine.connect() as conn:
+        with db.engine.begin() as conn:
             diary_columns = _column_names(inspector, 'diaries')
             _add_column(conn, diary_columns, 'diaries', 'user_id', f"user_id VARCHAR(80) DEFAULT '{DEFAULT_DEMO_USER_ID}'")
             _add_column(conn, diary_columns, 'diaries', 'tags', "tags TEXT NOT NULL DEFAULT '[]'")
@@ -105,28 +121,43 @@ def _migrate_database():
             _add_column(conn, analysis_columns, 'skin_analyses', 'today_routine', "today_routine TEXT DEFAULT '{}'")
             _add_column(conn, analysis_columns, 'skin_analyses', 'trend', "trend TEXT DEFAULT '{}'")
 
-            conn.execute(
-                text('UPDATE diaries SET user_id = :user_id WHERE user_id IS NULL OR user_id = ""'),
-                {'user_id': DEFAULT_DEMO_USER_ID},
-            )
-            conn.execute(
-                text('UPDATE products SET user_id = :user_id WHERE user_id IS NULL OR user_id = ""'),
-                {'user_id': DEFAULT_DEMO_USER_ID},
-            )
-            conn.execute(
-                text('UPDATE skin_analyses SET user_id = :user_id WHERE user_id IS NULL OR user_id = ""'),
-                {'user_id': DEFAULT_DEMO_USER_ID},
-            )
-
-            conn.commit()
     except Exception as exc:
         print(f'[migrate] 数据库迁移失败: {exc}')
+
+
+def _backfill_user_ids():
+    """Attach legacy records to the demo user; skip cleanly if the DB is read-only."""
+    from sqlalchemy import text
+
+    statements = (
+        ('diaries', "UPDATE diaries SET user_id = :user_id WHERE user_id IS NULL OR user_id = ''"),
+        ('products', "UPDATE products SET user_id = :user_id WHERE user_id IS NULL OR user_id = ''"),
+        ('skin_analyses', "UPDATE skin_analyses SET user_id = :user_id WHERE user_id IS NULL OR user_id = ''"),
+    )
+
+    for table_name, statement in statements:
+        try:
+            with db.engine.begin() as conn:
+                blank_count = conn.execute(
+                    text(f"SELECT COUNT(*) FROM {table_name} WHERE user_id IS NULL OR user_id = ''")
+                ).scalar()
+                if not blank_count:
+                    continue
+                conn.execute(text(statement), {'user_id': DEFAULT_DEMO_USER_ID})
+        except Exception as exc:
+            if 'readonly database' in str(exc).lower():
+                print('[migrate] legacy user_id backfill skipped: SQLite database is read-only')
+                return
+            print(f'[migrate] user_id backfill skipped for {table_name}: {exc}')
 
 
 def _seed_product_knowledge():
     """Seed or refresh bundled product knowledge."""
     try:
         from product_knowledge import ProductKnowledge
+
+        if Product.query.filter(Product.source == 'knowledge_base').count() > 0:
+            return
 
         count = ProductKnowledge(db.session).seed_knowledge_base(force=True)
         if count > 0:

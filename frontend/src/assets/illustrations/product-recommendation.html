@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Mirror Mate · 推荐搭配</title>
+<style>
+  :root {
+    --ink: #1f2933; --soft: #758393; --muted: #97a7b5;
+    --blue: #6ea6cf; --blue-deep: #2f78ad;
+    --sage: #b7c4ad; --sage-dark: #8b9b80;
+    --glass: rgba(255,255,255,0.68);
+    --glass-strong: rgba(255,255,255,0.84);
+    --glass-border: rgba(255,255,255,0.42);
+    --line: rgba(111,151,180,0.16);
+    --shadow: 0 14px 28px rgba(74,112,143,0.08);
+    --radius: 18px;
+    --r-sm: 15px;
+    --r-xs: 10px;
+    --page: linear-gradient(180deg, #f7fcff 0%, #edf6fb 40%, #f0f7fb 100%);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #e2ecf3;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 100vh; padding: 32px 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .canvas {
+    display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; align-items: flex-start;
+  }
+
+  /* ── Phone mockup ── */
+  .phone {
+    width: 390px;
+    background: var(--page);
+    border-radius: 40px;
+    box-shadow:
+      0 0 0 3px #1a1c1e,
+      0 0 0 6px #2d3033,
+      0 0 0 8px #1a1c1e,
+      0 20px 60px rgba(0,0,0,0.34);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* ── Status bar ── */
+  .status-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 28px 6px; font-size: 12px; font-weight: 600; color: var(--ink);
+  }
+  .status-bar .time { letter-spacing: 0.02em; }
+  .status-icons { display: flex; gap: 6px; align-items: center; font-size: 11px; }
+
+  /* ── Nav pill ── */
+  .nav-pill {
+    display: flex; align-items: center; gap: 8px;
+    margin: 6px 20px 10px; padding: 10px 16px;
+    background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: var(--r-xs); font-size: 13px; color: var(--soft);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 4px 12px rgba(74,112,143,0.05);
+  }
+  .nav-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sage); }
+
+  /* ── Header ── */
+  .screen-header {
+    padding: 8px 24px 10px;
+  }
+  .screen-header .label {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--blue-deep); text-transform: uppercase;
+  }
+  .screen-header h2 {
+    font-size: 28px; font-weight: 800; color: var(--ink);
+    letter-spacing: 0.03em; margin-top: 2px;
+  }
+  .screen-header .sub {
+    font-size: 12px; color: var(--soft); margin-top: 2px;
+  }
+
+  /* ── Section title ── */
+  .section-title {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 24px 10px;
+    font-size: 13px; font-weight: 700; color: var(--soft);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .section-title .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .am-dot { background: #e8b84b; }
+  .pm-dot { background: #5f8fb8; }
+
+  /* ── Product list ── */
+  .product-list {
+    padding: 0 20px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  /* ── Product card (mirrors .bm-product-card exactly) ── */
+  .product-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: 76px 1fr 22px;
+    gap: 9px;
+    min-height: 80px;
+    padding: 7px 7px 7px 8px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, rgba(255,255,255,0.28), rgba(247,252,255,0.16));
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(18px) saturate(1.08);
+    -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  }
+
+  /* Decorative star (matches ::after) */
+  .product-card::after {
+    content: '';
+    position: absolute; right: 10px; top: 8px;
+    width: 14px; height: 14px;
+    background:
+      linear-gradient(90deg, transparent 42%, rgba(255,183,53,0.35) 43% 57%, transparent 58%),
+      linear-gradient(0deg, transparent 42%, rgba(255,183,53,0.35) 43% 57%, transparent 58%);
+    transform: rotate(45deg); opacity: 0.2; pointer-events: none;
+  }
+
+  /* ── Photo ── */
+  .photo {
+    width: 76px; height: 64px;
+    border: 1px solid rgba(255,255,255,0.46);
+    border-radius: var(--r-sm);
+    background-size: cover; background-position: center;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+  .photo.cleanser { background: linear-gradient(135deg, #e8f0f8, #d4e4f0); }
+  .photo.serum   { background: linear-gradient(135deg, #f2eadc, #e8dcc8); }
+  .photo.lotion  { background: linear-gradient(135deg, #e6f0e8, #d2e4d6); }
+  .photo.cream   { background: linear-gradient(135deg, #f0e8e4, #e6d8d0); }
+  .photo.sunscreen { background: linear-gradient(135deg, #fef4dc, #fce8b4); }
+
+  /* ── Info ── */
+  .info {
+    display: flex; flex-direction: column; justify-content: center;
+    min-width: 0;
+  }
+  .info .pname {
+    font-size: 15px; font-weight: 700; color: #22364a;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    letter-spacing: 0.02em;
+  }
+  .info .pmeta {
+    font-size: 12px; color: #6b7b88; margin-top: 1px;
+  }
+  .info .tags-row {
+    display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap;
+  }
+  .tag {
+    font-size: 10px; padding: 2px 8px; border-radius: 999px;
+    font-weight: 600; letter-spacing: 0.03em; line-height: 1.5;
+    white-space: nowrap;
+  }
+  .tag-cat {
+    background: rgba(119,174,130,0.13); color: #55815d;
+  }
+  .tag-use {
+    background: rgba(110,166,207,0.12); color: var(--blue-deep);
+  }
+  .tag-star {
+    background: rgba(200,160,60,0.13); color: #8a641b;
+  }
+
+  /* ── Chevron ── */
+  .chevron {
+    display: flex; align-items: center; justify-content: center;
+    color: #aabbc6; font-size: 14px; flex-shrink: 0;
+  }
+
+  /* ── Tab bar ── */
+  .tab-bar {
+    display: flex; justify-content: space-around; align-items: center;
+    padding: 10px 16px 20px;
+    border-top: 1px solid rgba(255,255,255,0.72);
+    background: rgba(255,255,255,0.44);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  }
+  .tab {
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-size: 10px; color: var(--soft); font-weight: 600;
+  }
+  .tab.active { color: var(--blue-deep); }
+  .tab-icon {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--line);
+  }
+  .tab.active .tab-icon { background: var(--blue); }
+
+  /* ── Label between phones ── */
+  .label-between {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; padding: 0 4px; flex-shrink: 0;
+  }
+  .label-between .arrow-col {
+    font-size: 20px; color: var(--soft);
+  }
+  .label-between .step-text {
+    font-size: 11px; color: var(--soft); letter-spacing: 0.06em; font-weight: 600;
+  }
+
+  @media (max-width: 860px) {
+    .canvas { flex-direction: column; align-items: center; }
+    .label-between { flex-direction: row; padding: 12px 0; }
+    .phone { width: min(390px, 92vw); }
+  }
+</style>
+</head>
+<body>
+
+<div class="canvas">
+
+  <!-- ═══════════ PHONE 1: AM Routine ═══════════ -->
+  <div class="phone">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="status-icons">📶 🔋 91%</span>
+    </div>
+    <div class="nav-pill">
+      <span class="dot"></span> 产品柜 · 今日推荐
+    </div>
+    <div class="screen-header">
+      <div class="label">Mirror Mate · 妆伴</div>
+      <h2>☀️ 晨间 Routine</h2>
+      <div class="sub">4 步防护保湿 · 适合所有肤质</div>
+    </div>
+
+    <div class="section-title"><span class="dot am-dot"></span> 按顺序使用</div>
+
+    <div class="product-list">
+      <!-- 1. Cleanser already done → first step is toner -->
+      <div class="product-card">
+        <div class="photo cleanser">🧴</div>
+        <div class="info">
+          <div class="pname">金盏花爽肤水</div>
+          <div class="pmeta">Kiehl's · 250ml</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">爽肤水</span>
+            <span class="tag tag-use">舒缓镇定</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+
+      <div class="product-card">
+        <div class="photo serum">✨</div>
+        <div class="info">
+          <div class="pname">神仙水</div>
+          <div class="pmeta">SK-II · 230ml</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">精华</span>
+            <span class="tag tag-star">PITERA™</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+
+      <div class="product-card">
+        <div class="photo lotion">💧</div>
+        <div class="info">
+          <div class="pname">黄油乳液</div>
+          <div class="pmeta">CLINIQUE · 125ml</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">乳液</span>
+            <span class="tag tag-use">基础保湿</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+
+      <div class="product-card">
+        <div class="photo sunscreen">☂️</div>
+        <div class="info">
+          <div class="pname">小金瓶防晒</div>
+          <div class="pmeta">ANESSA · 60ml · SPF 50+</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">防晒</span>
+            <span class="tag tag-use">日常防护</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab active"><div class="tab-icon"></div>今日</div>
+      <div class="tab"><div class="tab-icon"></div>产品柜</div>
+      <div class="tab"><div class="tab-icon"></div>妆记</div>
+      <div class="tab"><div class="tab-icon"></div>我的</div>
+    </div>
+  </div>
+
+  <!-- ═══════════ Arrow ─══════════ -->
+  <div class="label-between">
+    <div class="arrow-col">☀️<br>↓<br>🌙</div>
+    <div class="step-text">日护<br>→<br>夜养</div>
+  </div>
+
+  <!-- ═══════════ PHONE 2: PM Routine ═══════════ -->
+  <div class="phone">
+    <div class="status-bar">
+      <span class="time">9:41</span>
+      <span class="status-icons">📶 🔋 91%</span>
+    </div>
+    <div class="nav-pill">
+      <span class="dot"></span> 产品柜 · 今日推荐
+    </div>
+    <div class="screen-header">
+      <div class="label">Mirror Mate · 妆伴</div>
+      <h2>🌙 夜间 Routine</h2>
+      <div class="sub">4 步深层修护 · 黄金吸收期</div>
+    </div>
+
+    <div class="section-title"><span class="dot pm-dot"></span> 按顺序使用</div>
+
+    <div class="product-list">
+      <div class="product-card">
+        <div class="photo serum">🔮</div>
+        <div class="info">
+          <div class="pname">小黑瓶精华</div>
+          <div class="pmeta">Lancôme · 50ml</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">精华</span>
+            <span class="tag tag-use">肌底修护</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+
+      <div class="product-card">
+        <div class="photo serum">🌌</div>
+        <div class="info">
+          <div class="pname">小棕瓶精华</div>
+          <div class="pmeta">Estée Lauder · 50ml</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">精华</span>
+            <span class="tag tag-star">夜间修护</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+
+      <div class="product-card">
+        <div class="photo serum">🔴</div>
+        <div class="info">
+          <div class="pname">红腰子精华</div>
+          <div class="pmeta">Shiseido · 50ml</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">精华</span>
+            <span class="tag tag-use">强韧屏障</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+
+      <div class="product-card">
+        <div class="photo cream">🫧</div>
+        <div class="info">
+          <div class="pname">奇迹面霜</div>
+          <div class="pmeta">La Mer · 60ml</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">面霜</span>
+            <span class="tag tag-star">深层修护</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+    </div>
+
+    <!-- Bonus cards -->
+    <div class="section-title" style="padding-top:4px">
+      <span style="font-size:12px">🩹 按需搭配</span>
+    </div>
+    <div class="product-list" style="padding-bottom:12px">
+      <div class="product-card">
+        <div class="photo lotion">🛡️</div>
+        <div class="info">
+          <div class="pname">保湿修复乳</div>
+          <div class="pmeta">CeraVe · 236ml</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">面霜</span>
+            <span class="tag tag-use">屏障修复</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+      <div class="product-card">
+        <div class="photo cream">🌿</div>
+        <div class="info">
+          <div class="pname">B5 修复霜</div>
+          <div class="pmeta">La Roche-Posay · 40ml</div>
+          <div class="tags-row">
+            <span class="tag tag-cat">面霜</span>
+            <span class="tag tag-use">修护泛红</span>
+          </div>
+        </div>
+        <div class="chevron">›</div>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <div class="tab active"><div class="tab-icon"></div>今日</div>
+      <div class="tab"><div class="tab-icon"></div>产品柜</div>
+      <div class="tab"><div class="tab-icon"></div>妆记</div>
+      <div class="tab"><div class="tab-icon"></div>我的</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

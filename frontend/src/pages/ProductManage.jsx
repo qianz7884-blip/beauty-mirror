@@ -8,6 +8,7 @@ import RecognizePanel from '../components/RecognizePanel'
 import ImageViewer from '../components/ImageViewer'
 import ProductRecordActions from '../components/ProductRecordActions'
 import ProductVoiceSheet from '../components/ProductVoiceSheet'
+import ProductCatalogSheet from '../components/ProductCatalogSheet'
 import productEmptyIllustration from '../assets/illustrations/beauty-mirror-ip/large-prop-product-cabinet-cutout.png'
 import productPetMainIllustration from '../assets/ip/beauty-mirror-main-ip-main-layer.png'
 import productPetDecorIllustration from '../assets/ip/beauty-mirror-main-ip-decor-layer.png'
@@ -101,6 +102,13 @@ const RECOMMENDATION_TAG_FIELDS = [
     label: '我的反馈',
     options: ['好用', '持妆好', '不卡粉', '容易卡粉', '搓泥', '闷痘', '太油', '太干'],
   },
+]
+
+const PRODUCT_KNOWLEDGE_FIELDS = [
+  { field: 'ingredients', label: '核心成分' },
+  { field: 'efficacy', label: '功效说明' },
+  { field: 'usage_instructions', label: '使用方法' },
+  { field: 'suitable_skin', label: '适合肤质' },
 ]
 
 function readProductCache() {
@@ -372,7 +380,7 @@ export default function ProductManage() {
   const [showSearch, setShowSearch] = useState(false)
   const [viewMode, setViewMode] = useState('list')
   const [showForm, setShowForm] = useState(false)
-  const [showAddActions, setShowAddActions] = useState(false)
+  const [showCatalogSheet, setShowCatalogSheet] = useState(false)
   const [showVoiceEntry, setShowVoiceEntry] = useState(false)
   const [showCategoryManager, setShowCategoryManager] = useState(false)
   const [newCategory, setNewCategory] = useState('')
@@ -423,7 +431,7 @@ export default function ProductManage() {
     setEditingProduct(null)
     setInitialValues({})
     setShowSearch(false)
-    setShowAddActions(true)
+    setShowCatalogSheet(true)
 
     const nextParams = new URLSearchParams(searchParams)
     nextParams.delete('add')
@@ -437,7 +445,7 @@ export default function ProductManage() {
       setEditingProduct(null)
       setInitialValues({})
       setShowSearch(false)
-      setShowAddActions(value => !value)
+      setShowCatalogSheet(value => !value)
     }
 
     window.addEventListener('beauty-mirror:toggle-product-add', handleToggleAddActions)
@@ -451,6 +459,15 @@ export default function ProductManage() {
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
     window.setTimeout(() => setToast(null), 2000)
+  }
+
+  const openCatalogSheet = () => {
+    setSelectedProduct(null)
+    setShowForm(false)
+    setEditingProduct(null)
+    setInitialValues({})
+    setShowSearch(false)
+    setShowCatalogSheet(true)
   }
 
   const clampPetPosition = (x, y, width, height) => {
@@ -627,14 +644,14 @@ export default function ProductManage() {
   const openManualForm = (values = {}) => {
     setEditingProduct(null)
     setInitialValues(values)
-    setShowAddActions(false)
+    setShowCatalogSheet(false)
     setShowForm(true)
   }
 
   const handlePhotoPick = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
-    setShowAddActions(false)
+    setShowCatalogSheet(false)
     setRecognizePhoto({
       file,
       previewUrl: URL.createObjectURL(file),
@@ -649,8 +666,20 @@ export default function ProductManage() {
   }
 
   const startVoiceEntry = () => {
-    setShowAddActions(false)
+    setShowCatalogSheet(false)
     setShowVoiceEntry(true)
+  }
+
+  const handleCatalogAdded = (product) => {
+    if (product) {
+      setProducts(prev => {
+        const next = [product, ...prev.filter(item => item.id !== product.id)]
+        writeProductCache(next)
+        return next
+      })
+    }
+    showToast('已加入化妆柜')
+    load()
   }
 
   const handleVoiceResult = (values) => {
@@ -871,6 +900,10 @@ export default function ProductManage() {
       { label: '适合场景', items: parseTagText(selectedProduct.suitable_scenes) },
       { label: '我的反馈', items: parseTagText(selectedProduct.user_feedback) },
     ].filter(group => group.items.length > 0)
+    const knowledgeDetails = PRODUCT_KNOWLEDGE_FIELDS.map(({ field, label }) => ({
+      label,
+      value: selectedProduct[field],
+    })).filter(item => String(item.value || '').trim())
 
     return (
       <div className="bm-screen bm-product-detail-page" style={pageBackground.style}>
@@ -1070,6 +1103,25 @@ export default function ProductManage() {
 
           <div className="bm-detail-panel">
             <div className="bm-detail-panel-title">
+              <strong>产品库信息</strong>
+              <span>{knowledgeDetails.length ? '随产品库一起带入' : '还未录入'}</span>
+            </div>
+            {knowledgeDetails.length ? (
+              <div className="bm-detail-knowledge">
+                {knowledgeDetails.map(item => (
+                  <div key={item.label}>
+                    <span>{item.label}</span>
+                    <p>{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="bm-detail-field-copy">这件产品还没有录入成分、功效或使用方法，后面补产品库表格后会一起带进来。</p>
+            )}
+          </div>
+
+          <div className="bm-detail-panel">
+            <div className="bm-detail-panel-title">
               <strong>推荐标签</strong>
               <span>{recommendationTags.length ? '用于镜前建议' : '还未设置'}</span>
             </div>
@@ -1204,7 +1256,7 @@ export default function ProductManage() {
               className={showSearch ? 'active' : ''}
               onClick={() => {
                 setShowSearch(value => !value)
-                setShowAddActions(false)
+                setShowCatalogSheet(false)
               }}
               aria-label="搜索"
             >
@@ -1248,25 +1300,6 @@ export default function ProductManage() {
         </div>
 
       </section>
-
-      {showAddActions && (
-        <>
-          <button
-            type="button"
-            className="bm-vault-add-backdrop"
-            aria-label="关闭快速添加"
-            onClick={() => setShowAddActions(false)}
-          />
-          <div className="bm-vault-add-popover" role="dialog" aria-label="快速添加产品">
-            <ProductRecordActions
-              className="bm-vault-add-actions"
-              onCamera={() => cameraInputRef.current?.click()}
-              onVoice={startVoiceEntry}
-              onManual={() => openManualForm()}
-            />
-          </div>
-        </>
-      )}
 
       {showPetReminder && (
         <section
@@ -1320,13 +1353,19 @@ export default function ProductManage() {
         <section className="bm-product-empty">
           <img className="bm-empty-visual" src={productEmptyIllustration} alt="" aria-hidden="true" />
           <h2>开始建立你的美妆柜</h2>
-          <p>选择一种记录方式，之后都可以继续修改。</p>
-          <ProductRecordActions
-            className="bm-empty-actions"
-            onCamera={() => cameraInputRef.current?.click()}
-            onVoice={startVoiceEntry}
-            onManual={() => openManualForm()}
-          />
+          <p>优先从产品库搜索，一键加入；搜不到时再拍照或手动录入。</p>
+          <div className="bm-empty-actions">
+            <button className="bm-catalog-empty-primary" type="button" onClick={openCatalogSheet}>
+              <Search size={18} strokeWidth={1.8} />
+              从产品库添加
+            </button>
+            <ProductRecordActions
+              className="bm-empty-secondary-actions"
+              onCamera={() => cameraInputRef.current?.click()}
+              onVoice={startVoiceEntry}
+              onManual={() => openManualForm()}
+            />
+          </div>
           <button className="bm-empty-category" type="button" onClick={() => setShowCategoryManager(true)}>
             先管理分类
           </button>
@@ -1376,6 +1415,19 @@ export default function ProductManage() {
           categories={DEFAULT_CATEGORIES.concat(customCategories)}
           onSaved={handleRecognizeSaved}
           onClose={() => setRecognizePhoto(null)}
+        />
+      )}
+
+      {showCatalogSheet && (
+        <ProductCatalogSheet
+          categories={productCategories}
+          cabinetProducts={products}
+          getPlaceholderImage={getProductPlaceholderImage}
+          onAdded={handleCatalogAdded}
+          onCamera={() => cameraInputRef.current?.click()}
+          onVoice={startVoiceEntry}
+          onManual={() => openManualForm()}
+          onClose={() => setShowCatalogSheet(false)}
         />
       )}
 

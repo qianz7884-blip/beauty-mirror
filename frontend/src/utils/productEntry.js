@@ -4,6 +4,9 @@ export function getRequestErrorMessage(error, fallback = '操作失败') {
   if (typeof error?.response?.data === 'string' && error.response.data.trim()) {
     return error.response.data.slice(0, 120)
   }
+  if (error?.response?.status >= 500) {
+    return '后端服务暂时没有响应，请先启动或重启 backend（5000 端口）'
+  }
   if (error?.response?.status) return `服务端错误 (${error.response.status})`
   if (error?.code === 'ECONNABORTED') return '请求超时，请稍后重试'
   if (error?.request) return '无法连接服务器，请检查后端是否启动'

@@ -1,8 +1,16 @@
 import json
+import re
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
+
+SOURCE_URL_PATTERN = re.compile(r'https?://[^\s，。；;）)]+', re.IGNORECASE)
+
+
+def extract_source_url(notes):
+    match = SOURCE_URL_PATTERN.search(notes or '')
+    return match.group(0).rstrip('，,。；;') if match else ''
 
 
 class Product(db.Model):
@@ -54,6 +62,7 @@ class Product(db.Model):
             'price': price,
             'photo': self.photo,
             'notes': self.notes,
+            'source_url': extract_source_url(self.notes),
             'usage_percent': self.usage_percent or 0,
             # 产品知识字段
             'ingredients': self.ingredients,

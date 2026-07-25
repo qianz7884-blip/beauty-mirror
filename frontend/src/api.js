@@ -45,6 +45,16 @@ export function getAnonymousUserId() {
   return cachedAnonymousUserId
 }
 
+export function resetAnonymousUserId() {
+  cachedAnonymousUserId = createAnonymousUserId()
+  try {
+    localStorage.setItem(ANONYMOUS_USER_ID_KEY, cachedAnonymousUserId)
+  } catch {
+    // Keep the new in-memory ID for this tab if storage is unavailable.
+  }
+  return cachedAnonymousUserId
+}
+
 // 上传文件的基础地址：／/api → 去掉 /api → 拼接 /uploads
 const _uploadsBase = (() => {
   if (apiBaseURL.startsWith('http')) {
@@ -92,6 +102,10 @@ export function analyzeSkin(formData) {
   return api.post('/skin-analysis', formData, { timeout: 60000 }).then(r => r.data)
 }
 
+export function analyzeFaceRatio(formData) {
+  return api.post('/face-ratio-analysis', formData, { timeout: 45000 }).then(r => r.data)
+}
+
 // ==================== Dashboard ====================
 
 export function fetchDashboard() {
@@ -100,8 +114,28 @@ export function fetchDashboard() {
 
 // ==================== 产品 ====================
 
+export function fetchUserSession() {
+  return api.get('/user/session').then(r => r.data)
+}
+
+export function exportUserData() {
+  return api.get('/user/export').then(r => r.data)
+}
+
 export function fetchProducts(params = {}) {
   return api.get('/products', { params }).then(r => r.data)
+}
+
+export function fetchCatalogProducts(params = {}) {
+  return api.get('/catalog-products', { params }).then(r => r.data)
+}
+
+export function fetchCatalogProduct(id) {
+  return api.get(`/catalog-products/${id}`).then(r => r.data)
+}
+
+export function addCatalogProductToCabinet(id, payload = {}) {
+  return api.post(`/catalog-products/${id}/add-to-cabinet`, payload).then(r => r.data)
 }
 
 export function fetchProduct(id) {
