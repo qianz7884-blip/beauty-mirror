@@ -4,7 +4,7 @@ import sys
 import zipfile
 import xml.etree.ElementTree as ET
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from config import Config
 from models import Product, db
@@ -123,16 +123,40 @@ def _notes_with_source(record):
     return notes
 
 
-def _save_local_image(image_file):
+def _image_candidates(image_file):
     image_file = _clean(image_file)
     if not image_file:
-        return ''
+        return []
 
     image_path = Path(image_file)
-    if not image_path.is_absolute():
-        image_path = WORKBOOK_PATH.parent / 'product_images' / image_file
-    if not image_path.exists():
-        print(f'[image] 找不到图片：{image_path}')
+    names = [Path(image_file).name, PureWindowsPath(image_file).name]
+    candidates = [image_path] if image_path.is_absolute() else [
+        WORKBOOK_PATH.parent / 'product_images' / image_file,
+    ]
+
+    for name in names:
+        if name:
+            candidates.extend([
+                WORKBOOK_PATH.parent / 'product_images' / name,
+                BACKEND_DIR / 'catalog_data' / 'product_images' / name,
+                BACKEND_DIR.parent / 'docs' / 'product_images' / name,
+            ])
+
+    unique = []
+    seen = set()
+    for path in candidates:
+        key = str(path)
+        if key not in seen:
+            seen.add(key)
+            unique.append(path)
+    return unique
+
+
+def _save_local_image(image_file):
+    candidates = _image_candidates(image_file)
+    image_path = next((path for path in candidates if path.exists()), None)
+    if not image_path:
+        print(f"[image] 找不到图片：{_clean(image_file)}")
         return ''
 
     try:
