@@ -11,7 +11,25 @@ from models import Product, db
 from upload_utils import save_photo_bytes
 
 
-WORKBOOK_PATH = Path(__file__).resolve().parent.parent / 'docs' / 'product_catalog_template.xlsx'
+BACKEND_DIR = Path(__file__).resolve().parent
+
+
+def _resolve_workbook_path():
+    env_path = os.environ.get('PRODUCT_CATALOG_WORKBOOK_PATH')
+    if env_path:
+        return Path(env_path)
+
+    candidates = (
+        BACKEND_DIR.parent / 'docs' / 'product_catalog_template.xlsx',
+        BACKEND_DIR / 'catalog_data' / 'product_catalog_template.xlsx',
+    )
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[-1]
+
+
+WORKBOOK_PATH = _resolve_workbook_path()
 NS = {'a': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 CATEGORY_MAP = {
     '补水喷雾': '爽肤水',
