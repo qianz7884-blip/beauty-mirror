@@ -374,7 +374,7 @@ export default function ProductCatalogSheet({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay bm-catalog-overlay" onClick={onClose}>
       <div className="modal-sheet bm-catalog-sheet" onClick={event => event.stopPropagation()}>
         <div className="modal-header bm-catalog-header">
           <div>
