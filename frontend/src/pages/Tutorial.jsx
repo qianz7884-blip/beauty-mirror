@@ -236,6 +236,18 @@ function mapImageYToFramePercent(point, imageLayout) {
   return clampPercent(((imageLayout.offsetY + yInImage * imageLayout.scale) / imageLayout.height) * 100, -20, 120)
 }
 
+function mapImageXToFramePercent(point, imageLayout) {
+  const xNorm = Number(point?.x_norm)
+  if (!Number.isFinite(xNorm)) return null
+
+  if (!imageLayout) {
+    return clampPercent(xNorm * 100)
+  }
+
+  const xInImage = xNorm * imageLayout.naturalWidth
+  return clampPercent(((imageLayout.offsetX + xInImage * imageLayout.scale) / imageLayout.width) * 100, -20, 120)
+}
+
 function buildShareBasedBoundaries(faceRatio) {
   const threePart = faceRatio?.measurements?.three_part || {}
   const upperShare = Number(threePart.upper?.share)
@@ -249,6 +261,58 @@ function buildShareBasedBoundaries(faceRatio) {
   const brow = top + shares[0] * height
   const nose = brow + shares[1] * height
   return [top, brow, nose, top + height]
+}
+
+function buildFiveEyeOverlay(faceRatio, imageLayout) {
+  if (!faceRatio?.ok) {
+    return {
+      boundaries: [],
+      segments: [],
+    }
+  }
+
+  const guidePoints = faceRatio.measurements?.five_eye_guides || {}
+  const pointKeys = [
+    ['face_left', '左脸缘'],
+    ['left_eye_outer', '左眼外'],
+    ['left_eye_inner', '左眼内'],
+    ['right_eye_inner', '右眼内'],
+    ['right_eye_outer', '右眼外'],
+    ['face_right', '右脸缘'],
+  ]
+  const pointBoundaries = pointKeys.map(([key, fallbackLabel]) => ({
+    id: key,
+    label: guidePoints[key]?.label || fallbackLabel,
+    left: mapImageXToFramePercent(guidePoints[key], imageLayout),
+  }))
+  const hasMappedPoints = pointBoundaries.every((item, index, arr) => (
+    Number.isFinite(item.left)
+    && (index === 0 || item.left > arr[index - 1].left)
+  ))
+
+  if (!hasMappedPoints) {
+    return {
+      boundaries: [],
+      segments: [],
+    }
+  }
+
+  const segmentDefs = [
+    ['left-space', '左侧', 0, 1],
+    ['left-eye', '左眼', 1, 2],
+    ['eye-gap', '眼距', 2, 3],
+    ['right-eye', '右眼', 3, 4],
+    ['right-space', '右侧', 4, 5],
+  ]
+
+  return {
+    boundaries: pointBoundaries,
+    segments: segmentDefs.map(([id, label, startIndex, endIndex]) => ({
+      id,
+      label,
+      left: clampPercent((pointBoundaries[startIndex].left + pointBoundaries[endIndex].left) / 2, 4, 96),
+    })),
+  }
 }
 
 function buildMirrorGuideOverlay(faceRatio, imageLayout) {
@@ -265,6 +329,10 @@ function buildMirrorGuideOverlay(faceRatio, imageLayout) {
       approx: false,
       note: '参考分割',
       segments: fallbackSegments,
+      fiveEye: {
+        boundaries: [],
+        segments: [],
+      },
       boundaries: fallbackBoundaries.map((top, index) => ({
         id: ['top', 'brow', 'nose', 'chin'][index],
         label: ['额顶', '眉心', '鼻底', '下巴'][index],
@@ -323,6 +391,7 @@ function buildMirrorGuideOverlay(faceRatio, imageLayout) {
       ? (hairlineMeasured ? '按照片关键点定位' : '额上部近似定位')
       : '按比例回退定位',
     boundaries,
+    fiveEye: buildFiveEyeOverlay(faceRatio, imageLayout),
     segments,
   }
 }
@@ -643,6 +712,23 @@ export default function Tutorial() {
                     title={boundary.label}
                   >
                     <span>{boundary.label}</span>
+                  </i>
+                ))}
+                {mirrorGuideOverlay.fiveEye.boundaries.map(boundary => (
+                  <i
+                    className="bm-mirror-eye-boundary"
+                    key={boundary.id}
+                    style={{ left: `${boundary.left}%` }}
+                    title={boundary.label}
+                  />
+                ))}
+                {mirrorGuideOverlay.fiveEye.segments.map(segment => (
+                  <i
+                    className="bm-mirror-eye-segment"
+                    key={segment.id}
+                    style={{ left: `${segment.left}%` }}
+                  >
+                    {segment.label}
                   </i>
                 ))}
                 {mirrorGuideOverlay.segments.map(segment => (

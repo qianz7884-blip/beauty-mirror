@@ -363,6 +363,38 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
         )
 
         upper_status = _segment_label('上庭', upper_norm) if hairline_available else '发际线不可见，暂不判断'
+        five_eye_guides = {
+            'face_left': {
+                'label': '左脸缘',
+                'x': _round(points['face_left'][0], 1),
+                'x_norm': _round(_safe_ratio(points['face_left'][0], width), 4),
+            },
+            'left_eye_outer': {
+                'label': '左眼外',
+                'x': _round(points['left_eye_outer'][0], 1),
+                'x_norm': _round(_safe_ratio(points['left_eye_outer'][0], width), 4),
+            },
+            'left_eye_inner': {
+                'label': '左眼内',
+                'x': _round(points['left_eye_inner'][0], 1),
+                'x_norm': _round(_safe_ratio(points['left_eye_inner'][0], width), 4),
+            },
+            'right_eye_inner': {
+                'label': '右眼内',
+                'x': _round(points['right_eye_inner'][0], 1),
+                'x_norm': _round(_safe_ratio(points['right_eye_inner'][0], width), 4),
+            },
+            'right_eye_outer': {
+                'label': '右眼外',
+                'x': _round(points['right_eye_outer'][0], 1),
+                'x_norm': _round(_safe_ratio(points['right_eye_outer'][0], width), 4),
+            },
+            'face_right': {
+                'label': '右脸缘',
+                'x': _round(points['face_right'][0], 1),
+                'x_norm': _round(_safe_ratio(points['face_right'][0], width), 4),
+            },
+        }
         three_part_guides = {
             'forehead_top': {
                 'label': '发际线' if hairline_available else '额上部',
@@ -473,6 +505,7 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
                     'eye_spacing_ratio': _round(eye_spacing_ratio),
                     'face_eye_count': _round(face_eye_count),
                 },
+                'five_eye_guides': five_eye_guides,
                 'contour': {
                     'face_height_width_ratio': _round(face_height_width_ratio),
                     'jaw_cheek_ratio': _round(jaw_cheek_ratio),

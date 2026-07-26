@@ -5220,6 +5220,52 @@ body {
   display: none;
 }
 
+.bm-mirror-eye-boundary {
+  position: absolute;
+  top: 20%;
+  bottom: 18%;
+  width: 0;
+  border-left: 1px dashed rgba(255, 255, 255, 0.66);
+  filter: drop-shadow(0 1px 4px rgba(25, 45, 56, 0.20));
+}
+
+.bm-mirror-guide-lines.is-measured .bm-mirror-eye-boundary {
+  border-left-color: rgba(184, 221, 255, 0.90);
+  border-left-style: solid;
+}
+
+.bm-mirror-guide-lines.is-approx .bm-mirror-eye-boundary {
+  border-left-color: rgba(244, 212, 152, 0.86);
+}
+
+.bm-mirror-eye-segment {
+  position: absolute;
+  bottom: 10%;
+  display: inline-flex;
+  align-items: center;
+  max-width: 42px;
+  min-height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(31, 66, 82, 0.30);
+  color: rgba(255, 255, 255, 0.90);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 760;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.bm-mirror-guide-lines.is-approx .bm-mirror-eye-segment {
+  background: rgba(133, 92, 39, 0.30);
+}
+
 .bm-mirror-guide-lines b {
   position: absolute;
   display: flex;
