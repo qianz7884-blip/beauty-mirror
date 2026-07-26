@@ -5250,11 +5250,9 @@ body {
   display: inline-flex;
   align-items: center;
   max-width: 42px;
-  min-height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: rgba(31, 66, 82, 0.30);
-  color: rgba(255, 255, 255, 0.90);
+  min-height: 16px;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.94);
   font-size: 9px;
   font-style: normal;
   font-weight: 760;
@@ -5263,13 +5261,13 @@ body {
   text-overflow: ellipsis;
   transform: translateX(-50%);
   white-space: nowrap;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  text-shadow:
+    0 1px 4px rgba(23, 42, 54, 0.72),
+    0 0 8px rgba(23, 42, 54, 0.38);
 }
 
 .bm-mirror-guide-lines.is-approx .bm-mirror-eye-segment {
-  background: rgba(133, 92, 39, 0.30);
+  color: rgba(255, 238, 198, 0.96);
 }
 
 .bm-mirror-guide-lines b {
@@ -5299,35 +5297,25 @@ body {
 }
 
 .bm-mirror-guide-lines b span {
-  min-height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: rgba(30, 54, 64, 0.22);
+  min-height: 18px;
+  padding: 0;
   font-size: 12px;
   font-weight: 780;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
 }
 
 .bm-mirror-guide-lines b em {
   justify-content: flex-end;
-  min-height: 22px;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: rgba(26, 77, 88, 0.28);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  min-height: 18px;
+  padding: 0;
   font-size: 11px;
   font-style: normal;
   font-weight: 820;
-  opacity: 0.88;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  opacity: 0.94;
 }
 
 .bm-mirror-guide-lines.is-approx b em,
 .bm-mirror-guide-lines.is-approx b span {
-  background: rgba(133, 92, 39, 0.28);
+  color: rgba(255, 238, 198, 0.96);
 }
 
 .bm-mirror-guide-source {
@@ -5397,6 +5385,93 @@ body {
 
 .bm-face-ratio-loading {
   z-index: 8;
+}
+
+.bm-photo-capture-guide {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid rgba(124, 151, 168, 0.13);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(238, 249, 247, 0.68));
+  box-shadow: 0 12px 24px rgba(74, 112, 143, 0.08);
+}
+
+.bm-photo-capture-guide > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bm-photo-capture-guide strong {
+  color: #21384a;
+  font-size: 13px;
+  font-weight: 820;
+}
+
+.bm-photo-capture-guide span {
+  min-width: 0;
+  color: #6f8391;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.bm-photo-capture-guide ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bm-photo-capture-guide li {
+  position: relative;
+  min-width: 0;
+  padding-left: 15px;
+  color: #425c6e;
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.bm-photo-capture-guide li::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 0.56em;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #8bd3c1;
+  box-shadow: 0 0 0 3px rgba(139, 211, 193, 0.18);
+}
+
+.bm-face-ratio-quality-alert {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+  padding: 10px 11px;
+  border: 1px solid rgba(209, 148, 91, 0.22);
+  border-radius: 16px;
+  background: rgba(255, 246, 232, 0.74);
+  color: #855c27;
+}
+
+.bm-face-ratio-quality-alert strong {
+  color: #75501f;
+  font-size: 13px;
+  font-weight: 820;
+}
+
+.bm-face-ratio-quality-alert span {
+  color: #8c6c43;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .bm-ratio-metric-strip {
@@ -5610,6 +5685,24 @@ body {
 
   .bm-ratio-metric small {
     font-size: 9px;
+  }
+
+  .bm-photo-capture-guide {
+    padding: 10px;
+  }
+
+  .bm-photo-capture-guide > div {
+    display: grid;
+    gap: 3px;
+  }
+
+  .bm-photo-capture-guide span {
+    text-align: left;
+  }
+
+  .bm-photo-capture-guide ul {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .bm-ratio-reference-compact {

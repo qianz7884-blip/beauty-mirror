@@ -24,6 +24,13 @@ const TIME_OPTIONS = [
   { id: 'complete', label: '30分钟完整', minutes: 30, keywords: '完整妆容 约会拍照妆' },
 ]
 
+const PHOTO_CAPTURE_TIPS = [
+  '脸正对镜头，鼻梁尽量在中线',
+  '两只眼睛高度接近，不歪头不侧脸',
+  '发际线、眉毛、下巴都要露出来',
+  '用正面柔光，脸占画面六到七成',
+]
+
 const SCENES = [
   {
     id: 'commute',
@@ -584,6 +591,7 @@ export default function Tutorial() {
   const Icon = activeGuide.icon
   const displayedRatioTags = (getUsefulRatioTags(faceRatio).length ? getUsefulRatioTags(faceRatio) : faceRatio?.ratio_tags || []).slice(0, 5)
   const ratioTips = faceRatio?.makeup_tips?.slice(0, 3) || []
+  const ratioQualityFlags = faceRatio?.quality_flags || []
   const ratioReferenceRows = useMemo(() => buildRatioReferenceRows(faceRatio), [faceRatio])
   const threePartSegments = useMemo(() => buildThreePartSegments(faceRatio), [faceRatio])
   const mirrorGuideOverlay = useMemo(() => buildMirrorGuideOverlay(faceRatio, mirrorImageLayout), [faceRatio, mirrorImageLayout])
@@ -735,8 +743,8 @@ export default function Tutorial() {
               ) : (
                 <span className="bm-mirror-placeholder">
                   <Camera size={26} strokeWidth={1.6} />
-                  <strong>拍一张正面照</strong>
-                  <small>自动生成比例标签和视频关键词</small>
+                  <strong>正脸平视拍一张</strong>
+                  <small>鼻梁居中，露出发际线、眉毛和下巴</small>
                 </span>
               )}
               <span
@@ -813,6 +821,18 @@ export default function Tutorial() {
             </div>
           </div>
 
+          <div className="bm-photo-capture-guide" aria-label="拍照提示">
+            <div>
+              <strong>拍照提示</strong>
+              <span>越接近正脸，三庭五眼线越准</span>
+            </div>
+            <ul>
+              {PHOTO_CAPTURE_TIPS.map(tip => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          </div>
+
           <div className="bm-ratio-metric-strip" aria-label="面部比例参考数据">
             {ratioMetricCards.map((item, index) => (
               <div className="bm-ratio-metric" key={item.id}>
@@ -829,6 +849,14 @@ export default function Tutorial() {
           <div className="bm-face-ratio-info bm-mirror-result-info">
             {faceRatio?.ok ? (
               <>
+                {ratioQualityFlags.length > 0 && (
+                  <div className="bm-face-ratio-quality-alert">
+                    <strong>建议重拍正脸照</strong>
+                    {ratioQualityFlags.map(flag => (
+                      <span key={flag}>{flag}</span>
+                    ))}
+                  </div>
+                )}
                 <p className="bm-face-ratio-summary">{faceRatio.summary}</p>
                 {displayedRatioTags.length > 0 && (
                   <div className="bm-face-ratio-tags">
