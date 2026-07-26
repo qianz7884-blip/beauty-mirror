@@ -218,6 +218,54 @@ function buildThreePartSegments(faceRatio) {
   })
 }
 
+function buildMirrorGuideOverlay(faceRatio) {
+  const fallbackSegments = [
+    { id: 'upper', label: '上庭', percent: '参考', status: '未分析时显示三等分参考线' },
+    { id: 'middle', label: '中庭', percent: '参考', status: '未分析时显示三等分参考线' },
+    { id: 'lower', label: '下庭', percent: '参考', status: '未分析时显示三等分参考线' },
+  ]
+
+  if (!faceRatio?.ok) {
+    return {
+      measured: false,
+      approx: false,
+      note: '参考分割',
+      segments: fallbackSegments,
+      style: undefined,
+    }
+  }
+
+  const threePart = faceRatio.measurements?.three_part || {}
+  const rows = []
+  const segments = [
+    ['upper', '上庭', '上庭均衡'],
+    ['middle', '中庭', '中庭均衡'],
+    ['lower', '下庭', '下庭均衡'],
+  ].map(([key, label, fallback]) => {
+    const item = threePart[key] || {}
+    const share = Number(item.share)
+    const rowShare = Number.isFinite(share) && share > 0 ? share : 1 / 3
+    rows.push(`${Math.max(1, Math.round(rowShare * 1000))}fr`)
+
+    return {
+      id: key,
+      label: item.label || label,
+      percent: formatRatioPercent(item.share),
+      status: item.status || getPrimaryRatioTag(faceRatio, tag => tag.startsWith(label), fallback),
+    }
+  })
+  const upper = threePart.upper || {}
+  const hairlineMeasured = upper.hairline_available === true
+
+  return {
+    measured: true,
+    approx: !hairlineMeasured,
+    note: hairlineMeasured ? '发际线实测分割' : '额上部近似分割',
+    segments,
+    style: { gridTemplateRows: rows.join(' ') },
+  }
+}
+
 function buildRatioMetricCards(faceRatio) {
   if (!faceRatio?.ok) {
     return [
@@ -299,6 +347,7 @@ export default function Tutorial() {
   const ratioTips = faceRatio?.makeup_tips?.slice(0, 3) || []
   const ratioReferenceRows = useMemo(() => buildRatioReferenceRows(faceRatio), [faceRatio])
   const threePartSegments = useMemo(() => buildThreePartSegments(faceRatio), [faceRatio])
+  const mirrorGuideOverlay = useMemo(() => buildMirrorGuideOverlay(faceRatio), [faceRatio])
   const ratioMetricCards = useMemo(() => buildRatioMetricCards(faceRatio), [faceRatio])
   const videoRecommendations = useMemo(
     () => buildVideoRecommendations(faceRatio, activeGuide),
@@ -445,10 +494,18 @@ export default function Tutorial() {
                   <small>自动生成比例标签和视频关键词</small>
                 </span>
               )}
-              <span className="bm-mirror-guide-lines" aria-hidden="true">
-                <b>上庭</b>
-                <b>中庭</b>
-                <b>下庭</b>
+              <span
+                className={`bm-mirror-guide-lines${mirrorGuideOverlay.measured ? ' is-measured' : ''}${mirrorGuideOverlay.approx ? ' is-approx' : ''}`}
+                style={mirrorGuideOverlay.style}
+                aria-hidden="true"
+              >
+                {mirrorGuideOverlay.segments.map(segment => (
+                  <b key={segment.id} title={segment.status}>
+                    <span>{segment.label}</span>
+                    <em>{segment.percent}</em>
+                  </b>
+                ))}
+                <small className="bm-mirror-guide-source">{mirrorGuideOverlay.note}</small>
               </span>
               {analyzingFaceRatio && (
                 <span className="bm-face-ratio-loading">
