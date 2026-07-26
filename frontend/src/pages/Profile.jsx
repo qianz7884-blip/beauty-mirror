@@ -8,12 +8,15 @@ import {
   Copy,
   Database,
   Download,
+  BookOpenCheck,
   MessageSquare,
+  PackageCheck,
   Paintbrush,
   Palette,
   RefreshCw,
   Settings,
   ShieldCheck,
+  ScanFace,
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
@@ -443,11 +446,9 @@ export default function Profile() {
   }
 
   const profileHighlights = [
-    { icon: SlidersHorizontal, label: '肤质', value: skinType || '未设' },
-    { icon: Bell, label: '提醒', value: reminderOn ? `${activeReminders.length} 条` : '已关' },
-    { icon: Camera, label: '头像', value: profileImage ? '已设' : '未设' },
-    { icon: Palette, label: '主题', value: activeTheme.label },
-    { icon: ShieldCheck, label: '隐私', value: '后端分析' },
+    { icon: PackageCheck, label: '产品', value: userSession?.counts?.products ?? products.length },
+    { icon: BookOpenCheck, label: '日记', value: userSession?.counts?.diaries ?? 0 },
+    { icon: ScanFace, label: '检测', value: userSession?.counts?.skin_analyses ?? 0 },
   ]
 
   return (
@@ -455,8 +456,9 @@ export default function Profile() {
       <section className="bm-hero bm-profile-hero">
         <div className="bm-profile-hero-main">
           <div>
+            <span className="bm-page-kicker">MY MIRROR MATE</span>
             <h1>我的</h1>
-            <p className="bm-subtitle">管理肤质、提醒、主题和设备偏好。</p>
+            <p className="bm-subtitle">集中管理个人肤质、产品提醒与隐私数据。</p>
           </div>
           <div className="bm-profile-avatar-wrap">
             <div className={`bm-profile-avatar bm-profile-avatar-static ${profileImage ? 'has-image' : ''}`} aria-label="个人头像">

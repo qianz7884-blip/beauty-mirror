@@ -10,9 +10,11 @@ import {
 import DiaryCard from '../components/DiaryCard'
 import DiaryForm from '../components/DiaryForm'
 import {
+  CalendarCheck2,
   Camera,
   ChevronLeft,
   ChevronRight,
+  Flame,
   Image,
   Pencil,
   Plus,
@@ -53,6 +55,19 @@ function formatDayTitle(dateKey) {
 
 function formatMonthShort(date) {
   return `${date.getMonth() + 1}月`
+}
+
+function calculateCurrentStreak(diaryCountByDate) {
+  const cursor = new Date()
+  const todayKey = toDateKey(cursor)
+  if (!diaryCountByDate[todayKey]) cursor.setDate(cursor.getDate() - 1)
+
+  let streak = 0
+  while (diaryCountByDate[toDateKey(cursor)]) {
+    streak += 1
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  return streak
 }
 
 function hexToRgba(hex, alpha) {
@@ -356,6 +371,9 @@ export default function MakeupDiary() {
   const selectedDiaries = diariesByDate[selectedDate] || []
   const selectedDateLabel = formatDayTitle(selectedDate)
   const todayKey = toDateKey(new Date())
+  const visibleMonthPrefix = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, '0')}`
+  const monthRecordDays = Object.keys(diaryCountByDate).filter(key => key.startsWith(visibleMonthPrefix)).length
+  const currentStreak = useMemo(() => calculateCurrentStreak(diaryCountByDate), [diaryCountByDate])
 
   const handleMonthChange = (offset) => {
     setVisibleMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1))
@@ -389,8 +407,9 @@ export default function MakeupDiary() {
       {/* ══ Diary Calendar ══ */}
       <header className="dv-diary-head">
         <div>
+          <span className="bm-page-kicker">BEAUTY NOTES</span>
           <h1>日记</h1>
-          <p>按日期回看每一次妆容记录。</p>
+          <p>用轻量记录，看见肤况与妆容习惯的变化。</p>
         </div>
         <button
           type="button"
@@ -409,6 +428,18 @@ export default function MakeupDiary() {
         onSelectDate={handleSelectDate}
         onMonthChange={handleMonthChange}
       />
+
+      <section className="dv-diary-summary" aria-label="日记统计">
+        <span>
+          <CalendarCheck2 size={20} strokeWidth={1.7} />
+          <span><small>本月记录</small><strong>{monthRecordDays} 天</strong></span>
+        </span>
+        <i />
+        <span>
+          <Flame size={20} strokeWidth={1.7} />
+          <span><small>连续记录</small><strong>{currentStreak} 天</strong></span>
+        </span>
+      </section>
 
       {/* ══ Feed ══ */}
       <section className="dv-day-feed" ref={selectedDayRef}>

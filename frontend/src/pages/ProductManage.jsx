@@ -894,6 +894,11 @@ export default function ProductManage() {
   const lowStockCount = useMemo(() => (
     products.filter(product => getProductUsagePercent(product, usageRecords) >= 80).length
   ), [products, usageRecords])
+  const expiringCount = useMemo(() => (
+    products.filter(product => ['临期', '已过期'].includes(
+      getProductStatus({ ...product, usage_percent: getProductUsagePercent(product, usageRecords) }),
+    )).length
+  ), [products, usageRecords])
   const petReminderText = lowStockCount > 0
     ? `还有 ${lowStockCount} 件产品快用完啦`
     : '现在没有快用完的产品'
@@ -1281,8 +1286,9 @@ export default function ProductManage() {
       <section className="bm-vault-simple-head">
         <div className="bm-vault-title-row">
           <div>
-            <h1>我的产品</h1>
-            <p>管理你的美妆库存</p>
+            <span className="bm-page-kicker">MY BEAUTY CABINET</span>
+            <h1>我的美妆柜</h1>
+            <p>看余量、查临期，也记录每一件常用产品。</p>
           </div>
           <div className="bm-vault-head-actions">
             <button
@@ -1305,6 +1311,14 @@ export default function ProductManage() {
                 ? <SlidersHorizontal size={22} strokeWidth={1.9} />
                 : <Grid2X2 size={20} strokeWidth={1.9} />}
             </button>
+            <button
+              type="button"
+              className="bm-vault-add-button"
+              onClick={openCatalogSheet}
+              aria-label="添加产品"
+            >
+              <PlusCircle size={22} strokeWidth={1.9} />
+            </button>
           </div>
         </div>
 
@@ -1319,6 +1333,21 @@ export default function ProductManage() {
             />
           </label>
         )}
+
+        <div className="bm-vault-overview" aria-label="产品概览">
+          <span>
+            <small>全部产品</small>
+            <strong>{products.length}</strong>
+          </span>
+          <span className={expiringCount > 0 ? 'is-warning' : ''}>
+            <small>临期关注</small>
+            <strong>{expiringCount}</strong>
+          </span>
+          <span className={lowStockCount > 0 ? 'is-warning' : ''}>
+            <small>余量不足</small>
+            <strong>{lowStockCount}</strong>
+          </span>
+        </div>
 
         <div className="bm-vault-tabs" role="tablist" aria-label="产品分类">
           {filterCategories.map(tab => (
