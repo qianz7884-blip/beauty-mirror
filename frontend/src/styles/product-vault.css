@@ -5192,6 +5192,10 @@ body {
   border-left: 1px dashed rgba(255, 255, 255, 0.54);
 }
 
+.bm-mirror-guide-lines.is-measured::before {
+  display: none;
+}
+
 .bm-mirror-guide-lines.is-measured {
   --bm-guide-line-color: rgba(139, 211, 193, 0.96);
   --bm-guide-text-color: #ffffff;
@@ -5222,15 +5226,16 @@ body {
 
 .bm-mirror-eye-boundary {
   position: absolute;
+  z-index: 2;
   top: 20%;
   bottom: 18%;
   width: 0;
-  border-left: 1px dashed rgba(255, 255, 255, 0.66);
+  border-left: 2px dashed rgba(189, 232, 255, 0.88);
   filter: drop-shadow(0 1px 4px rgba(25, 45, 56, 0.20));
 }
 
 .bm-mirror-guide-lines.is-measured .bm-mirror-eye-boundary {
-  border-left-color: rgba(184, 221, 255, 0.90);
+  border-left-color: rgba(138, 209, 255, 0.98);
   border-left-style: solid;
 }
 
@@ -5240,6 +5245,7 @@ body {
 
 .bm-mirror-eye-segment {
   position: absolute;
+  z-index: 4;
   bottom: 10%;
   display: inline-flex;
   align-items: center;
@@ -5268,6 +5274,7 @@ body {
 
 .bm-mirror-guide-lines b {
   position: absolute;
+  z-index: 5;
   display: flex;
   left: 6%;
   right: 6%;

@@ -263,6 +263,48 @@ function buildShareBasedBoundaries(faceRatio) {
   return [top, brow, nose, top + height]
 }
 
+function buildFallbackFiveEyeOverlay(faceRatio) {
+  const fiveEye = faceRatio?.measurements?.five_eye || {}
+  const leftEye = Number(fiveEye.left_eye_width)
+  const rightEye = Number(fiveEye.right_eye_width)
+  const eyeGap = Number(fiveEye.inner_eye_distance)
+  const faceEyeCount = Number(fiveEye.face_eye_count)
+  const avgEye = Number.isFinite(leftEye) && Number.isFinite(rightEye)
+    ? (leftEye + rightEye) / 2
+    : 1
+  const leftEyeUnits = Number.isFinite(leftEye) && avgEye > 0 ? Math.max(0.5, leftEye / avgEye) : 1
+  const rightEyeUnits = Number.isFinite(rightEye) && avgEye > 0 ? Math.max(0.5, rightEye / avgEye) : 1
+  const gapUnits = Number.isFinite(eyeGap) && avgEye > 0 ? Math.max(0.5, eyeGap / avgEye) : 1
+  const totalUnits = Number.isFinite(faceEyeCount) && faceEyeCount > 0 ? faceEyeCount : 5
+  const sideUnits = Math.max(0.45, (totalUnits - leftEyeUnits - gapUnits - rightEyeUnits) / 2)
+  const units = [sideUnits, leftEyeUnits, gapUnits, rightEyeUnits, sideUnits]
+  const unitTotal = units.reduce((sum, value) => sum + value, 0)
+  const start = 14
+  const span = 72
+  const labels = ['左脸缘', '左眼外', '左眼内', '右眼内', '右眼外', '右脸缘']
+  const boundaries = [{ id: 'fallback-0', label: labels[0], left: start }]
+  let cursor = start
+
+  units.forEach((unit, index) => {
+    cursor += (unit / unitTotal) * span
+    boundaries.push({
+      id: `fallback-${index + 1}`,
+      label: labels[index + 1],
+      left: clampPercent(cursor, 0, 100),
+    })
+  })
+
+  const segmentLabels = ['左侧', '左眼', '眼距', '右眼', '右侧']
+  return {
+    boundaries,
+    segments: segmentLabels.map((label, index) => ({
+      id: `fallback-segment-${index}`,
+      label,
+      left: clampPercent((boundaries[index].left + boundaries[index + 1].left) / 2, 4, 96),
+    })),
+  }
+}
+
 function buildFiveEyeOverlay(faceRatio, imageLayout) {
   if (!faceRatio?.ok) {
     return {
@@ -285,16 +327,13 @@ function buildFiveEyeOverlay(faceRatio, imageLayout) {
     label: guidePoints[key]?.label || fallbackLabel,
     left: mapImageXToFramePercent(guidePoints[key], imageLayout),
   }))
-  const hasMappedPoints = pointBoundaries.every((item, index, arr) => (
-    Number.isFinite(item.left)
-    && (index === 0 || item.left > arr[index - 1].left)
-  ))
+  const sortedBoundaries = pointBoundaries
+    .filter(item => Number.isFinite(item.left))
+    .sort((a, b) => a.left - b.left)
+  const hasMappedPoints = sortedBoundaries.length === pointBoundaries.length
 
   if (!hasMappedPoints) {
-    return {
-      boundaries: [],
-      segments: [],
-    }
+    return buildFallbackFiveEyeOverlay(faceRatio)
   }
 
   const segmentDefs = [
@@ -306,11 +345,11 @@ function buildFiveEyeOverlay(faceRatio, imageLayout) {
   ]
 
   return {
-    boundaries: pointBoundaries,
+    boundaries: sortedBoundaries,
     segments: segmentDefs.map(([id, label, startIndex, endIndex]) => ({
       id,
       label,
-      left: clampPercent((pointBoundaries[startIndex].left + pointBoundaries[endIndex].left) / 2, 4, 96),
+      left: clampPercent((sortedBoundaries[startIndex].left + sortedBoundaries[endIndex].left) / 2, 4, 96),
     })),
   }
 }
