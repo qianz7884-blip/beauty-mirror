@@ -796,10 +796,11 @@ export default function Tutorial() {
 
       <section className="bm-hero bm-tutorial-hero">
         <div>
+          <span className="bm-page-kicker">PERSONAL MAKEUP GUIDE</span>
           <h1>教程推荐</h1>
-          <p className="bm-flow-copy">按时间、场景和面部比例找到今天适合的教程</p>
+          <p className="bm-flow-copy">先读懂三庭五眼，再按时间和场景匹配今天适合的视频教程。</p>
         </div>
-        <span className="bm-tutorial-brand-mark">Beauty<br />Mirror</span>
+        <span className="bm-tutorial-brand-mark" aria-hidden="true">✦</span>
       </section>
 
       <div className="bm-flow-content">
