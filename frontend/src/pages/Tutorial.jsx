@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Clock3,
   Copy,
+  ExternalLink,
   Image as ImageIcon,
   Loader2,
   Moon,
@@ -29,6 +30,19 @@ const PHOTO_CAPTURE_TIPS = [
   '两只眼睛高度接近，不歪头不侧脸',
   '发际线、眉毛、下巴都要露出来',
   '用正面柔光，脸占画面六到七成',
+]
+
+const VIDEO_PLATFORMS = [
+  {
+    id: 'douyin',
+    label: '抖音',
+    buildUrl: query => `https://www.douyin.com/search/${encodeURIComponent(query)}?type=video`,
+  },
+  {
+    id: 'xiaohongshu',
+    label: '小红书',
+    buildUrl: query => `https://www.xiaohongshu.com/search_result?keyword=${encodeURIComponent(query)}&source=web_explore_feed`,
+  },
 ]
 
 const SCENES = [
@@ -231,6 +245,24 @@ function clampPercent(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, number))
 }
 
+function buildPaddedPercentRange(start, end, padding, min, max, minSpan = 0) {
+  const rangeStart = Number(start)
+  const rangeEnd = Number(end)
+  if (!Number.isFinite(rangeStart) || !Number.isFinite(rangeEnd) || rangeEnd <= rangeStart) return null
+
+  let nextStart = Math.max(min, rangeStart - padding)
+  let nextEnd = Math.min(max, rangeEnd + padding)
+  const currentSpan = nextEnd - nextStart
+
+  if (minSpan > 0 && currentSpan < minSpan) {
+    const extra = (minSpan - currentSpan) / 2
+    nextStart = Math.max(min, nextStart - extra)
+    nextEnd = Math.min(max, nextEnd + extra)
+  }
+
+  return [nextStart, nextEnd]
+}
+
 function mapImageYToFramePercent(point, imageLayout) {
   const yNorm = Number(point?.y_norm)
   if (!Number.isFinite(yNorm)) return null
@@ -429,6 +461,17 @@ function buildMirrorGuideOverlay(faceRatio, imageLayout) {
   })
   const upper = threePart.upper || {}
   const hairlineMeasured = upper.hairline_available === true
+  const fiveEye = buildFiveEyeOverlay(faceRatio, imageLayout)
+  const firstEyeBoundary = fiveEye.boundaries[0]
+  const lastEyeBoundary = fiveEye.boundaries[fiveEye.boundaries.length - 1]
+  const horizontalRange = buildPaddedPercentRange(firstEyeBoundary?.left, lastEyeBoundary?.left, 7, 3, 97, 34) || [7, 93]
+  const verticalRange = buildPaddedPercentRange(boundaryTops[0], boundaryTops[3], 7, 3, 97, 42) || [12, 88]
+  const guideStyle = {
+    '--bm-guide-left': `${horizontalRange[0]}%`,
+    '--bm-guide-right': `${100 - horizontalRange[1]}%`,
+    '--bm-guide-eye-top': `${verticalRange[0]}%`,
+    '--bm-guide-eye-bottom': `${100 - verticalRange[1]}%`,
+  }
 
   return {
     measured: true,
@@ -437,7 +480,8 @@ function buildMirrorGuideOverlay(faceRatio, imageLayout) {
       ? (hairlineMeasured ? '按照片关键点定位' : '额上部近似定位')
       : '按比例回退定位',
     boundaries,
-    fiveEye: buildFiveEyeOverlay(faceRatio, imageLayout),
+    fiveEye,
+    style: guideStyle,
     segments,
   }
 }
@@ -749,6 +793,7 @@ export default function Tutorial() {
               )}
               <span
                 className={`bm-mirror-guide-lines${mirrorGuideOverlay.measured ? ' is-measured' : ''}${mirrorGuideOverlay.approx ? ' is-approx' : ''}`}
+                style={mirrorGuideOverlay.style}
                 aria-hidden="true"
               >
                 {mirrorGuideOverlay.boundaries.map(boundary => (
@@ -961,18 +1006,34 @@ export default function Tutorial() {
               </p>
               <div className="bm-video-query-list">
                 {videoRecommendations.map(item => (
-                  <button
-                    key={item.query}
-                    type="button"
-                    onClick={() => handleCopyVideoQuery(item.query)}
-                  >
-                    <Video size={17} strokeWidth={1.7} />
-                    <span>
-                      <strong>{item.title}</strong>
-                      <small>{item.query}</small>
-                    </span>
-                    <Copy size={15} strokeWidth={1.8} />
-                  </button>
+                  <div className="bm-video-query-card" key={item.query}>
+                    <button
+                      type="button"
+                      className="bm-video-query-copy"
+                      onClick={() => handleCopyVideoQuery(item.query)}
+                    >
+                      <Video size={17} strokeWidth={1.7} />
+                      <span>
+                        <strong>{item.title}</strong>
+                        <small>{item.query}</small>
+                      </span>
+                      <Copy size={15} strokeWidth={1.8} />
+                    </button>
+                    <div className="bm-video-platform-links" aria-label="打开平台搜索">
+                      {VIDEO_PLATFORMS.map(platform => (
+                        <a
+                          key={platform.id}
+                          href={platform.buildUrl(item.query)}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`${platform.label} 搜索 ${item.query}`}
+                        >
+                          {platform.label}
+                          <ExternalLink size={12} strokeWidth={1.8} />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </>
