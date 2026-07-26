@@ -427,13 +427,13 @@ class RecommendationEngine:
             rs = region_scores.get(r)
             if rf:
                 cheek_rough.append(rf.get('texture', {}).get('roughness', 0))
-                cheek_L.append(rf.get('color', {}).get('lab_mean', [150, 0, 0])[0])
+                cheek_L.append(rf.get('color', {}).get('lab_mean', [60, 0, 0])[0])
                 cheek_erythema.append(rf.get('color', {}).get('erythema_index', 0))
             if rs:
                 cheek_hydration_scores.append(rs.get('hydration', 50))
 
         avg_cheek_rough = sum(cheek_rough) / len(cheek_rough) if cheek_rough else 0
-        avg_cheek_L = sum(cheek_L) / len(cheek_L) if cheek_L else 160
+        avg_cheek_L = sum(cheek_L) / len(cheek_L) if cheek_L else 60
         avg_cheek_ery = sum(cheek_erythema) / len(cheek_erythema) if cheek_erythema else 0
         avg_cheek_hyd = sum(cheek_hydration_scores) / len(cheek_hydration_scores) if cheek_hydration_scores else 50
 
@@ -506,14 +506,28 @@ class RecommendationEngine:
             rf = region_features.get(r)
             rs = region_scores.get(r)
             if rf:
-                eye_L_vals.append(rf.get('color', {}).get('lab_mean', [150, 0, 0])[0])
+                eye_L_vals.append(rf.get('color', {}).get('lab_mean', [60, 0, 0])[0])
             if rs:
                 eye_hydration.append(rs.get('hydration', 50))
 
-        avg_eye_L = sum(eye_L_vals) / len(eye_L_vals) if eye_L_vals else 160
+        avg_eye_L = sum(eye_L_vals) / len(eye_L_vals) if eye_L_vals else None
         avg_eye_hyd = sum(eye_hydration) / len(eye_hydration) if eye_hydration else 50
+        reference_L_vals = [
+            rf.get('color', {}).get('lab_mean', [60, 0, 0])[0]
+            for rname, rf in region_features.items()
+            if rname not in ('左眼周', '右眼周', '唇周')
+        ]
+        avg_reference_L = (
+            sum(reference_L_vals) / len(reference_L_vals)
+            if reference_L_vals
+            else None
+        )
 
-        if avg_eye_L < 135:
+        if (
+            avg_eye_L is not None
+            and avg_reference_L is not None
+            and avg_eye_L < avg_reference_L - 4.0
+        ):
             observations.append({
                 'area': '眼周',
                 'finding': '眼周略显暗沉',
@@ -550,11 +564,11 @@ class RecommendationEngine:
         # --- 整体暗沉检查 ---
         all_L_vals = []
         for rf in region_features.values():
-            L = rf.get('color', {}).get('lab_mean', [150, 0, 0])[0]
+            L = rf.get('color', {}).get('lab_mean', [60, 0, 0])[0]
             all_L_vals.append(L)
-        avg_all_L = sum(all_L_vals) / len(all_L_vals) if all_L_vals else 160
+        avg_all_L = sum(all_L_vals) / len(all_L_vals) if all_L_vals else 60
 
-        if avg_all_L < 138:
+        if avg_all_L < (140.0 * 100.0 / 255.0):
             observations.append({
                 'area': '全脸',
                 'finding': '整体肤色偏暗',

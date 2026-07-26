@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# ── 先 COPY 代码，再安装依赖（代码变更 = 缓存失效） ────────────
-COPY . .
+# ── 先复制依赖清单，普通代码变更可复用依赖安装层 ──────────────
+COPY requirements.txt .
 
 # ── 安装 Python 依赖 ──────────────────────────────────────────
 # 关键：先装 headless OpenCV（零 GL 依赖），再装其他依赖时排除 mediapipe，
@@ -26,6 +26,19 @@ RUN pip install --no-cache-dir opencv-contrib-python-headless \
     && grep -v "^mediapipe" requirements.txt > /tmp/reqs_no_mp.txt \
     && pip install --no-cache-dir -r /tmp/reqs_no_mp.txt \
     && pip install --no-cache-dir --no-deps mediapipe
+
+# ── 下载并校验发际线/皮肤语义分割模型 ─────────────────────────
+# 单独复制下载脚本，使普通业务代码变更可以复用 50MB 模型缓存层。
+COPY face_parsing.py download_face_parsing_model.py ./
+ARG FACE_PARSING_MODEL_URL=https://github.com/yakhyo/face-parsing/releases/download/weights/resnet18.onnx
+ENV FACE_PARSING_ENABLED=1 \
+    FACE_PARSING_MODEL_URL=${FACE_PARSING_MODEL_URL} \
+    FACE_PARSING_ONNX_PATH=/app/models/face_parsing_resnet18.onnx \
+    FACE_PARSING_INTRA_OP_THREADS=1
+RUN python download_face_parsing_model.py
+
+# ── 最后复制应用代码 ──────────────────────────────────────────
+COPY . .
 
 # ── 强制 MediaPipe 使用 CPU + 无头 EGL ─────────────────────────
 ENV MEDIAPIPE_DISABLE_GPU=1 \

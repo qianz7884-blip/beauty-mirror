@@ -34,4 +34,5 @@ class Config:
     UPLOAD_FOLDER_PRODUCTS = os.path.join(BASE_DIR, 'uploads', 'products')
     UPLOAD_FOLDER_DIARY = os.path.join(BASE_DIR, 'uploads', 'diary')
     UPLOAD_FOLDER_SKIN = os.path.join(BASE_DIR, 'uploads', 'skin')
+    UPLOAD_STORAGE = 'cloudinary' if os.environ.get('CLOUDINARY_URL') else 'local_ephemeral'
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB

@@ -72,6 +72,7 @@ const _uploadsBase = (() => {
  */
 export function getPhotoUrl(filename, type = 'products') {
   if (!filename) return ''
+  if (/^(https?:|data:|blob:)/i.test(filename)) return filename
   return `${_uploadsBase}/uploads/${type}/${filename}`
 }
 
@@ -162,6 +163,10 @@ export function deleteProduct(id) {
 
 export function fetchSkinAnalyses() {
   return api.get('/skin-analyses').then(r => r.data)
+}
+
+export function fetchLatestFaceRatio() {
+  return api.get('/skin-analyses/latest-face-ratio').then(r => r.data)
 }
 
 export function fetchSkinAnalysis(id) {

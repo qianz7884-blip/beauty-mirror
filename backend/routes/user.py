@@ -110,6 +110,10 @@ def _database_status():
 
 
 def _session_payload(user_id):
+    upload_storage = current_app.config.get('UPLOAD_STORAGE', 'local_ephemeral')
+    database = _database_status()
+    persistence_ready = database.get('mode') == 'cloud' and upload_storage != 'local_ephemeral'
+
     return {
         'user_id': user_id,
         'short_user_id': user_id[-8:] if len(user_id) > 8 else user_id,
@@ -117,8 +121,18 @@ def _session_payload(user_id):
         'counts': _counts_for_user(user_id),
         'last_activity_at': _last_activity_at(user_id),
         'knowledge_base_products': Product.query.filter(Product.source == 'knowledge_base').count(),
-        'database': _database_status(),
-        'scope': 'local_anonymous_user',
+        'database': database,
+        'storage': {
+            'backend': upload_storage,
+            'persistent': upload_storage != 'local_ephemeral',
+            'message': (
+                '上传图片保存在云图片存储中。'
+                if upload_storage != 'local_ephemeral'
+                else '上传图片保存在服务本地目录；云端部署重启后可能丢失。'
+            ),
+        },
+        'persistence_ready': persistence_ready,
+        'scope': 'device_anonymous_profile',
     }
 
 

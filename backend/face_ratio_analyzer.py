@@ -13,6 +13,7 @@ from math import hypot
 
 
 VERSION = 'face_ratio_v2'
+_FACE_PARSE_UNSET = object()
 
 BROW_INDICES = [70, 63, 105, 66, 107, 300, 293, 334, 296, 336]
 NOSE_BASE_INDICES = [2, 94, 97, 164, 326, 327]
@@ -139,12 +140,24 @@ def _load_image_rgb(image_bytes):
         return None
 
 
-def _estimate_hairline(landmarks, image_size, image_bytes=None, image_rgb=None):
+def _estimate_hairline(
+        landmarks,
+        image_size,
+        image_bytes=None,
+        image_rgb=None,
+        face_parse=_FACE_PARSE_UNSET):
     try:
         from face_parsing import estimate_hairline
 
         rgb = image_rgb if image_rgb is not None else _load_image_rgb(image_bytes)
-        return estimate_hairline(landmarks, image_size, image_rgb=rgb)
+        if face_parse is _FACE_PARSE_UNSET:
+            return estimate_hairline(landmarks, image_size, image_rgb=rgb)
+        return estimate_hairline(
+            landmarks,
+            image_size,
+            image_rgb=rgb,
+            face_parse=face_parse,
+        )
     except Exception as exc:
         print(f'[face_ratio] hairline estimation skipped: {exc}')
         return {'available': False, 'reason': 'hairline_estimation_failed'}
@@ -258,7 +271,12 @@ def _confidence(quality_flags, face_height, face_width):
     return 'high'
 
 
-def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None):
+def analyze_face_ratios(
+        landmarks,
+        image_size,
+        image_bytes=None,
+        image_rgb=None,
+        face_parse=_FACE_PARSE_UNSET):
     """
     分析面部比例倾向。
 
@@ -315,6 +333,7 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
             image_size,
             image_bytes=image_bytes,
             image_rgb=image_rgb,
+            face_parse=face_parse,
         )
         hairline_available = bool(isinstance(hairline, dict) and hairline.get('available'))
         if hairline_available:

@@ -1,24 +1,28 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
-import ProductManage from './pages/ProductManage'
-import MakeupDiary from './pages/MakeupDiary'
-import DiaryDetail from './pages/DiaryDetail'
-import Tutorial from './pages/Tutorial'
-import Profile from './pages/Profile'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Tutorial = lazy(() => import('./pages/Tutorial'))
+const ProductManage = lazy(() => import('./pages/ProductManage'))
+const MakeupDiary = lazy(() => import('./pages/MakeupDiary'))
+const DiaryDetail = lazy(() => import('./pages/DiaryDetail'))
+const Profile = lazy(() => import('./pages/Profile'))
 
 export default function App() {
   return (
     <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/products" element={<ProductManage />} />
-        <Route path="/diary" element={<MakeupDiary />} />
-        <Route path="/diary/:id" element={<DiaryDetail />} />
-        <Route path="/tutorial" element={<Tutorial />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<div className="bm-route-loading" role="status">正在打开页面…</div>}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/products" element={<ProductManage />} />
+          <Route path="/diary" element={<MakeupDiary />} />
+          <Route path="/diary/:id" element={<DiaryDetail />} />
+          <Route path="/tutorial" element={<Tutorial />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </Layout>
   )
 }

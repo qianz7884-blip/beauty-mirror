@@ -21,6 +21,27 @@ from scipy.ndimage import generate_binary_structure
 DEBUG_ROI = os.environ.get('DEBUG_ROI', '').lower() in ('1', 'true', 'yes', 'on')
 ROI_MIN_VALID_PIXELS = int(os.environ.get('ROI_MIN_VALID_PIXELS', '120'))
 
+# 评分版本用于区分历史记录。v2 统一使用 CIE Lab L* 的 0~100 标度。
+SCORING_VERSION = 'lab-lstar-v2'
+
+# 旧评分规则的阈值按 8-bit 亮度（0~255）制定，而 _rgb_to_lab() 返回
+# CIE Lab L*（0~100）。这些常量保留旧规则的相对位置，但使用正确量纲。
+_LSTAR_SCALE_FROM_8BIT = 100.0 / 255.0
+LSTAR_HYDRATION_LOW = 130.0 * _LSTAR_SCALE_FROM_8BIT
+LSTAR_HYDRATION_HIGH = 190.0 * _LSTAR_SCALE_FROM_8BIT
+LSTAR_BRIGHTNESS_LOW = 130.0 * _LSTAR_SCALE_FROM_8BIT
+LSTAR_BRIGHTNESS_HIGH = 195.0 * _LSTAR_SCALE_FROM_8BIT
+LSTAR_CHEEK_DRY_MAX = 155.0 * _LSTAR_SCALE_FROM_8BIT
+LSTAR_DULL_MAX = 140.0 * _LSTAR_SCALE_FROM_8BIT
+
+# ROI 内 L* 标准差的经验参考。数值越小，肤色越均匀。
+LSTAR_STD_GOOD = 12.0 * _LSTAR_SCALE_FROM_8BIT
+LSTAR_STD_POOR = 30.0 * _LSTAR_SCALE_FROM_8BIT
+
+# 眼周比面部非眼周参考区域低约 4 L* 时，才标记为相对暗沉。
+# 使用相对差值可避免整张照片曝光稍暗时必然触发“黑眼圈”。
+EYE_RELATIVE_DARK_DELTA = 4.0
+
 
 # ============================================================
 # RGB → Lab 转换矩阵（sRGB, D65 白点）
@@ -254,6 +275,8 @@ class FeatureExtractor:
         aggregated = self._aggregate_features(all_region_features)
 
         return {
+            'scoring_version': SCORING_VERSION,
+            'score_interpretation': '基于单张照片的视觉代理指标，不等同于临床含水量或皮肤诊断',
             'skin_type': skin_type,
             'overall_score': round(face_scores['overall']),
             'scores': {
@@ -677,8 +700,11 @@ class FeatureExtractor:
         用 Sigmoid 曲线将原始值映射到 0-100 分数。
         low_thresh → ~10 分，high_thresh → ~90 分。
         """
+        if high_thresh <= low_thresh:
+            raise ValueError('high_thresh 必须大于 low_thresh')
         midpoint = (low_thresh + high_thresh) / 2.0
-        steepness = 10.0 / max(high_thresh - low_thresh, 1e-10)
+        # logit(0.9) - logit(0.1) ≈ 4.394，使上下阈值分别约为 10 / 90 分。
+        steepness = 4.394449154672439 / (high_thresh - low_thresh)
         normalized = (value - midpoint) * steepness
         normalized = max(-50.0, min(50.0, normalized))  # 防止 exp 溢出
         score = 100.0 / (1.0 + np.exp(-normalized))
@@ -696,16 +722,20 @@ class FeatureExtractor:
         spots = region_features.get('spots', {})
         shine = region_features.get('shine', {})
 
-        L_mean = color.get('lab_mean', [150, 0, 0])[0]
+        L_mean = color.get('lab_mean', [60, 0, 0])[0]
         homogeneity = texture.get('homogeneity', 0.7)
         roughness = texture.get('roughness', 0.3)
         pore_vis = pores.get('pore_visibility', 0.3)
         gloss = shine.get('gloss_score', 0.3)
-        L_std = color.get('lab_std', [20, 5, 5])[0]
+        L_std = color.get('lab_std', [8, 5, 5])[0]
         spot_density = spots.get('spot_density', 0.0)
 
         # 水润度：亮度 + 纹理惩罚
-        hydration = self._sigmoid_score(L_mean, 130, 190)
+        hydration = self._sigmoid_score(
+            L_mean,
+            LSTAR_HYDRATION_LOW,
+            LSTAR_HYDRATION_HIGH,
+        )
         if roughness > 0.3:
             hydration -= (roughness - 0.3) * 50
         hydration = max(0.0, min(100.0, hydration))
@@ -717,7 +747,11 @@ class FeatureExtractor:
         smoothness = max(0.0, min(100.0, smoothness))
 
         # 光泽度（明亮）：亮度 + 油光惩罚
-        brightness = self._sigmoid_score(L_mean, 130, 195)
+        brightness = self._sigmoid_score(
+            L_mean,
+            LSTAR_BRIGHTNESS_LOW,
+            LSTAR_BRIGHTNESS_HIGH,
+        )
         if gloss > 0.5:
             brightness -= (gloss - 0.5) * 40
         brightness = max(0.0, min(100.0, brightness))
@@ -727,7 +761,12 @@ class FeatureExtractor:
         pores_score = max(5.0, min(100.0, pores_score))
 
         # 均匀度：低标准差 + 少斑点 = 高分
-        evenness = self._sigmoid_score(L_std, 30, 12, invert=True)
+        evenness = self._sigmoid_score(
+            L_std,
+            LSTAR_STD_GOOD,
+            LSTAR_STD_POOR,
+            invert=True,
+        )
         evenness -= spot_density * 5000
         if spots.get('color_variance', 0) > 0.15:
             evenness -= 10
@@ -807,7 +846,7 @@ class FeatureExtractor:
                 cheek_L.append(f['color']['lab_mean'][0])
                 cheek_erythema.append(f['color']['erythema_index'])
         cheek_rough = np.mean(cheek_roughness) if cheek_roughness else 0.3
-        cheek_L_mean = np.mean(cheek_L) if cheek_L else 160
+        cheek_L_mean = np.mean(cheek_L) if cheek_L else 60
         cheek_ery = np.mean(cheek_erythema) if cheek_erythema else 0.15
 
         # 眼周指标
@@ -820,7 +859,7 @@ class FeatureExtractor:
 
         # 判断
         is_t_zone_oily = t_zone_pore > 0.45 and t_zone_gloss > 0.40
-        is_cheek_dry = cheek_rough > 0.35 and cheek_L_mean < 155
+        is_cheek_dry = cheek_rough > 0.35 and cheek_L_mean < LSTAR_CHEEK_DRY_MAX
         is_sensitive = cheek_ery > 0.25 or eye_ery > 0.22
 
         if is_sensitive:
@@ -861,7 +900,13 @@ class FeatureExtractor:
         avg_t_gloss = np.mean(t_gloss) if t_gloss else 0
         avg_cheek_rough = np.mean(cheek_rough) if cheek_rough else 0
         avg_cheek_ery = np.mean(cheek_erythema) if cheek_erythema else 0
-        avg_eye_L = np.mean(eye_L) if eye_L else 160
+        avg_eye_L = np.mean(eye_L) if eye_L else None
+        reference_L = [
+            f['color']['lab_mean'][0]
+            for r, f in all_region_features.items()
+            if r not in ('左眼周', '右眼周', '唇周')
+        ]
+        avg_reference_L = np.mean(reference_L) if reference_L else None
 
         # 总计点数
         total_spots = sum(
@@ -886,7 +931,11 @@ class FeatureExtractor:
         if has_uneven:
             concerns.append('肤色不均')
 
-        if avg_eye_L < 140:
+        if (
+            avg_eye_L is not None
+            and avg_reference_L is not None
+            and avg_eye_L < avg_reference_L - EYE_RELATIVE_DARK_DELTA
+        ):
             concerns.append('黑眼圈')
 
         if avg_cheek_rough > 0.40:
@@ -897,7 +946,7 @@ class FeatureExtractor:
 
         # 整体亮度偏低
         all_L = [f['color']['lab_mean'][0] for f in all_region_features.values()]
-        if all_L and np.mean(all_L) < 140:
+        if all_L and np.mean(all_L) < LSTAR_DULL_MAX:
             concerns.append('肤色暗沉')
 
         if total_spots > 10:
@@ -991,6 +1040,8 @@ class FeatureExtractor:
     @staticmethod
     def _make_default_result():
         return {
+            'scoring_version': SCORING_VERSION,
+            'score_interpretation': '未获得有效 ROI，以下为中性占位数据',
             'skin_type': '中性',
             'overall_score': 50,
             'scores': {

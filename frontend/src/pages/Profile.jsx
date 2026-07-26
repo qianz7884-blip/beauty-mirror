@@ -32,7 +32,7 @@ import {
   subscribeThemeSettings,
 } from '../utils/themeSettings'
 import { buildProductReminders } from '../utils/productReminders'
-import profileIpSticker from '../assets/illustrations/beauty-mirror-ip/ip-avatar-only.png'
+import profileIpSticker from '../assets/illustrations/beauty-mirror-ip/ip-avatar-only.webp'
 
 const SKIN_TYPES = ['干性', '油性', '混合', '敏感', '中性']
 const SKIN_TYPE_KEY = 'beauty_mirror_skin_type'
@@ -186,16 +186,17 @@ function UserDataPanel({
 }) {
   const counts = session?.counts || {}
   const database = session?.database || {}
+  const storage = session?.storage || {}
 
   return (
     <div className="bm-user-panel">
       <div className="bm-user-panel-head">
         <span className="bm-reminder-toggle-icon"><Database size={17} strokeWidth={1.8} /></span>
         <div>
-          <strong>本地数据</strong>
-          <small>{session?.last_activity_at ? `最近记录 ${session.last_activity_at}` : '当前浏览器身份'}</small>
+          <strong>设备身份数据</strong>
+          <small>{session?.last_activity_at ? `最近记录 ${session.last_activity_at}` : '当前设备匿名身份'}</small>
         </div>
-        <button type="button" onClick={onRefresh} aria-label="刷新本地数据">
+        <button type="button" onClick={onRefresh} aria-label="刷新设备身份数据">
           <RefreshCw size={16} strokeWidth={1.8} />
         </button>
       </div>
@@ -223,6 +224,11 @@ function UserDataPanel({
       <div className={`bm-user-db ${database.writable === false ? 'warning' : 'ok'}`}>
         <Database size={16} strokeWidth={1.7} />
         <span>{database.message || '数据库状态读取中'}</span>
+      </div>
+
+      <div className={`bm-user-db ${storage.persistent === false ? 'warning' : 'ok'}`}>
+        <Camera size={16} strokeWidth={1.7} />
+        <span>{storage.message || '图片存储状态读取中'}</span>
       </div>
 
       <div className="bm-user-actions">
@@ -272,7 +278,7 @@ export default function Profile() {
         return data
       })
       .catch(() => {
-        setUserMessage('本地数据状态读取失败，请确认后端服务正在运行')
+        setUserMessage('设备身份数据读取失败，请确认后端服务正在运行')
         return null
       })
   }
@@ -303,7 +309,7 @@ export default function Profile() {
         }
       })
       .catch(() => {
-        if (!cancelled) setUserMessage('本地数据状态读取失败，请确认后端服务正在运行')
+        if (!cancelled) setUserMessage('设备身份数据读取失败，请确认后端服务正在运行')
       })
     return () => {
       cancelled = true
@@ -385,7 +391,7 @@ export default function Profile() {
   const handleCopyUserId = () => {
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(userId)
-        .then(() => setUserMessage('当前本地身份 ID 已复制'))
+        .then(() => setUserMessage('当前设备身份 ID 已复制'))
         .catch(() => setUserMessage('复制失败，可以手动长按 ID 复制'))
       return
     }
@@ -393,7 +399,7 @@ export default function Profile() {
   }
 
   const handleExportUserData = () => {
-    setUserMessage('正在准备当前本地身份的数据备份')
+    setUserMessage('正在准备当前设备身份的数据备份')
     exportUserData()
       .then(data => {
         const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -408,7 +414,7 @@ export default function Profile() {
         link.click()
         link.remove()
         URL.revokeObjectURL(url)
-        setUserMessage('已导出当前本地身份的数据备份')
+        setUserMessage('已导出当前设备身份的数据备份')
       })
       .catch(() => {
         setUserMessage('导出失败，请确认后端服务正在运行')
@@ -416,13 +422,13 @@ export default function Profile() {
   }
 
   const handleResetUserId = () => {
-    const confirmed = window.confirm('切换后会进入一个新的空白本地身份，旧数据不会删除。建议先备份当前数据，再确认切换。')
+    const confirmed = window.confirm('切换后会进入一个新的空白设备身份，旧数据不会删除。建议先备份当前数据，再确认切换。')
     if (!confirmed) return
 
     const nextUserId = resetAnonymousUserId()
     setUserId(nextUserId)
     setUserSession(null)
-    setUserMessage('已切换到新的本地身份，旧数据仍保留在数据库里')
+    setUserMessage('已切换到新的设备身份，旧数据仍保留在后端数据库里')
     fetchProducts()
       .then(data => setProducts(Array.isArray(data) ? data : []))
       .catch(() => setProducts([]))
@@ -432,7 +438,7 @@ export default function Profile() {
   const handleRefreshUserSession = () => {
     setUserMessage('')
     refreshUserSession().then(data => {
-      if (data) setUserMessage('本地数据状态已刷新')
+      if (data) setUserMessage('设备身份数据状态已刷新')
     })
   }
 
@@ -441,7 +447,7 @@ export default function Profile() {
     { icon: Bell, label: '提醒', value: reminderOn ? `${activeReminders.length} 条` : '已关' },
     { icon: Camera, label: '头像', value: profileImage ? '已设' : '未设' },
     { icon: Palette, label: '主题', value: activeTheme.label },
-    { icon: ShieldCheck, label: '隐私', value: '本地' },
+    { icon: ShieldCheck, label: '隐私', value: '后端分析' },
   ]
 
   return (
@@ -450,7 +456,7 @@ export default function Profile() {
         <div className="bm-profile-hero-main">
           <div>
             <h1>我的</h1>
-            <p className="bm-subtitle">管理肤质、提醒、主题和本地偏好。</p>
+            <p className="bm-subtitle">管理肤质、提醒、主题和设备偏好。</p>
           </div>
           <div className="bm-profile-avatar-wrap">
             <div className={`bm-profile-avatar bm-profile-avatar-static ${profileImage ? 'has-image' : ''}`} aria-label="个人头像">
@@ -537,8 +543,8 @@ export default function Profile() {
           )}
           <MenuItem
             icon={Database}
-            label="本地数据"
-            desc="查看当前身份、数据库状态和备份"
+            label="设备身份数据"
+            desc="查看匿名身份、后端数据库状态和备份"
             badge={`${userSession?.counts?.total_records ?? 0} 条`}
             onClick={() => setShowUserPanel(!showUserPanel)}
           />
@@ -705,7 +711,7 @@ export default function Profile() {
             icon={ShieldCheck}
             label="隐私设置"
             desc="查看图像使用说明"
-            onClick={() => alert('面部图像默认本地处理；产品、日记和头像偏好只保存在当前设备或你的本地后端。')}
+            onClick={() => alert('面部照片会上传到后端完成 MediaPipe 与 ROI 分析，原图不发送给 Gemini；结构化特征可用于生成文字建议。分析记录、产品和日记保存在后端，头像与主题偏好保存在当前设备。结果不构成医疗诊断。')}
           />
         </div>
       </section>

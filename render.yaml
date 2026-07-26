@@ -11,11 +11,19 @@ services:
         value: gemini-2.5-flash
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
       - key: ROI_FEATURE_BUDGET_MS
         value: 2500
       - key: ROI_FEATURE_MAX_SIDE
         value: 180
       - key: SKIN_ANALYSIS_CONCURRENCY
+        value: 1
+      - key: FACE_PARSING_ENABLED
+        value: 1
+      - key: FACE_PARSING_INTRA_OP_THREADS
         value: 1
       - key: GEMINI_TIMEOUT_MS
         value: 30000

@@ -969,9 +969,16 @@ def _save_heatmap_debug_images(skin_mask_u8, display_mask, heatmap_debug, final_
         print(f'[heatmap] debug image save failed: {exc}')
 
 
-def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
-                          alpha=0.5, colormap_name='RdYlGn_r',
-                          show_labels=True):
+def generate_skin_heatmap(
+        image_bytes,
+        landmarks,
+        image_size,
+        region_scores,
+        alpha=0.5,
+        colormap_name='RdYlGn_r',
+        show_labels=True,
+        image_rgb=None,
+        face_parse=None):
     """
     生成 Apple Health 风格的面部热力图。
 
@@ -991,6 +998,8 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
         alpha:          热力图透明度 0-1，默认 0.5（推荐 0.45~0.6）
         colormap_name:  matplotlib colormap，默认 'RdYlGn_r'
         show_labels:    是否显示区域评分标签
+        image_rgb:      可选，已解码 RGB；用于避免重复解码
+        face_parse:     可选，已完成的皮肤/头发分割；与 ROI、三庭共享
 
     返回：
         str: "data:image/png;base64,..." 格式的 base64 PNG
@@ -1006,18 +1015,26 @@ def generate_skin_heatmap(image_bytes, landmarks, image_size, region_scores,
         debug_id = f'heatmap_{int(time.time() * 1000)}'
 
         # ── 加载原图 ──
-        img = load_image(image_bytes).convert('RGB')
-        img_np = np.array(img, dtype=np.uint8)
+        if image_rgb is None:
+            img = load_image(image_bytes).convert('RGB')
+            img_np = np.array(img, dtype=np.uint8)
+        else:
+            img_np = np.asarray(image_rgb, dtype=np.uint8)
+            if img_np.ndim != 3 or img_np.shape[2] < 3:
+                raise ValueError(f'heatmap image_rgb invalid: shape={img_np.shape}')
+            img_np = np.ascontiguousarray(img_np[:, :, :3])
         _log_array_memory('heatmap.input_rgb', img_np)
 
         # ═══════════════════════════════════════════════════════
         # Step 1: 生成人脸 Skin Mask（改进轮廓 + 五官排除 + 羽化）
         # ═══════════════════════════════════════════════════════
+        mask_kwargs = {'face_parse': face_parse} if face_parse is not None else {}
         skin_mask_u8, mask_debug = build_improved_face_skin_mask(
             landmarks,
             image_size,
             image_rgb=img_np,
             return_debug=True,
+            **mask_kwargs,
         )
         display_mask_u8 = mask_debug.get('face_mask', skin_mask_u8) if isinstance(mask_debug, dict) else skin_mask_u8
         display_mask = _build_visual_display_mask(display_mask_u8, image_size)

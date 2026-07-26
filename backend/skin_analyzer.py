@@ -4,7 +4,7 @@
 功能：
     1. MediaPipe Face Landmarker 面部检测
     2. 8 区域 ROI 裁剪（前额/脸颊/鼻子/下巴/眼周/唇周）
-    3. ChromaDB RAG 知识检索增强分析精度
+    3. 本地 JSON 轻量 RAG 检索参考知识
     4. Gemini Vision 多图分区肤质分析
     5. matplotlib 面部热点图生成
 
@@ -77,6 +77,37 @@ def _prepare_analysis_image_bytes(image_bytes):
 
     print(f'[skin_analyzer] analysis image size kept: {original_size[0]}x{original_size[1]}')
     return image_bytes, {'original_size': original_size, 'analysis_size': original_size, 'scale': 1.0}
+
+
+def prepare_face_parsing(image_bytes):
+    """
+    Decode once and run face parsing once.
+
+    The returned semantic result is shared by the skin ROI and face-ratio
+    pipelines so both features use the exact same hair/skin boundary.
+    """
+    image_rgb = np.array(load_image(image_bytes).convert('RGB'), dtype=np.uint8)
+    try:
+        from face_parsing import parse_face, summarize_face_parse
+
+        face_parse = parse_face(image_rgb)
+        summary = summarize_face_parse(face_parse)
+        print(
+            '[skin_analyzer] face parsing: '
+            f"available={summary.get('available')}, source={summary.get('source')}, "
+            f"reason={summary.get('reason', '')}"
+        )
+        return image_rgb, face_parse, summary
+    except Exception as exc:
+        print(f'[skin_analyzer] face parsing failed, using geometry fallback: {exc}')
+        return image_rgb, None, {
+            'available': False,
+            'enabled': True,
+            'model_exists': False,
+            'session_ready': False,
+            'source': 'mediapipe_geometry_fallback',
+            'reason': str(exc),
+        }
 
 
 def _get_detector():
@@ -257,7 +288,13 @@ def _get_rag_context(face_data, region_count=8, query_text=None):
 # 面部热力图生成（委托给 heatmap_generator 模块）
 # ============================================================
 
-def generate_heatmap(image_bytes, landmarks, image_size, region_scores):
+def generate_heatmap(
+        image_bytes,
+        landmarks,
+        image_size,
+        region_scores,
+        image_rgb=None,
+        face_parse=None):
     """
     生成 Apple Health 风格的面部热力图。
 
@@ -287,6 +324,8 @@ def generate_heatmap(image_bytes, landmarks, image_size, region_scores):
             region_scores=region_scores,
             alpha=0.5,
             colormap_name='RdYlGn_r',
+            image_rgb=image_rgb,
+            face_parse=face_parse,
         )
     except ImportError as e:
         print(f'[skin_analyzer] heatmap_generator 模块不可用: {e}')
@@ -364,10 +403,22 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
     landmarks = face_info['landmarks']
     img_size = face_info['image_size']
 
+    analysis_image_rgb, face_parse, face_parsing_summary = prepare_face_parsing(
+        analysis_image_bytes
+    )
+    if isinstance(face_data, dict):
+        face_data['face_parsing'] = face_parsing_summary
+
     try:
         from face_ratio_analyzer import analyze_face_ratios
 
-        face_ratio = analyze_face_ratios(landmarks, img_size, image_bytes=analysis_image_bytes)
+        face_ratio = analyze_face_ratios(
+            landmarks,
+            img_size,
+            image_bytes=analysis_image_bytes,
+            image_rgb=analysis_image_rgb,
+            face_parse=face_parse,
+        )
         if isinstance(face_data, dict):
             face_data['face_ratio'] = face_ratio
         print(f'[skin_analyzer] 面部比例分析完成: {face_ratio.get("ratio_tags", []) if isinstance(face_ratio, dict) else []}')
@@ -391,6 +442,8 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
             landmarks,
             img_size,
             max_side=ROI_FEATURE_MAX_SIDE,
+            image_rgb=analysis_image_rgb,
+            face_parse=face_parse,
         )
         roi_analysis_elapsed_ms = (time.perf_counter() - roi_analysis_started) * 1000
 
@@ -588,7 +641,14 @@ mirror_advice 要求：
         heatmap_b64 = None
         if feature_json.get('region_scores'):
             try:
-                heatmap_b64 = generate_heatmap(analysis_image_bytes, landmarks, img_size, feature_json['region_scores'])
+                heatmap_b64 = generate_heatmap(
+                    analysis_image_bytes,
+                    landmarks,
+                    img_size,
+                    feature_json['region_scores'],
+                    image_rgb=analysis_image_rgb,
+                    face_parse=face_parse,
+                )
             except Exception as e:
                 print(f'[skin_analyzer] 热点图生成异常: {e}')
 
@@ -611,7 +671,14 @@ mirror_advice 要求：
         heatmap_b64 = None
         if feature_json.get('region_scores'):
             try:
-                heatmap_b64 = generate_heatmap(analysis_image_bytes, landmarks, img_size, feature_json['region_scores'])
+                heatmap_b64 = generate_heatmap(
+                    analysis_image_bytes,
+                    landmarks,
+                    img_size,
+                    feature_json['region_scores'],
+                    image_rgb=analysis_image_rgb,
+                    face_parse=face_parse,
+                )
             except Exception as he:
                 print(f'[skin_analyzer] 热点图生成异常: {he}')
 
