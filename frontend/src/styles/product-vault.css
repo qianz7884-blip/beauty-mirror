@@ -5176,20 +5176,18 @@ body {
   --bm-guide-line-color: rgba(255, 255, 255, 0.72);
   --bm-guide-text-color: rgba(255, 255, 255, 0.86);
   position: absolute;
-  inset: 18% 13% 17%;
+  inset: 0;
   z-index: 2;
-  display: grid !important;
-  grid-template-rows: repeat(3, 1fr);
+  display: block !important;
   margin: 0 !important;
   pointer-events: none;
-  transition: grid-template-rows 220ms ease, inset 220ms ease;
 }
 
 .bm-mirror-guide-lines::before {
   content: '';
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: 10%;
+  bottom: 10%;
   left: 50%;
   border-left: 1px dashed rgba(255, 255, 255, 0.54);
 }
@@ -5197,35 +5195,43 @@ body {
 .bm-mirror-guide-lines.is-measured {
   --bm-guide-line-color: rgba(139, 211, 193, 0.96);
   --bm-guide-text-color: #ffffff;
-  inset: 16% 12% 16%;
 }
 
 .bm-mirror-guide-lines.is-approx {
   --bm-guide-line-color: rgba(244, 212, 152, 0.96);
 }
 
+.bm-mirror-guide-boundary {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  height: 0;
+  border-top: 1px dashed var(--bm-guide-line-color);
+  font-style: normal;
+  filter: drop-shadow(0 1px 4px rgba(25, 45, 56, 0.22));
+}
+
+.bm-mirror-guide-lines.is-measured .bm-mirror-guide-boundary {
+  border-top-style: solid;
+  border-top-width: 2px;
+}
+
+.bm-mirror-guide-boundary span {
+  display: none;
+}
+
 .bm-mirror-guide-lines b {
-  position: relative;
+  position: absolute;
   display: flex;
-  align-items: flex-start;
+  left: 6%;
+  right: 6%;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 0;
-  padding-top: 6px;
-  border-top: 1px dashed var(--bm-guide-line-color);
+  transform: translateY(-50%);
   color: var(--bm-guide-text-color);
   line-height: 1;
   text-shadow: 0 1px 8px rgba(38, 58, 70, 0.34);
-}
-
-.bm-mirror-guide-lines b:first-child {
-  border-top: 0;
-}
-
-.bm-mirror-guide-lines.is-measured b:not(:first-child) {
-  border-top-style: solid;
-  border-top-width: 2px;
-  box-shadow: 0 -1px 0 rgba(30, 73, 84, 0.12);
 }
 
 .bm-mirror-guide-lines b span,
@@ -5233,39 +5239,48 @@ body {
   display: inline-flex;
   align-items: center;
   min-width: 0;
-  max-width: 50%;
+  max-width: 48%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bm-mirror-guide-lines b span {
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(30, 54, 64, 0.22);
   font-size: 12px;
   font-weight: 780;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
 
 .bm-mirror-guide-lines b em {
   justify-content: flex-end;
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 820;
-  opacity: 0.88;
-}
-
-.bm-mirror-guide-lines.is-measured b em {
-  min-height: 20px;
+  min-height: 22px;
   padding: 0 7px;
   border-radius: 999px;
   background: rgba(26, 77, 88, 0.28);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 820;
+  opacity: 0.88;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
 
+.bm-mirror-guide-lines.is-approx b em,
+.bm-mirror-guide-lines.is-approx b span {
+  background: rgba(133, 92, 39, 0.28);
+}
+
 .bm-mirror-guide-source {
   position: absolute;
-  right: 0;
-  bottom: -18px;
+  right: 7%;
+  bottom: 7%;
   display: inline-flex;
   align-items: center;
   max-width: 100%;

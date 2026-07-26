@@ -218,12 +218,46 @@ function buildThreePartSegments(faceRatio) {
   })
 }
 
-function buildMirrorGuideOverlay(faceRatio) {
+function clampPercent(value, min = 0, max = 100) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return null
+  return Math.max(min, Math.min(max, number))
+}
+
+function mapImageYToFramePercent(point, imageLayout) {
+  const yNorm = Number(point?.y_norm)
+  if (!Number.isFinite(yNorm)) return null
+
+  if (!imageLayout) {
+    return clampPercent(yNorm * 100)
+  }
+
+  const yInImage = yNorm * imageLayout.naturalHeight
+  return clampPercent(((imageLayout.offsetY + yInImage * imageLayout.scale) / imageLayout.height) * 100, -20, 120)
+}
+
+function buildShareBasedBoundaries(faceRatio) {
+  const threePart = faceRatio?.measurements?.three_part || {}
+  const upperShare = Number(threePart.upper?.share)
+  const middleShare = Number(threePart.middle?.share)
+  const lowerShare = Number(threePart.lower?.share)
+  const shares = [upperShare, middleShare, lowerShare].every(value => Number.isFinite(value) && value > 0)
+    ? [upperShare, middleShare, lowerShare]
+    : [1 / 3, 1 / 3, 1 / 3]
+  const top = 14
+  const height = 72
+  const brow = top + shares[0] * height
+  const nose = brow + shares[1] * height
+  return [top, brow, nose, top + height]
+}
+
+function buildMirrorGuideOverlay(faceRatio, imageLayout) {
   const fallbackSegments = [
     { id: 'upper', label: '上庭', percent: '参考', status: '未分析时显示三等分参考线' },
     { id: 'middle', label: '中庭', percent: '参考', status: '未分析时显示三等分参考线' },
     { id: 'lower', label: '下庭', percent: '参考', status: '未分析时显示三等分参考线' },
   ]
+  const fallbackBoundaries = [14, 38, 62, 86]
 
   if (!faceRatio?.ok) {
     return {
@@ -231,27 +265,52 @@ function buildMirrorGuideOverlay(faceRatio) {
       approx: false,
       note: '参考分割',
       segments: fallbackSegments,
-      style: undefined,
+      boundaries: fallbackBoundaries.map((top, index) => ({
+        id: ['top', 'brow', 'nose', 'chin'][index],
+        label: ['额顶', '眉心', '鼻底', '下巴'][index],
+        top,
+      })),
     }
   }
 
   const threePart = faceRatio.measurements?.three_part || {}
-  const rows = []
-  const segments = [
-    ['upper', '上庭', '上庭均衡'],
-    ['middle', '中庭', '中庭均衡'],
-    ['lower', '下庭', '下庭均衡'],
-  ].map(([key, label, fallback]) => {
+  const guidePoints = faceRatio.measurements?.three_part_guides || {}
+  const pointBoundaries = [
+    ['forehead_top', '发际线'],
+    ['brow_center', '眉心'],
+    ['nose_base', '鼻底'],
+    ['chin', '下巴'],
+  ].map(([key, fallbackLabel]) => ({
+    id: key,
+    label: guidePoints[key]?.label || fallbackLabel,
+    top: mapImageYToFramePercent(guidePoints[key], imageLayout),
+  }))
+  const hasMappedPoints = pointBoundaries.every((item, index, arr) => (
+    Number.isFinite(item.top)
+    && (index === 0 || item.top > arr[index - 1].top)
+  ))
+  const boundaryTops = hasMappedPoints
+    ? pointBoundaries.map(item => item.top)
+    : buildShareBasedBoundaries(faceRatio)
+  const boundaries = pointBoundaries.map((item, index) => ({
+    ...item,
+    top: boundaryTops[index],
+  }))
+  const sourceMode = hasMappedPoints ? 'photo_points' : 'ratio_fallback'
+  const segmentDefs = [
+    ['upper', '上庭', '上庭均衡', 0, 1],
+    ['middle', '中庭', '中庭均衡', 1, 2],
+    ['lower', '下庭', '下庭均衡', 2, 3],
+  ]
+  const segments = segmentDefs.map(([key, label, fallback, startIndex, endIndex]) => {
     const item = threePart[key] || {}
-    const share = Number(item.share)
-    const rowShare = Number.isFinite(share) && share > 0 ? share : 1 / 3
-    rows.push(`${Math.max(1, Math.round(rowShare * 1000))}fr`)
-
+    const center = (boundaryTops[startIndex] + boundaryTops[endIndex]) / 2
     return {
       id: key,
       label: item.label || label,
       percent: formatRatioPercent(item.share),
       status: item.status || getPrimaryRatioTag(faceRatio, tag => tag.startsWith(label), fallback),
+      top: clampPercent(center, 4, 96),
     }
   })
   const upper = threePart.upper || {}
@@ -259,10 +318,12 @@ function buildMirrorGuideOverlay(faceRatio) {
 
   return {
     measured: true,
-    approx: !hairlineMeasured,
-    note: hairlineMeasured ? '发际线实测分割' : '额上部近似分割',
+    approx: !hairlineMeasured || sourceMode !== 'photo_points',
+    note: sourceMode === 'photo_points'
+      ? (hairlineMeasured ? '按照片关键点定位' : '额上部近似定位')
+      : '按比例回退定位',
+    boundaries,
     segments,
-    style: { gridTemplateRows: rows.join(' ') },
   }
 }
 
@@ -323,6 +384,9 @@ export default function Tutorial() {
   const [toast, setToast] = useState(null)
   const [timeId, setTimeId] = useState('daily')
   const [sceneId, setSceneId] = useState('commute')
+  const [mirrorImageLayout, setMirrorImageLayout] = useState(null)
+  const facePreviewFrameRef = useRef(null)
+  const facePreviewImageRef = useRef(null)
   const faceCameraRef = useRef(null)
   const faceAlbumRef = useRef(null)
 
@@ -338,6 +402,73 @@ export default function Tutorial() {
     }
   }, [facePhotoPreview])
 
+  const refreshMirrorImageLayout = () => {
+    const frame = facePreviewFrameRef.current
+    const image = facePreviewImageRef.current
+
+    if (!frame || !image || !image.naturalWidth || !image.naturalHeight) {
+      setMirrorImageLayout(null)
+      return
+    }
+
+    const width = frame.clientWidth
+    const height = frame.clientHeight
+    if (!width || !height) {
+      setMirrorImageLayout(null)
+      return
+    }
+
+    const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight)
+    const renderedWidth = image.naturalWidth * scale
+    const renderedHeight = image.naturalHeight * scale
+    const nextLayout = {
+      width,
+      height,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      scale,
+      offsetX: (width - renderedWidth) / 2,
+      offsetY: (height - renderedHeight) / 2,
+    }
+
+    setMirrorImageLayout(prev => {
+      if (
+        prev
+        && Math.abs(prev.width - nextLayout.width) < 0.5
+        && Math.abs(prev.height - nextLayout.height) < 0.5
+        && Math.abs(prev.naturalWidth - nextLayout.naturalWidth) < 0.5
+        && Math.abs(prev.naturalHeight - nextLayout.naturalHeight) < 0.5
+        && Math.abs(prev.offsetY - nextLayout.offsetY) < 0.5
+      ) {
+        return prev
+      }
+      return nextLayout
+    })
+  }
+
+  useEffect(() => {
+    if (!facePhotoPreview) {
+      setMirrorImageLayout(null)
+      return undefined
+    }
+
+    const frame = facePreviewFrameRef.current
+    const rafId = window.requestAnimationFrame(refreshMirrorImageLayout)
+    let observer = null
+
+    if (typeof ResizeObserver !== 'undefined' && frame) {
+      observer = new ResizeObserver(refreshMirrorImageLayout)
+      observer.observe(frame)
+    }
+
+    window.addEventListener('resize', refreshMirrorImageLayout)
+    return () => {
+      window.cancelAnimationFrame(rafId)
+      window.removeEventListener('resize', refreshMirrorImageLayout)
+      observer?.disconnect()
+    }
+  }, [facePhotoPreview])
+
   const activeGuide = useMemo(
     () => buildGuide(timeId, sceneId, products),
     [timeId, sceneId, products],
@@ -347,7 +478,7 @@ export default function Tutorial() {
   const ratioTips = faceRatio?.makeup_tips?.slice(0, 3) || []
   const ratioReferenceRows = useMemo(() => buildRatioReferenceRows(faceRatio), [faceRatio])
   const threePartSegments = useMemo(() => buildThreePartSegments(faceRatio), [faceRatio])
-  const mirrorGuideOverlay = useMemo(() => buildMirrorGuideOverlay(faceRatio), [faceRatio])
+  const mirrorGuideOverlay = useMemo(() => buildMirrorGuideOverlay(faceRatio, mirrorImageLayout), [faceRatio, mirrorImageLayout])
   const ratioMetricCards = useMemo(() => buildRatioMetricCards(faceRatio), [faceRatio])
   const videoRecommendations = useMemo(
     () => buildVideoRecommendations(faceRatio, activeGuide),
@@ -480,13 +611,19 @@ export default function Tutorial() {
             </span>
             <img className="bm-mirror-ip-sticker" src={tutorialRatioWitchSticker} alt="" aria-hidden="true" />
             <button
+              ref={facePreviewFrameRef}
               type="button"
               className={`bm-face-ratio-drop bm-mirror-photo${facePhotoPreview ? ' has-photo' : ''}`}
               onClick={() => faceCameraRef.current?.click()}
               disabled={analyzingFaceRatio}
             >
               {facePhotoPreview ? (
-                <img src={facePhotoPreview} alt="面部比例分析预览" />
+                <img
+                  ref={facePreviewImageRef}
+                  src={facePhotoPreview}
+                  alt="面部比例分析预览"
+                  onLoad={refreshMirrorImageLayout}
+                />
               ) : (
                 <span className="bm-mirror-placeholder">
                   <Camera size={26} strokeWidth={1.6} />
@@ -496,11 +633,20 @@ export default function Tutorial() {
               )}
               <span
                 className={`bm-mirror-guide-lines${mirrorGuideOverlay.measured ? ' is-measured' : ''}${mirrorGuideOverlay.approx ? ' is-approx' : ''}`}
-                style={mirrorGuideOverlay.style}
                 aria-hidden="true"
               >
+                {mirrorGuideOverlay.boundaries.map(boundary => (
+                  <i
+                    className="bm-mirror-guide-boundary"
+                    key={boundary.id}
+                    style={{ top: `${boundary.top}%` }}
+                    title={boundary.label}
+                  >
+                    <span>{boundary.label}</span>
+                  </i>
+                ))}
                 {mirrorGuideOverlay.segments.map(segment => (
-                  <b key={segment.id} title={segment.status}>
+                  <b key={segment.id} style={{ top: `${segment.top}%` }} title={segment.status}>
                     <span>{segment.label}</span>
                     <em>{segment.percent}</em>
                   </b>

@@ -363,6 +363,30 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
         )
 
         upper_status = _segment_label('上庭', upper_norm) if hairline_available else '发际线不可见，暂不判断'
+        three_part_guides = {
+            'forehead_top': {
+                'label': '发际线' if hairline_available else '额上部',
+                'y': _round(points['forehead_top'][1], 1),
+                'y_norm': _round(_safe_ratio(points['forehead_top'][1], height), 4),
+                'source': upper_source,
+                'hairline_available': hairline_available,
+            },
+            'brow_center': {
+                'label': '眉心',
+                'y': _round(points['brow_center'][1], 1),
+                'y_norm': _round(_safe_ratio(points['brow_center'][1], height), 4),
+            },
+            'nose_base': {
+                'label': '鼻底',
+                'y': _round(points['nose_base'][1], 1),
+                'y_norm': _round(_safe_ratio(points['nose_base'][1], height), 4),
+            },
+            'chin': {
+                'label': '下巴',
+                'y': _round(points['chin'][1], 1),
+                'y_norm': _round(_safe_ratio(points['chin'][1], height), 4),
+            },
+        }
         primary_tags = [
             *([upper_status] if hairline_available else []),
             _segment_label('中庭', middle_norm),
@@ -441,6 +465,7 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
                         'status': _segment_label('下庭', lower_norm),
                     },
                 },
+                'three_part_guides': three_part_guides,
                 'five_eye': {
                     'left_eye_width': _round(left_eye_width, 1),
                     'right_eye_width': _round(right_eye_width, 1),
