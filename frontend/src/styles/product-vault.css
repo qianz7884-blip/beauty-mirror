@@ -5522,6 +5522,20 @@ body {
   line-height: 1.35;
 }
 
+.bm-face-ratio-quality-alert button {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(209, 148, 91, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #75501f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
 .bm-ratio-metric-strip {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

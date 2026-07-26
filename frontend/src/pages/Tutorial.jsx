@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { analyzeFaceRatio, fetchProducts } from '../api'
 import { usePageBackground } from '../utils/backgroundSettings'
+import { compressPhoto } from '../utils/skinAnalysisView'
 import tutorialRatioWitchSticker from '../assets/illustrations/beauty-mirror-ip/tutorial-ratio-witch-sticker.png'
 
 const TIME_OPTIONS = [
@@ -220,6 +221,8 @@ function buildThreePartSegments(faceRatio) {
   if (!faceRatio?.ok) return []
 
   const threePart = faceRatio.measurements?.three_part || {}
+  if (threePart.upper?.hairline_available !== true) return []
+
   return [
     ['upper', '上庭', '上庭均衡'],
     ['middle', '中庭', '中庭均衡'],
@@ -443,6 +446,8 @@ function buildMirrorGuideOverlay(faceRatio, imageLayout) {
     top: boundaryTops[index],
   }))
   const sourceMode = hasMappedPoints ? 'photo_points' : 'ratio_fallback'
+  const upper = threePart.upper || {}
+  const hairlineMeasured = upper.hairline_available === true
   const segmentDefs = [
     ['upper', '上庭', '上庭均衡', 0, 1],
     ['middle', '中庭', '中庭均衡', 1, 2],
@@ -459,30 +464,37 @@ function buildMirrorGuideOverlay(faceRatio, imageLayout) {
       top: clampPercent(center, 4, 96),
     }
   })
-  const upper = threePart.upper || {}
-  const hairlineMeasured = upper.hairline_available === true
+  const visibleBoundaries = hairlineMeasured
+    ? boundaries
+    : boundaries.filter(boundary => boundary.id !== 'forehead_top')
+  const visibleSegments = hairlineMeasured
+    ? segments
+    : segments.filter(segment => segment.id !== 'upper')
   const fiveEye = buildFiveEyeOverlay(faceRatio, imageLayout)
   const firstEyeBoundary = fiveEye.boundaries[0]
   const lastEyeBoundary = fiveEye.boundaries[fiveEye.boundaries.length - 1]
   const horizontalRange = buildPaddedPercentRange(firstEyeBoundary?.left, lastEyeBoundary?.left, 7, 3, 97, 34) || [7, 93]
-  const verticalRange = buildPaddedPercentRange(boundaryTops[0], boundaryTops[3], 7, 3, 97, 42) || [12, 88]
+  const verticalRange = hairlineMeasured
+    ? buildPaddedPercentRange(boundaryTops[0], boundaryTops[3], 7, 3, 97, 42)
+    : buildPaddedPercentRange(boundaryTops[1], boundaryTops[3], 8, 3, 97, 38)
+  const safeVerticalRange = verticalRange || [12, 88]
   const guideStyle = {
     '--bm-guide-left': `${horizontalRange[0]}%`,
     '--bm-guide-right': `${100 - horizontalRange[1]}%`,
-    '--bm-guide-eye-top': `${verticalRange[0]}%`,
-    '--bm-guide-eye-bottom': `${100 - verticalRange[1]}%`,
+    '--bm-guide-eye-top': `${safeVerticalRange[0]}%`,
+    '--bm-guide-eye-bottom': `${100 - safeVerticalRange[1]}%`,
   }
 
   return {
     measured: true,
     approx: !hairlineMeasured || sourceMode !== 'photo_points',
     note: sourceMode === 'photo_points'
-      ? (hairlineMeasured ? '按照片关键点定位' : '额上部近似定位')
-      : '按比例回退定位',
-    boundaries,
+      ? (hairlineMeasured ? '按照片关键点定位' : '发际线未识别')
+      : (hairlineMeasured ? '按比例回退定位' : '发际线未识别'),
+    boundaries: visibleBoundaries,
     fiveEye,
     style: guideStyle,
-    segments,
+    segments: visibleSegments,
   }
 }
 
@@ -498,13 +510,19 @@ function buildRatioMetricCards(faceRatio) {
   const measurements = faceRatio.measurements || {}
   const threePart = measurements.three_part || {}
   const fiveEye = measurements.five_eye || {}
+  const hasHairline = threePart.upper?.hairline_available === true
   const usefulTags = getUsefulRatioTags(faceRatio)
   const direction = usefulTags[0] || faceRatio.primary_tags?.[0] || '整体比例接近均衡'
-  const threeValues = [
-    `上 ${formatRatioNumber(threePart.upper?.normalized)}`,
-    `中 ${formatRatioNumber(threePart.middle?.normalized)}`,
-    `下 ${formatRatioNumber(threePart.lower?.normalized)}`,
-  ].join(' · ')
+  const threeValues = hasHairline
+    ? [
+      `上 ${formatRatioNumber(threePart.upper?.normalized)}`,
+      `中 ${formatRatioNumber(threePart.middle?.normalized)}`,
+      `下 ${formatRatioNumber(threePart.lower?.normalized)}`,
+    ].join(' · ')
+    : [
+      `中 ${formatRatioNumber(threePart.middle?.normalized)}`,
+      `下 ${formatRatioNumber(threePart.lower?.normalized)}`,
+    ].join(' · ')
   const eyeSpacingRatio = formatRatioNumber(fiveEye.eye_spacing_ratio)
   const faceEyeCount = formatRatioNumber(fiveEye.face_eye_count)
 
@@ -521,7 +539,7 @@ function buildRatioMetricCards(faceRatio) {
       icon: '三',
       label: '三庭',
       value: threeValues.includes('--') ? '参考已生成' : threeValues,
-      helper: '参考区间 0.88-1.12',
+      helper: hasHairline ? '参考区间 0.88-1.12' : '发际线未识别，上庭未判断',
     },
     {
       id: 'five',
@@ -636,6 +654,10 @@ export default function Tutorial() {
   const displayedRatioTags = (getUsefulRatioTags(faceRatio).length ? getUsefulRatioTags(faceRatio) : faceRatio?.ratio_tags || []).slice(0, 5)
   const ratioTips = faceRatio?.makeup_tips?.slice(0, 3) || []
   const ratioQualityFlags = faceRatio?.quality_flags || []
+  const needsHairlineRetake = faceRatio?.measurements?.three_part?.upper?.hairline_available === false
+  const ratioRetakeMessages = ratioQualityFlags.length > 0
+    ? ratioQualityFlags
+    : needsHairlineRetake ? ['请露出额头和发际线后重拍'] : []
   const ratioReferenceRows = useMemo(() => buildRatioReferenceRows(faceRatio), [faceRatio])
   const threePartSegments = useMemo(() => buildThreePartSegments(faceRatio), [faceRatio])
   const mirrorGuideOverlay = useMemo(() => buildMirrorGuideOverlay(faceRatio, mirrorImageLayout), [faceRatio, mirrorImageLayout])
@@ -665,8 +687,9 @@ export default function Tutorial() {
     event.target.value = ''
 
     try {
+      const analysisFile = await compressPhoto(file, 1024)
       const formData = new FormData()
-      formData.append('photo', file)
+      formData.append('photo', analysisFile)
       const data = await analyzeFaceRatio(formData)
       const nextRatio = data.face_ratio
 
@@ -677,7 +700,11 @@ export default function Tutorial() {
       setFaceRatio(nextRatio)
       showToast('已生成视频推荐方向')
     } catch (error) {
-      setFaceRatioError(error.response?.data?.message || error.response?.data?.error || error.message || '面部比例分析失败')
+      if (error.code === 'ECONNABORTED') {
+        setFaceRatioError('分析超时了。请换一张更清晰的正脸照，或稍后重试；第一次加载模型会更慢。')
+      } else {
+        setFaceRatioError(error.response?.data?.message || error.response?.data?.error || error.message || '面部比例分析失败')
+      }
     } finally {
       setAnalyzingFaceRatio(false)
     }
@@ -894,12 +921,17 @@ export default function Tutorial() {
           <div className="bm-face-ratio-info bm-mirror-result-info">
             {faceRatio?.ok ? (
               <>
-                {ratioQualityFlags.length > 0 && (
+                {ratioRetakeMessages.length > 0 && (
                   <div className="bm-face-ratio-quality-alert">
-                    <strong>建议重拍正脸照</strong>
-                    {ratioQualityFlags.map(flag => (
+                    <strong>{needsHairlineRetake ? '发际线未识别，建议重拍' : '建议重拍正脸照'}</strong>
+                    {ratioRetakeMessages.map(flag => (
                       <span key={flag}>{flag}</span>
                     ))}
+                    {needsHairlineRetake && (
+                      <button type="button" onClick={() => faceCameraRef.current?.click()}>
+                        重新拍照
+                      </button>
+                    )}
                   </div>
                 )}
                 <p className="bm-face-ratio-summary">{faceRatio.summary}</p>
@@ -948,7 +980,7 @@ export default function Tutorial() {
               </>
             ) : (
               <>
-                <p className="bm-face-ratio-note">三庭结果是关键点近似，不代表绝对脸型，只用于匹配教程方向。</p>
+                <p className="bm-face-ratio-note">发际线清晰时才判断上庭；识别不到时只用中庭、下庭和五眼匹配教程方向。</p>
                 {faceRatioError && <p className="bm-face-ratio-error">{faceRatioError}</p>}
               </>
             )}

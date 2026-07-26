@@ -4,7 +4,7 @@
 基于 MediaPipe Face Landmarker 输出的归一化关键点，计算适合妆容推荐使用的
 面部比例标签。这里刻意使用「倾向」而不是绝对脸型/审美判断：
 
-- 三庭需要真实发际线，MediaPipe 无法稳定拿到发际线，所以只做上庭近似。
+- 三庭需要真实发际线；发际线不可见时，上庭不参与判断。
 - 五眼基于眼角和脸颊外缘关键点估算，照片角度、镜头畸变和表情都会影响结果。
 - 输出用于妆容教程匹配，不用于身份识别、医学判断或审美打分。
 """
@@ -397,7 +397,7 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
         }
         three_part_guides = {
             'forehead_top': {
-                'label': '发际线' if hairline_available else '额上部',
+                'label': '发际线' if hairline_available else '发际线未识别',
                 'y': _round(points['forehead_top'][1], 1),
                 'y_norm': _round(_safe_ratio(points['forehead_top'][1], height), 4),
                 'source': upper_source,
@@ -435,6 +435,8 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
         ] or ['面部比例整体均衡']
 
         quality_flags, pose_metrics = _quality_flags(points, face_height, face_width)
+        if not hairline_available:
+            quality_flags.insert(0, '未识别到清晰发际线，请露出额头和发际线后重拍')
         makeup_tips = _make_tips(primary_tags)
 
         technique_tags = []
@@ -473,7 +475,7 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
             'measurements': {
                 'three_part': {
                     'upper': {
-                        'label': '上庭' if hairline_available else '额上部近似',
+                        'label': '上庭' if hairline_available else '发际线未识别',
                         'pixels': _round(upper, 1),
                         'share': _round(_safe_ratio(upper, three_total)),
                         'normalized': _round(upper_norm),

@@ -103,7 +103,7 @@ export function analyzeSkin(formData) {
 }
 
 export function analyzeFaceRatio(formData) {
-  return api.post('/face-ratio-analysis', formData, { timeout: 45000 }).then(r => r.data)
+  return api.post('/face-ratio-analysis', formData, { timeout: 90000 }).then(r => r.data)
 }
 
 // ==================== Dashboard ====================

@@ -4,7 +4,7 @@ import threading
 from flask import Blueprint, current_app, jsonify, request
 
 from models import SkinAnalysis, db
-from skin_analyzer import analyze_skin, detect_face
+from skin_analyzer import _prepare_analysis_image_bytes, analyze_skin, detect_face
 from upload_utils import delete_photo, save_photo_bytes
 
 from .common import error, get_current_user_id
@@ -34,7 +34,8 @@ def face_ratio_analysis():
         return error('请上传一张正面面部照片')
 
     image_bytes = photo_file.read()
-    has_face, face_info = detect_face(image_bytes)
+    analysis_image_bytes, analysis_meta = _prepare_analysis_image_bytes(image_bytes)
+    has_face, face_info = detect_face(analysis_image_bytes)
     if not has_face:
         return jsonify({
             'success': False,
@@ -47,7 +48,7 @@ def face_ratio_analysis():
     face_ratio = analyze_face_ratios(
         face_info['landmarks'],
         face_info['image_size'],
-        image_bytes=image_bytes,
+        image_bytes=analysis_image_bytes,
     )
     face_data = face_info.get('face_data', {})
     if isinstance(face_data, dict):
@@ -58,6 +59,7 @@ def face_ratio_analysis():
         'face_ratio': face_ratio,
         'face_data': face_data,
         'image_size': face_info.get('image_size'),
+        'analysis_meta': analysis_meta,
     })
 
 
