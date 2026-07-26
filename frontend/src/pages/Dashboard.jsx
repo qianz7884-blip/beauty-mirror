@@ -9,14 +9,14 @@ import RecognizePanel from '../components/RecognizePanel'
 import SkinAnalysisPanel from '../components/SkinAnalysisPanel'
 import { getAllCategories } from '../categories'
 import { usePageBackground } from '../utils/backgroundSettings'
-import weatherCloudy from '../assets/illustrations/weather/weather-cloudy.png'
-import weatherFog from '../assets/illustrations/weather/weather-fog.png'
-import weatherPartly from '../assets/illustrations/weather/weather-partly.png'
-import weatherRain from '../assets/illustrations/weather/weather-rain.png'
-import weatherSnow from '../assets/illustrations/weather/weather-snow.png'
-import weatherStorm from '../assets/illustrations/weather/weather-storm.png'
-import weatherSunny from '../assets/illustrations/weather/weather-sunny.png'
-import todayAdviceIllustration from '../assets/illustrations/beauty-mirror-ip/today-advice-card-cutout.png'
+import weatherCloudy from '../assets/illustrations/weather/weather-cloudy.webp'
+import weatherFog from '../assets/illustrations/weather/weather-fog.webp'
+import weatherPartly from '../assets/illustrations/weather/weather-partly.webp'
+import weatherRain from '../assets/illustrations/weather/weather-rain.webp'
+import weatherSnow from '../assets/illustrations/weather/weather-snow.webp'
+import weatherStorm from '../assets/illustrations/weather/weather-storm.webp'
+import weatherSunny from '../assets/illustrations/weather/weather-sunny.webp'
+import todayAdviceIllustration from '../assets/illustrations/beauty-mirror-ip/today-advice-card-cutout.webp'
 
 function TodayAction({ icon: Icon, title, desc, onClick, variant = 'secondary' }) {
   return (
@@ -387,7 +387,7 @@ export default function Dashboard() {
         <h1>今天要去哪？</h1>
         <div className="bm-privacy">
           <ShieldCheck size={15} strokeWidth={1.8} />
-          <span>面部图像默认本地处理</span>
+          <span>照片上传后端分析 · 原图不发送给 Gemini</span>
         </div>
       </section>
 

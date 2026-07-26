@@ -13,6 +13,8 @@ backend/test_*.jpg
 backend/models/face_parsing_*.onnx
 backend/debug_roi/
 backend/debug_heatmap/
+backend/calibration_images/
+backend/calibration_report*.json
 backend/knowledge_base/chroma_data/
 backend/instance/
 backend/uploads/products/*

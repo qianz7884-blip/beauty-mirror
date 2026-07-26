@@ -11,6 +11,10 @@ services:
         value: gemini-2.5-flash
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
       - key: ROI_FEATURE_BUDGET_MS
         value: 2500
       - key: ROI_FEATURE_MAX_SIDE

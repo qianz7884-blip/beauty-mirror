@@ -15,10 +15,17 @@ import {
   Sun,
   Video,
 } from 'lucide-react'
-import { analyzeFaceRatio, fetchProducts } from '../api'
+import {
+  analyzeFaceRatio,
+  fetchLatestFaceRatio,
+  fetchProducts,
+  getPhotoUrl,
+} from '../api'
 import { usePageBackground } from '../utils/backgroundSettings'
 import { compressPhoto } from '../utils/skinAnalysisView'
-import tutorialRatioWitchSticker from '../assets/illustrations/beauty-mirror-ip/tutorial-ratio-witch-sticker.png'
+import tutorialRatioWitchSticker from '../assets/illustrations/beauty-mirror-ip/tutorial-ratio-witch-sticker.webp'
+
+const FACE_RATIO_CACHE_KEY = 'beauty_mirror_latest_face_ratio'
 
 const TIME_OPTIONS = [
   { id: 'quick', label: '5分钟救急', minutes: 5, keywords: '快速出门妆 懒人淡妆' },
@@ -556,6 +563,8 @@ export default function Tutorial() {
   const [products, setProducts] = useState([])
   const [facePhotoPreview, setFacePhotoPreview] = useState('')
   const [faceRatio, setFaceRatio] = useState(null)
+  const [faceRatioSource, setFaceRatioSource] = useState('')
+  const [faceRatioCreatedAt, setFaceRatioCreatedAt] = useState('')
   const [faceRatioError, setFaceRatioError] = useState('')
   const [analyzingFaceRatio, setAnalyzingFaceRatio] = useState(false)
   const [toast, setToast] = useState(null)
@@ -569,6 +578,34 @@ export default function Tutorial() {
 
   useEffect(() => {
     fetchProducts().then(setProducts).catch(() => setProducts([]))
+
+    const restoreCachedRatio = () => {
+      try {
+        const cached = JSON.parse(localStorage.getItem(FACE_RATIO_CACHE_KEY) || 'null')
+        if (cached?.face_ratio?.ok) {
+          setFaceRatio(cached.face_ratio)
+          setFaceRatioSource('tutorial_cache')
+          setFaceRatioCreatedAt(cached.created_at || '')
+        }
+      } catch {
+        // 没有可复用记录时保持初始拍照状态。
+      }
+    }
+
+    fetchLatestFaceRatio()
+      .then((data) => {
+        if (!data?.has_result || !data.face_ratio?.ok) {
+          restoreCachedRatio()
+          return
+        }
+        setFaceRatio(data.face_ratio)
+        setFaceRatioSource('skin_analysis')
+        setFaceRatioCreatedAt(data.created_at || '')
+        if (data.photo) {
+          setFacePhotoPreview(getPhotoUrl(data.photo, 'skin'))
+        }
+      })
+      .catch(restoreCachedRatio)
   }, [])
 
   useEffect(() => {
@@ -682,6 +719,8 @@ export default function Tutorial() {
 
     setFacePhotoPreview(URL.createObjectURL(file))
     setFaceRatio(null)
+    setFaceRatioSource('')
+    setFaceRatioCreatedAt('')
     setFaceRatioError('')
     setAnalyzingFaceRatio(true)
     event.target.value = ''
@@ -698,6 +737,22 @@ export default function Tutorial() {
       }
 
       setFaceRatio(nextRatio)
+      setFaceRatioSource('tutorial_photo')
+      const createdAt = new Date().toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+      setFaceRatioCreatedAt(createdAt)
+      try {
+        localStorage.setItem(FACE_RATIO_CACHE_KEY, JSON.stringify({
+          face_ratio: nextRatio,
+          created_at: createdAt,
+        }))
+      } catch {
+        // 浏览器禁用本地存储时，本次结果仍可正常使用。
+      }
       showToast('已生成视频推荐方向')
     } catch (error) {
       if (error.code === 'ECONNABORTED') {
@@ -716,6 +771,8 @@ export default function Tutorial() {
     }
     setFacePhotoPreview('')
     setFaceRatio(null)
+    setFaceRatioSource('')
+    setFaceRatioCreatedAt('')
     setFaceRatioError('')
     setAnalyzingFaceRatio(false)
   }
@@ -810,6 +867,11 @@ export default function Tutorial() {
                   src={facePhotoPreview}
                   alt="面部比例分析预览"
                   onLoad={refreshMirrorImageLayout}
+                  onError={() => {
+                    if (!facePhotoPreview.startsWith('blob:')) {
+                      setFacePhotoPreview('')
+                    }
+                  }}
                 />
               ) : (
                 <span className="bm-mirror-placeholder">
@@ -921,6 +983,16 @@ export default function Tutorial() {
           <div className="bm-face-ratio-info bm-mirror-result-info">
             {faceRatio?.ok ? (
               <>
+                <div className="bm-face-ratio-status">
+                  <span>
+                    {faceRatioSource === 'skin_analysis'
+                      ? '已读取最近一次镜前检测'
+                      : faceRatioSource === 'tutorial_cache'
+                        ? '已恢复上次教程分析'
+                        : '本次教程页分析'}
+                  </span>
+                  {faceRatioCreatedAt && <span>{faceRatioCreatedAt}</span>}
+                </div>
                 {ratioRetakeMessages.length > 0 && (
                   <div className="bm-face-ratio-quality-alert">
                     <strong>{needsHairlineRetake ? '发际线未识别，建议重拍' : '建议重拍正脸照'}</strong>

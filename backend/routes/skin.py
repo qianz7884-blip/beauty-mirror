@@ -136,6 +136,40 @@ def skin_analyses_list():
     return jsonify([record.to_dict() for record in records])
 
 
+@skin_bp.route('/skin-analyses/latest-face-ratio')
+def latest_face_ratio():
+    """Return the newest reusable face-ratio result without the heavy heatmap payload."""
+    records = (
+        _user_skin_analyses_query()
+        .order_by(SkinAnalysis.created_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    for record in records:
+        face_ratio = record.get_face_data().get('face_ratio')
+        if isinstance(face_ratio, dict) and face_ratio.get('ok'):
+            return jsonify({
+                'has_result': True,
+                'analysis_id': record.id,
+                'photo': record.photo,
+                'face_ratio': face_ratio,
+                'created_at': (
+                    record.created_at.strftime('%Y-%m-%d %H:%M')
+                    if record.created_at
+                    else ''
+                ),
+            })
+
+    return jsonify({
+        'has_result': False,
+        'analysis_id': None,
+        'photo': '',
+        'face_ratio': None,
+        'created_at': '',
+    })
+
+
 @skin_bp.route('/skin-analyses/<int:sid>')
 def skin_analysis_detail(sid):
     record = _user_skin_analyses_query().filter(SkinAnalysis.id == sid).first()

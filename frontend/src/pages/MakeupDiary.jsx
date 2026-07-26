@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { usePageBackground } from '../utils/backgroundSettings'
 import { MOOD_OPTIONS, getMoodInfo } from '../utils/moods'
-import diaryEmptyIllustration from '../assets/illustrations/beauty-mirror-ip/diary-empty-resting.png'
+import diaryEmptyIllustration from '../assets/illustrations/beauty-mirror-ip/diary-empty-resting.webp'
 
 const HEATMAP_WEEKDAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const HEATMAP_MIN_WEEKS = 24

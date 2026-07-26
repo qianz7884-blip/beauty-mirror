@@ -47,6 +47,14 @@ body {
     linear-gradient(180deg, #eef8ff 0%, #f7fbfd 42%, #edf6fb 100%);
 }
 
+.bm-route-loading {
+  min-height: calc(100dvh - var(--tab-bar-h, 72px));
+  display: grid;
+  place-items: center;
+  color: #5b7790;
+  font-size: 14px;
+}
+
 button,
 input,
 textarea,
@@ -1180,4 +1188,3 @@ select.form-input {
 /* ============================
    肤质分析面板
    ============================ */
-

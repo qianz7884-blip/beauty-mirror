@@ -16,8 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# ── 先 COPY 代码，再安装依赖（代码变更 = 缓存失效） ────────────
-COPY . .
+# ── 先复制依赖清单，普通代码变更可复用依赖安装层 ──────────────
+COPY requirements.txt .
 
 # ── 安装 Python 依赖 ──────────────────────────────────────────
 # 关键：先装 headless OpenCV（零 GL 依赖），再装其他依赖时排除 mediapipe，
@@ -26,6 +26,9 @@ RUN pip install --no-cache-dir opencv-contrib-python-headless \
     && grep -v "^mediapipe" requirements.txt > /tmp/reqs_no_mp.txt \
     && pip install --no-cache-dir -r /tmp/reqs_no_mp.txt \
     && pip install --no-cache-dir --no-deps mediapipe
+
+# ── 最后复制应用代码 ──────────────────────────────────────────
+COPY . .
 
 # ── 强制 MediaPipe 使用 CPU + 无头 EGL ─────────────────────────
 ENV MEDIAPIPE_DISABLE_GPU=1 \

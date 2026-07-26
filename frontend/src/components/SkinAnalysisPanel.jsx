@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { SkinHistoryGallery, SkinHistoryList } from './SkinHistoryViews'
 import { buildMirrorAdviceCards, buildStatusSummary, compressPhoto } from '../utils/skinAnalysisView'
-import mirrorAdviceIllustration from '../assets/illustrations/beauty-mirror-ip/mirror-advice-handmirror.png'
+import mirrorAdviceIllustration from '../assets/illustrations/beauty-mirror-ip/mirror-advice-handmirror.webp'
 
 function getLocalDateKey(date = new Date()) {
   const year = date.getFullYear()
@@ -397,7 +397,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
               请拍摄清晰的面部正面照，确保光线充足
             </p>
             <div className="privacy-hint">
-              面部图像默认本地处理，建议仅用于当前妆容辅助。
+              照片会上传到后端完成面部与 ROI 分析，原图不发送给 Gemini；结果仅作妆容和护理参考。
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => cameraRef.current?.click()}>

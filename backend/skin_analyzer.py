@@ -4,7 +4,7 @@
 功能：
     1. MediaPipe Face Landmarker 面部检测
     2. 8 区域 ROI 裁剪（前额/脸颊/鼻子/下巴/眼周/唇周）
-    3. ChromaDB RAG 知识检索增强分析精度
+    3. 本地 JSON 轻量 RAG 检索参考知识
     4. Gemini Vision 多图分区肤质分析
     5. matplotlib 面部热点图生成
 
