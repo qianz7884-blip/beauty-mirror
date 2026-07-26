@@ -1,36 +1,49 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Briefcase,
+  AlertCircle,
   Camera,
+  CheckCircle2,
   ChevronRight,
   Clock3,
   Copy,
   ExternalLink,
   Image as ImageIcon,
   Loader2,
-  Moon,
   Package,
+  Play,
   RotateCcw,
+  ScanFace,
   Sparkles,
   Sun,
   Video,
 } from 'lucide-react'
 import {
   analyzeFaceRatio,
+  completeTutorialPlan,
+  createTutorialPlan,
+  fetchLatestTutorialPlan,
   fetchLatestFaceRatio,
   fetchProducts,
+  fetchSkinAnalysis,
+  fetchTutorialRecommendations,
+  getAnonymousUserId,
   getPhotoUrl,
 } from '../api'
 import { usePageBackground } from '../utils/backgroundSettings'
 import { compressPhoto } from '../utils/skinAnalysisView'
 import tutorialRatioWitchSticker from '../assets/illustrations/beauty-mirror-ip/tutorial-ratio-witch-sticker.webp'
+import tutorialCommuteCover from '../assets/illustrations/tutorial-covers/tutorial-commute.webp'
+import tutorialBrightCover from '../assets/illustrations/tutorial-covers/tutorial-bright.webp'
+import tutorialEveningCover from '../assets/illustrations/tutorial-covers/tutorial-evening.webp'
 
 const FACE_RATIO_CACHE_KEY = 'beauty_mirror_latest_face_ratio'
+const WEATHER_CACHE_KEY = 'beauty_mirror_today_weather_v2'
 
 const TIME_OPTIONS = [
-  { id: 'quick', label: '5分钟救急', minutes: 5, keywords: '快速出门妆 懒人淡妆' },
-  { id: 'daily', label: '15分钟日常', minutes: 15, keywords: '通勤妆 自然精致妆' },
-  { id: 'complete', label: '30分钟完整', minutes: 30, keywords: '完整妆容 约会拍照妆' },
+  { id: 'quick', label: '5分钟', minutes: 5, keywords: '快速出门妆 懒人淡妆' },
+  { id: 'daily', label: '15分钟', minutes: 15, keywords: '通勤妆 自然精致妆' },
+  { id: 'complete', label: '30分钟', minutes: 30, keywords: '完整妆容 约会拍照妆' },
 ]
 
 const PHOTO_CAPTURE_TIPS = [
@@ -53,27 +66,33 @@ const VIDEO_PLATFORMS = [
   },
 ]
 
+const TUTORIAL_COVERS = [
+  tutorialCommuteCover,
+  tutorialBrightCover,
+  tutorialEveningCover,
+]
+
 const SCENES = [
   {
     id: 'commute',
-    label: '通勤前',
-    title: '快速出门教程',
+    label: '通勤',
+    title: '通勤清透妆',
     icon: Sun,
-    focus: '自然、干净、减少步骤',
+    focus: '自然干净，减少步骤',
   },
   {
     id: 'office',
-    label: '办公室光',
-    title: '自然精致教程',
-    icon: Briefcase,
-    focus: '底妆清透、边界干净',
+    label: '约会',
+    title: '柔和约会妆',
+    icon: Sparkles,
+    focus: '柔和提气色，细节精致',
   },
   {
     id: 'evening',
-    label: '晚间出门',
-    title: '完整氛围教程',
-    icon: Moon,
-    focus: '加强层次、但不过度',
+    label: '拍照',
+    title: '上镜立体妆',
+    icon: Camera,
+    focus: '加强轮廓，镜头下更立体',
   },
 ]
 
@@ -81,6 +100,20 @@ const PRODUCT_PRIORITY = {
   commute: ['防晒', '底妆', '眉眼', '唇妆'],
   office: ['底妆', '遮瑕', '定妆', '眉眼', '唇妆'],
   evening: ['底妆', '遮瑕', '眉眼', '腮红修容', '唇妆'],
+}
+
+function readCachedWeather() {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const cached = JSON.parse(localStorage.getItem(WEATHER_CACHE_KEY) || 'null')
+    return cached?.weather && typeof cached.weather === 'object' ? cached.weather : null
+  } catch {
+    return null
+  }
+}
+
+function getFaceRatioCacheKey() {
+  return `${FACE_RATIO_CACHE_KEY}:${getAnonymousUserId()}`
 }
 
 function buildGuide(timeId, sceneId, products) {
@@ -132,18 +165,29 @@ function buildVideoRecommendations(faceRatio, guide) {
   const thirdTag = uniqueTags[2] || '面部比例修饰'
   const timePart = guide.time.replace(/\s/g, '')
   const timeKeywords = guide.timeKeywords || '日常新手妆'
+  const sceneTitle = {
+    commute: '通勤清透妆',
+    office: '自然精致妆',
+    evening: '柔雾氛围妆',
+  }[guide.id] || '日常清透妆'
 
   return [
     {
-      title: '比例修饰教程',
+      title: `适合你的${sceneTitle}`,
+      description: `根据${mainTag}与${guide.label}为你匹配`,
+      duration: `${guide.minutes}分钟`,
       query: `${mainTag} ${guide.label} 妆容教程`,
     },
     {
-      title: '时间预算教程',
+      title: '自然提亮裸妆',
+      description: `适合${secondTag}，步骤更精简`,
+      duration: guide.minutes <= 5 ? '5分钟' : '15分钟',
       query: `${timePart} ${timeKeywords} ${guide.label} ${secondTag} 教程`,
     },
     {
-      title: '局部手法教程',
+      title: '柔雾感约会妆',
+      description: `重点修饰${thirdTag}`,
+      duration: '30分钟',
       query: `${thirdTag} 腮红 修容 眼妆 教程`,
     },
   ]
@@ -560,13 +604,22 @@ function buildRatioMetricCards(faceRatio) {
 
 export default function Tutorial() {
   const pageBackground = usePageBackground('tutorial')
+  const location = useLocation()
+  const navigate = useNavigate()
   const [products, setProducts] = useState([])
   const [facePhotoPreview, setFacePhotoPreview] = useState('')
   const [faceRatio, setFaceRatio] = useState(null)
+  const [analysisId, setAnalysisId] = useState(null)
   const [faceRatioSource, setFaceRatioSource] = useState('')
   const [faceRatioCreatedAt, setFaceRatioCreatedAt] = useState('')
   const [faceRatioError, setFaceRatioError] = useState('')
   const [analyzingFaceRatio, setAnalyzingFaceRatio] = useState(false)
+  const [showRatioAnalyzer, setShowRatioAnalyzer] = useState(false)
+  const [recommendationData, setRecommendationData] = useState(null)
+  const [recommendationLoading, setRecommendationLoading] = useState(false)
+  const [recommendationError, setRecommendationError] = useState('')
+  const [activePlan, setActivePlan] = useState(null)
+  const [planBusy, setPlanBusy] = useState(false)
   const [toast, setToast] = useState(null)
   const [timeId, setTimeId] = useState('daily')
   const [sceneId, setSceneId] = useState('commute')
@@ -575,15 +628,17 @@ export default function Tutorial() {
   const facePreviewImageRef = useRef(null)
   const faceCameraRef = useRef(null)
   const faceAlbumRef = useRef(null)
+  const recommendationRequestRef = useRef(0)
 
   useEffect(() => {
     fetchProducts().then(setProducts).catch(() => setProducts([]))
 
     const restoreCachedRatio = () => {
       try {
-        const cached = JSON.parse(localStorage.getItem(FACE_RATIO_CACHE_KEY) || 'null')
+        const cached = JSON.parse(localStorage.getItem(getFaceRatioCacheKey()) || 'null')
         if (cached?.face_ratio?.ok) {
           setFaceRatio(cached.face_ratio)
+          setAnalysisId(null)
           setFaceRatioSource('tutorial_cache')
           setFaceRatioCreatedAt(cached.created_at || '')
         }
@@ -592,21 +647,41 @@ export default function Tutorial() {
       }
     }
 
-    fetchLatestFaceRatio()
+    const applySkinAnalysis = (data, source = 'skin_analysis') => {
+      const nextRatio = data?.face_data?.face_ratio || data?.face_ratio
+      if (!nextRatio?.ok) return false
+      setFaceRatio(nextRatio)
+      setAnalysisId(data.id || data.analysis_id || null)
+      setFaceRatioSource(source)
+      setFaceRatioCreatedAt(data.created_at || '')
+      if (data.photo) {
+        setFacePhotoPreview(getPhotoUrl(data.photo, 'skin'))
+      }
+      return true
+    }
+
+    const linkedAnalysisId = location.state?.analysisId
+    const loadRatio = linkedAnalysisId
+      ? fetchSkinAnalysis(linkedAnalysisId).then(data => {
+        if (!applySkinAnalysis(data, 'mirror_link')) restoreCachedRatio()
+      })
+      : fetchLatestFaceRatio()
       .then((data) => {
         if (!data?.has_result || !data.face_ratio?.ok) {
           restoreCachedRatio()
           return
         }
-        setFaceRatio(data.face_ratio)
-        setFaceRatioSource('skin_analysis')
-        setFaceRatioCreatedAt(data.created_at || '')
-        if (data.photo) {
-          setFacePhotoPreview(getPhotoUrl(data.photo, 'skin'))
-        }
+        applySkinAnalysis(data)
       })
       .catch(restoreCachedRatio)
-  }, [])
+
+    loadRatio.catch(restoreCachedRatio)
+    fetchLatestTutorialPlan()
+      .then(data => {
+        if (data?.has_plan && data.plan) setActivePlan(data.plan)
+      })
+      .catch(() => {})
+  }, [location.state?.analysisId])
 
   useEffect(() => {
     return () => {
@@ -683,11 +758,61 @@ export default function Tutorial() {
     }
   }, [facePhotoPreview])
 
-  const activeGuide = useMemo(
+  useEffect(() => {
+    if (!faceRatio?.ok) {
+      setRecommendationData(null)
+      setRecommendationError('')
+      return undefined
+    }
+
+    const requestId = recommendationRequestRef.current + 1
+    recommendationRequestRef.current = requestId
+    const timer = window.setTimeout(async () => {
+      setRecommendationLoading(true)
+      setRecommendationError('')
+      try {
+        const data = await fetchTutorialRecommendations({
+          analysis_id: analysisId || undefined,
+          face_ratio: analysisId ? undefined : faceRatio,
+          time_id: timeId,
+          scene_id: sceneId,
+          weather: readCachedWeather(),
+        })
+        if (recommendationRequestRef.current === requestId) {
+          setRecommendationData(data)
+        }
+      } catch (error) {
+        if (recommendationRequestRef.current === requestId) {
+          setRecommendationError(
+            error.response?.data?.error || '后端推荐暂时不可用，先显示基础教程方向。',
+          )
+        }
+      } finally {
+        if (recommendationRequestRef.current === requestId) {
+          setRecommendationLoading(false)
+        }
+      }
+    }, 180)
+
+    return () => window.clearTimeout(timer)
+  }, [analysisId, faceRatio, timeId, sceneId])
+
+  const fallbackGuide = useMemo(
     () => buildGuide(timeId, sceneId, products),
     [timeId, sceneId, products],
   )
-  const Icon = activeGuide.icon
+  const activeGuide = useMemo(() => {
+    const backendGuide = recommendationData?.guide
+    if (!backendGuide) return fallbackGuide
+    return {
+      ...fallbackGuide,
+      ...backendGuide,
+      id: backendGuide.scene_id || fallbackGuide.id,
+      label: backendGuide.scene_label || fallbackGuide.label,
+      time: backendGuide.label || fallbackGuide.time,
+      products: (recommendationData.matched_products || []).map(product => product.name),
+    }
+  }, [fallbackGuide, recommendationData])
   const displayedRatioTags = (getUsefulRatioTags(faceRatio).length ? getUsefulRatioTags(faceRatio) : faceRatio?.ratio_tags || []).slice(0, 5)
   const ratioTips = faceRatio?.makeup_tips?.slice(0, 3) || []
   const ratioQualityFlags = faceRatio?.quality_flags || []
@@ -699,10 +824,11 @@ export default function Tutorial() {
   const threePartSegments = useMemo(() => buildThreePartSegments(faceRatio), [faceRatio])
   const mirrorGuideOverlay = useMemo(() => buildMirrorGuideOverlay(faceRatio, mirrorImageLayout), [faceRatio, mirrorImageLayout])
   const ratioMetricCards = useMemo(() => buildRatioMetricCards(faceRatio), [faceRatio])
-  const videoRecommendations = useMemo(
-    () => buildVideoRecommendations(faceRatio, activeGuide),
-    [faceRatio, activeGuide],
-  )
+  const videoRecommendations = useMemo(() => (
+    recommendationData?.recommendations?.length
+      ? recommendationData.recommendations
+      : buildVideoRecommendations(faceRatio, activeGuide)
+  ), [recommendationData, faceRatio, activeGuide])
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type })
@@ -719,9 +845,12 @@ export default function Tutorial() {
 
     setFacePhotoPreview(URL.createObjectURL(file))
     setFaceRatio(null)
+    setAnalysisId(null)
     setFaceRatioSource('')
     setFaceRatioCreatedAt('')
     setFaceRatioError('')
+    setRecommendationData(null)
+    setRecommendationError('')
     setAnalyzingFaceRatio(true)
     event.target.value = ''
 
@@ -746,7 +875,7 @@ export default function Tutorial() {
       })
       setFaceRatioCreatedAt(createdAt)
       try {
-        localStorage.setItem(FACE_RATIO_CACHE_KEY, JSON.stringify({
+        localStorage.setItem(getFaceRatioCacheKey(), JSON.stringify({
           face_ratio: nextRatio,
           created_at: createdAt,
         }))
@@ -771,9 +900,12 @@ export default function Tutorial() {
     }
     setFacePhotoPreview('')
     setFaceRatio(null)
+    setAnalysisId(null)
     setFaceRatioSource('')
     setFaceRatioCreatedAt('')
     setFaceRatioError('')
+    setRecommendationData(null)
+    setRecommendationError('')
     setAnalyzingFaceRatio(false)
   }
 
@@ -783,6 +915,48 @@ export default function Tutorial() {
       showToast('已复制视频搜索词')
     } catch {
       showToast(query)
+    }
+  }
+
+  const buildRecommendationPayload = (recommendationIndex = 0) => ({
+    analysis_id: analysisId || undefined,
+    face_ratio: analysisId ? undefined : faceRatio,
+    time_id: timeId,
+    scene_id: sceneId,
+    weather: readCachedWeather(),
+    recommendation_index: recommendationIndex,
+  })
+
+  const handleStartTutorial = async (recommendationIndex = 0) => {
+    if (!faceRatio?.ok) {
+      setShowRatioAnalyzer(true)
+      faceCameraRef.current?.click()
+      return
+    }
+
+    setPlanBusy(true)
+    try {
+      const plan = await createTutorialPlan(buildRecommendationPayload(recommendationIndex))
+      setActivePlan(plan)
+      showToast('今天的教程流程已准备好')
+    } catch (error) {
+      showToast(error.response?.data?.error || '生成教程流程失败，请稍后重试', 'error')
+    } finally {
+      setPlanBusy(false)
+    }
+  }
+
+  const handleCompleteTutorial = async () => {
+    if (!activePlan?.id) return
+    setPlanBusy(true)
+    try {
+      const data = await completeTutorialPlan(activePlan.id, { mood: 'stable' })
+      setActivePlan(data.plan)
+      showToast(data.already_completed ? '这套教程已经记录过了' : '已完成，并同步到妆容日记')
+    } catch (error) {
+      showToast(error.response?.data?.error || '保存完成记录失败，请稍后重试', 'error')
+    } finally {
+      setPlanBusy(false)
     }
   }
 
@@ -800,10 +974,67 @@ export default function Tutorial() {
           <h1>教程推荐</h1>
           <p className="bm-flow-copy">先读懂三庭五眼，再按时间和场景匹配今天适合的视频教程。</p>
         </div>
-        <span className="bm-tutorial-brand-mark" aria-hidden="true">✦</span>
+        <img className="bm-tutorial-header-ip" src={tutorialRatioWitchSticker} alt="" aria-hidden="true" />
       </section>
 
       <div className="bm-flow-content">
+        <section className={`bm-tutorial-ratio-summary${faceRatio?.ok ? ' has-result' : ''}`}>
+          <div className="bm-tutorial-ratio-copy">
+            <span className="bm-flow-section-title">你的比例特点</span>
+            {faceRatio?.ok ? (
+              <>
+                <div className="bm-tutorial-ratio-tags">
+                  {(displayedRatioTags.length > 0 ? displayedRatioTags : ['比例整体均衡'])
+                    .slice(0, 3)
+                    .map(tag => <span key={tag}>{tag}</span>)}
+                </div>
+                {analysisId && (
+                  <span className="bm-tutorial-link-source">
+                    <CheckCircle2 size={13} strokeWidth={1.9} />
+                    已联动最近一次镜前检测
+                  </span>
+                )}
+              </>
+            ) : (
+              <p>拍一张清晰正脸照，生成三庭五眼标签后再匹配教程。</p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (faceRatio?.ok) {
+                  setShowRatioAnalyzer(value => !value)
+                } else {
+                  setShowRatioAnalyzer(true)
+                  faceCameraRef.current?.click()
+                }
+              }}
+            >
+              {faceRatio?.ok
+                ? (showRatioAnalyzer ? '收起详细分析' : '查看详细比例')
+                : '拍照分析'}
+              <ChevronRight size={14} strokeWidth={1.8} />
+            </button>
+          </div>
+          <button
+            type="button"
+            className={`bm-tutorial-ratio-portrait${facePhotoPreview ? ' has-photo' : ''}`}
+            onClick={() => {
+              if (faceRatio?.ok) {
+                setShowRatioAnalyzer(value => !value)
+              } else {
+                setShowRatioAnalyzer(true)
+                faceCameraRef.current?.click()
+              }
+            }}
+            aria-label={faceRatio?.ok ? '查看详细比例分析' : '拍照分析三庭五眼'}
+          >
+            {facePhotoPreview
+              ? <img src={facePhotoPreview} alt="" aria-hidden="true" />
+              : <ScanFace size={66} strokeWidth={1.08} aria-hidden="true" />}
+            <span aria-hidden="true"><i /><i /></span>
+          </button>
+        </section>
+
         <section className="bm-flow-panel bm-tutorial-control-panel" aria-label="教程筛选">
           <div className="bm-tutorial-choice-row">
             <div className="bm-tutorial-choice-label">
@@ -848,6 +1079,7 @@ export default function Tutorial() {
           </div>
         </section>
 
+        {showRatioAnalyzer && (
         <section className={`bm-face-ratio-card bm-mirror-analysis-card${faceRatio?.ok ? ' has-result' : ''}`}>
           <div className="bm-mirror-stage">
             <span className="bm-mirror-note" aria-hidden="true">
@@ -986,7 +1218,9 @@ export default function Tutorial() {
               <>
                 <div className="bm-face-ratio-status">
                   <span>
-                    {faceRatioSource === 'skin_analysis'
+                    {faceRatioSource === 'mirror_link'
+                      ? '从镜前检测结果进入'
+                      : faceRatioSource === 'skin_analysis'
                       ? '已读取最近一次镜前检测'
                       : faceRatioSource === 'tutorial_cache'
                         ? '已恢复上次教程分析'
@@ -1059,72 +1293,92 @@ export default function Tutorial() {
             )}
           </div>
 
-          <input
-            ref={faceCameraRef}
-            type="file"
-            accept="image/*"
-            capture="user"
-            className="bm-hidden-file"
-            onChange={handleFaceRatioPhotoSelected}
-          />
-          <input
-            ref={faceAlbumRef}
-            type="file"
-            accept="image/*"
-            className="bm-hidden-file"
-            onChange={handleFaceRatioPhotoSelected}
-          />
         </section>
+        )}
 
-        <section className="bm-routine-card bm-flow-routine bm-flow-routine-compact">
-          <div className="bm-routine-head">
-            <span className="bm-soft-icon"><Icon size={21} strokeWidth={1.6} /></span>
+        <input
+          ref={faceCameraRef}
+          type="file"
+          accept="image/*"
+          capture="user"
+          className="bm-hidden-file"
+          onChange={handleFaceRatioPhotoSelected}
+        />
+        <input
+          ref={faceAlbumRef}
+          type="file"
+          accept="image/*"
+          className="bm-hidden-file"
+          onChange={handleFaceRatioPhotoSelected}
+        />
+
+        <section className={`bm-video-match-card bm-tutorial-video-section${faceRatio?.ok ? '' : ' is-empty'}`}>
+          <div className="bm-flow-section-head">
             <div>
+              <div className="bm-flow-section-title">为你推荐</div>
               <p>{activeGuide.label} · {activeGuide.focus}</p>
-              <h2>{activeGuide.title}</h2>
             </div>
-            <span className="bm-time-chip"><Clock3 size={14} />{activeGuide.time}</span>
+            <span>{activeGuide.label} · {activeGuide.time}</span>
           </div>
 
-          {activeGuide.products.length > 0 && (
-            <div className="bm-product-strip bm-flow-product-strip">
-              <span className="bm-flow-product-label"><Package size={15} /> 可用产品</span>
-              <div className="bm-flow-product-chips">
-                {activeGuide.products.map(product => (
-                  <span key={product}>{product}</span>
+          {recommendationLoading && (
+            <div className="bm-tutorial-recommendation-state" role="status">
+              <Loader2 size={15} strokeWidth={1.8} />
+              正在结合镜前结果和化妆柜更新推荐…
+            </div>
+          )}
+          {recommendationError && (
+            <div className="bm-tutorial-recommendation-state is-warning">
+              <AlertCircle size={15} strokeWidth={1.8} />
+              {recommendationError}
+            </div>
+          )}
+
+          {recommendationData?.linkage && (
+            <div className="bm-tutorial-linkage" aria-label="推荐依据">
+              <div>
+                <strong>本次推荐依据</strong>
+                <span>
+                  {recommendationData.linkage.today_status
+                    || recommendationData.linkage.ratio_tags?.slice(0, 2).join('、')
+                    || '三庭五眼、时间与场景'}
+                </span>
+              </div>
+              <div className="bm-tutorial-linkage-tags">
+                {recommendationData.linkage.ratio_tags?.slice(0, 2).map(tag => (
+                  <span key={tag}>{tag}</span>
+                ))}
+                {recommendationData.linkage.weather_advice?.slice(0, 1).map(tip => (
+                  <span key={tip}>{tip}</span>
                 ))}
               </div>
             </div>
           )}
-        </section>
-
-        <section className={`bm-video-match-card${faceRatio?.ok ? '' : ' is-empty'}`}>
-          <div className="bm-flow-section-head">
-            <div className="bm-flow-section-title">推荐视频方向</div>
-            <span>{activeGuide.label} · {activeGuide.time}</span>
-          </div>
 
           {faceRatio?.ok ? (
             <>
-              <p className="bm-video-match-copy">
-                按你的比例标签、时间预算和使用场景生成搜索词。后面有视频库时，这里可以直接展示对应教程。
-              </p>
-              <div className="bm-video-query-list">
-                {videoRecommendations.map(item => (
-                  <div className="bm-video-query-card" key={item.query}>
-                    <button
-                      type="button"
-                      className="bm-video-query-copy"
-                      onClick={() => handleCopyVideoQuery(item.query)}
+              <div className="bm-tutorial-video-grid">
+                {videoRecommendations.map((item, index) => (
+                  <article
+                    className={`bm-tutorial-video-card${index === 0 ? ' is-featured' : ''}`}
+                    key={item.query}
+                  >
+                    <img src={TUTORIAL_COVERS[index]} alt="" aria-hidden="true" />
+                    <div className="bm-tutorial-video-overlay">
+                      <span>{item.duration}</span>
+                      <strong>{item.title}</strong>
+                      <small>{item.description}</small>
+                    </div>
+                    <a
+                      className="bm-tutorial-video-play"
+                      href={VIDEO_PLATFORMS[0].buildUrl(item.query)}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`在抖音搜索${item.title}`}
                     >
-                      <Video size={17} strokeWidth={1.7} />
-                      <span>
-                        <strong>{item.title}</strong>
-                        <small>{item.query}</small>
-                      </span>
-                      <Copy size={15} strokeWidth={1.8} />
-                    </button>
-                    <div className="bm-video-platform-links" aria-label="打开平台搜索">
+                      <Play size={index === 0 ? 24 : 17} fill="currentColor" strokeWidth={1.5} />
+                    </a>
+                    <div className="bm-tutorial-video-actions" aria-label="打开平台搜索">
                       {VIDEO_PLATFORMS.map(platform => (
                         <a
                           key={platform.id}
@@ -1134,20 +1388,114 @@ export default function Tutorial() {
                           aria-label={`${platform.label} 搜索 ${item.query}`}
                         >
                           {platform.label}
-                          <ExternalLink size={12} strokeWidth={1.8} />
+                          <ExternalLink size={11} strokeWidth={1.8} />
                         </a>
                       ))}
+                      <button type="button" onClick={() => handleCopyVideoQuery(item.query)} aria-label="复制视频搜索词">
+                        <Copy size={12} strokeWidth={1.8} />
+                      </button>
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
+
+              <div className="bm-tutorial-flow-actions">
+                <button
+                  type="button"
+                  className="bm-tutorial-start-flow"
+                  onClick={() => handleStartTutorial(0)}
+                  disabled={planBusy || recommendationLoading}
+                >
+                  {planBusy ? <Loader2 size={17} strokeWidth={1.8} /> : <Play size={17} fill="currentColor" strokeWidth={1.6} />}
+                  <span>{planBusy ? '正在生成…' : '使用主推荐，生成今天流程'}</span>
+                </button>
+              </div>
+
+              {activeGuide.products.length > 0 && (
+                <div className="bm-tutorial-product-row">
+                  <span><Package size={14} /> 可用产品</span>
+                  <div>
+                    {activeGuide.products.map(product => <span key={product}>{product}</span>)}
+                  </div>
+                </div>
+              )}
+
+              {recommendationData?.missing_steps?.length > 0 && (
+                <button
+                  type="button"
+                  className="bm-tutorial-product-gap"
+                  onClick={() => navigate('/products')}
+                >
+                  <span>
+                    化妆柜还缺少：{recommendationData.missing_steps.slice(0, 3).join('、')}
+                  </span>
+                  去补充产品
+                  <ChevronRight size={14} strokeWidth={1.8} />
+                </button>
+              )}
             </>
           ) : (
             <div className="bm-video-empty-state">
-              <Video size={23} strokeWidth={1.7} />
-              <p>拍照分析后，会在这里生成 3 个视频搜索词。</p>
-              <button type="button" onClick={() => faceCameraRef.current?.click()}>
+              <Video size={25} strokeWidth={1.7} />
+              <p>完成三庭五眼分析后，会结合你选择的时间和场景推荐视频。</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRatioAnalyzer(true)
+                  faceCameraRef.current?.click()
+                }}
+              >
                 现在分析
+                <ChevronRight size={15} strokeWidth={1.8} />
+              </button>
+            </div>
+          )}
+
+          {activePlan && (
+            <div className={`bm-active-tutorial-plan${activePlan.status === 'completed' ? ' is-completed' : ''}`}>
+              <div className="bm-active-tutorial-plan-head">
+                <span>
+                  {activePlan.status === 'completed'
+                    ? <CheckCircle2 size={18} strokeWidth={1.9} />
+                    : <Clock3 size={18} strokeWidth={1.8} />}
+                </span>
+                <div>
+                  <strong>
+                    {activePlan.status === 'completed' ? '今天的教程已完成' : '今天的教程流程'}
+                  </strong>
+                  <small>
+                    {activePlan.context?.guide?.scene_label || activeGuide.label}
+                    {' · '}
+                    {activePlan.context?.guide?.label || `${activePlan.time_minutes}分钟`}
+                  </small>
+                </div>
+              </div>
+              {activePlan.status !== 'completed' && (
+                <ol>
+                  {(activePlan.context?.flow_steps || []).slice(0, 5).map(step => (
+                    <li key={`${step.order}-${step.title}`}>
+                      <span>{step.order}</span>
+                      <div>
+                        <strong>{step.title}</strong>
+                        <small>
+                          {step.product?.name
+                            ? `使用 ${step.product.name}`
+                            : step.action}
+                        </small>
+                      </div>
+                      <em>{step.minutes} 分钟</em>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              <button
+                type="button"
+                onClick={activePlan.status === 'completed'
+                  ? () => navigate('/diary')
+                  : handleCompleteTutorial}
+                disabled={planBusy}
+              >
+                {activePlan.status === 'completed' ? '查看妆容日记' : '完成并同步到日记'}
                 <ChevronRight size={15} strokeWidth={1.8} />
               </button>
             </div>

@@ -1318,6 +1318,7 @@ export default function ProductManage() {
               aria-label="添加产品"
             >
               <PlusCircle size={22} strokeWidth={1.9} />
+              <span>添加</span>
             </button>
           </div>
         </div>
@@ -1333,7 +1334,9 @@ export default function ProductManage() {
             />
           </label>
         )}
+      </section>
 
+      <section className="bm-vault-controls" aria-label="产品筛选与概览">
         <div className="bm-vault-overview" aria-label="产品概览">
           <span>
             <small>全部产品</small>
@@ -1361,7 +1364,6 @@ export default function ProductManage() {
             </button>
           ))}
         </div>
-
       </section>
 
       {showPetReminder && (

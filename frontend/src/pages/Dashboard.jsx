@@ -204,13 +204,8 @@ function TodayWeatherCard({ weather, meta, onRetry }) {
       </div>
 
       <div className="bm-weather-metrics">
-        <WeatherMetric icon={Droplets} label="湿度" value={humidity} helper="空气状态" />
+        <WeatherMetric icon={Droplets} label="湿度" value={humidity} />
         <WeatherMetric icon={SunMedium} label="紫外线" value={uvValue} helper={getUvLevel(current.uvIndex)} />
-      </div>
-
-      <div className="bm-environment-tip">
-        <CloudSun size={17} strokeWidth={1.8} aria-hidden="true" />
-        <span>{buildEnvironmentAdvice(current)}</span>
       </div>
     </section>
   )
@@ -337,26 +332,38 @@ export default function Dashboard() {
 
   return (
     <div className="bm-screen bm-home bm-home-redesign" style={pageBackground.style}>
-      <header className="bm-home-heading">
-        <span className="bm-home-brand"><Sparkles size={15} strokeWidth={1.8} /> Mirror Mate</span>
-        <p>{todayLabel}</p>
-        <h1>镜前建议</h1>
-        <span>根据今天的环境和面部状态，给你简单、可执行的妆护提醒。</span>
-      </header>
+      <div className="bm-home-top">
+        <header className="bm-home-heading">
+          <span className="bm-home-brand"><Sparkles size={15} strokeWidth={1.8} /> Mirror Mate</span>
+          <p>{todayLabel}</p>
+          <h1>镜前建议</h1>
+          <span>结合今天的环境与面部状态，给你简单、可执行的提醒。</span>
+        </header>
 
-      <TodayWeatherCard weather={todayWeather} meta={weatherMeta} onRetry={handleWeatherRetry} />
+        <TodayWeatherCard weather={todayWeather} meta={weatherMeta} onRetry={handleWeatherRetry} />
+      </div>
+
+      <section className="bm-environment-tip" aria-label="今日环境建议">
+        <CloudSun size={18} strokeWidth={1.8} aria-hidden="true" />
+        <div>
+          <strong>今日环境建议</strong>
+          <span>{buildEnvironmentAdvice(todayWeather)}</span>
+        </div>
+      </section>
 
       <section className="bm-mirror-start-card">
-        <div className="bm-mirror-visual" aria-hidden="true">
-          <span className="bm-mirror-orbit"><i /><i /><i /></span>
-          <span className="bm-mirror-disc">
-            <ScanFace size={50} strokeWidth={1.25} />
-          </span>
-        </div>
-        <div className="bm-mirror-start-copy">
-          <span>今日检测</span>
-          <h2>拍一张，获得今天的镜前建议</h2>
-          <p>分析肤质状态、面部比例与环境影响，只展示最需要关注的重点。</p>
+        <div className="bm-mirror-card-main">
+          <div className="bm-mirror-visual" aria-hidden="true">
+            <span className="bm-mirror-orbit"><i /><i /><i /></span>
+            <span className="bm-mirror-disc">
+              <ScanFace size={38} strokeWidth={1.25} />
+            </span>
+          </div>
+          <div className="bm-mirror-start-copy">
+            <span>今日检测</span>
+            <h2>拍一张，获得今天的镜前建议</h2>
+            <p>分析肤质、面部比例与环境影响，只展示需要关注的重点。</p>
+          </div>
         </div>
         <button type="button" className="bm-mirror-primary-action" onClick={() => setSkinPanelProps({ autoOpenCamera: true })}>
           <ScanFace size={20} strokeWidth={1.8} />
@@ -385,6 +392,15 @@ export default function Dashboard() {
           viewHistoryId={skinPanelProps.viewHistoryId}
           forceHistoryMode={skinPanelProps.forceHistoryMode}
           autoOpenCamera={skinPanelProps.autoOpenCamera}
+          onOpenTutorial={(analysisId) => {
+            setSkinPanelProps(null)
+            navigate('/tutorial', {
+              state: {
+                analysisId,
+                fromMirror: true,
+              },
+            })
+          }}
           onClose={() => setSkinPanelProps(null)}
         />
       )}

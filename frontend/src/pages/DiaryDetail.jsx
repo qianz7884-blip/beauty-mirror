@@ -191,6 +191,10 @@ export default function DiaryDetail() {
         <SkinAnalysisPanel
           viewHistoryId={skinPanelProps.viewHistoryId}
           forceHistoryMode={true}
+          onOpenTutorial={(analysisId) => {
+            setSkinPanelProps(null)
+            navigate('/tutorial', { state: { analysisId, fromMirror: true } })
+          }}
           onClose={() => setSkinPanelProps(null)}
         />
       )}

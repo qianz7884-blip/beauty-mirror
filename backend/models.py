@@ -266,3 +266,80 @@ class SkinAnalysis(db.Model):
             'trend': self.get_trend(),
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
         }
+
+
+class TutorialPlan(db.Model):
+    """一次可继续、可完成的个性化妆容教程流程。"""
+    __tablename__ = 'tutorial_plans'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.String(80), index=True, default='', nullable=False)
+    skin_analysis_id = db.Column(
+        db.Integer,
+        db.ForeignKey('skin_analyses.id'),
+        nullable=True,
+    )
+    diary_id = db.Column(
+        db.Integer,
+        db.ForeignKey('diaries.id'),
+        nullable=True,
+    )
+    time_id = db.Column(db.String(30), default='daily', nullable=False)
+    time_minutes = db.Column(db.Integer, default=15, nullable=False)
+    scene_id = db.Column(db.String(30), default='commute', nullable=False)
+    status = db.Column(db.String(20), default='planned', nullable=False)
+    selected_recommendation = db.Column(db.Text, default='{}')
+    context_json = db.Column(db.Text, default='{}')
+    product_ids = db.Column(db.Text, default='[]')
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    @staticmethod
+    def _load_json(value, fallback):
+        try:
+            parsed = json.loads(value or '')
+            return parsed if isinstance(parsed, type(fallback)) else fallback
+        except (json.JSONDecodeError, TypeError):
+            return fallback
+
+    def get_selected_recommendation(self):
+        return self._load_json(self.selected_recommendation, {})
+
+    def set_selected_recommendation(self, value):
+        self.selected_recommendation = json.dumps(value or {}, ensure_ascii=False)
+
+    def get_context(self):
+        return self._load_json(self.context_json, {})
+
+    def set_context(self, value):
+        self.context_json = json.dumps(value or {}, ensure_ascii=False)
+
+    def get_product_ids(self):
+        return self._load_json(self.product_ids, [])
+
+    def set_product_ids(self, value):
+        cleaned = []
+        for product_id in value or []:
+            try:
+                number = int(product_id)
+            except (TypeError, ValueError):
+                continue
+            if number not in cleaned:
+                cleaned.append(number)
+        self.product_ids = json.dumps(cleaned, ensure_ascii=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'skin_analysis_id': self.skin_analysis_id,
+            'diary_id': self.diary_id,
+            'time_id': self.time_id,
+            'time_minutes': self.time_minutes,
+            'scene_id': self.scene_id,
+            'status': self.status,
+            'selected_recommendation': self.get_selected_recommendation(),
+            'context': self.get_context(),
+            'product_ids': self.get_product_ids(),
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M') if self.created_at else '',
+            'completed_at': self.completed_at.strftime('%Y-%m-%d %H:%M') if self.completed_at else '',
+        }

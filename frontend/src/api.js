@@ -177,6 +177,24 @@ export function deleteSkinAnalysis(id) {
   return api.delete(`/skin-analyses/${id}`).then(r => r.data)
 }
 
+// ==================== 个性化教程闭环 ====================
+
+export function fetchTutorialRecommendations(payload = {}) {
+  return api.post('/tutorial/recommendations', payload).then(r => r.data)
+}
+
+export function fetchLatestTutorialPlan() {
+  return api.get('/tutorial/plans/latest').then(r => r.data)
+}
+
+export function createTutorialPlan(payload = {}) {
+  return api.post('/tutorial/plans', payload).then(r => r.data)
+}
+
+export function completeTutorialPlan(id, payload = {}) {
+  return api.patch(`/tutorial/plans/${id}/complete`, payload).then(r => r.data)
+}
+
 // ==================== 日记 ====================
 
 export function fetchDiaries() {

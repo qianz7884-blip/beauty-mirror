@@ -3,7 +3,7 @@ from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify
 
-from models import Diary, Product, SkinAnalysis, db
+from models import Diary, Product, SkinAnalysis, TutorialPlan, db
 
 from .common import DEFAULT_DEMO_USER_ID, get_current_user_id
 
@@ -21,11 +21,13 @@ def _counts_for_user(user_id):
     product_count = _user_products_query(user_id).count()
     diary_count = Diary.query.filter(Diary.user_id == user_id).count()
     analysis_count = SkinAnalysis.query.filter(SkinAnalysis.user_id == user_id).count()
+    tutorial_plan_count = TutorialPlan.query.filter(TutorialPlan.user_id == user_id).count()
     return {
         'products': product_count,
         'diaries': diary_count,
         'skin_analyses': analysis_count,
-        'total_records': product_count + diary_count + analysis_count,
+        'tutorial_plans': tutorial_plan_count,
+        'total_records': product_count + diary_count + analysis_count + tutorial_plan_count,
     }
 
 
@@ -38,6 +40,7 @@ def _last_activity_at(user_id):
         _user_products_query(user_id).order_by(Product.created_at.desc()).first(),
         Diary.query.filter(Diary.user_id == user_id).order_by(Diary.created_at.desc()).first(),
         SkinAnalysis.query.filter(SkinAnalysis.user_id == user_id).order_by(SkinAnalysis.created_at.desc()).first(),
+        TutorialPlan.query.filter(TutorialPlan.user_id == user_id).order_by(TutorialPlan.created_at.desc()).first(),
     ]
     dates = [item.created_at for item in latest_items if item and item.created_at]
     return _format_dt(max(dates)) if dates else ''
@@ -145,7 +148,7 @@ def user_session():
 def user_export():
     user_id = get_current_user_id()
     payload = {
-        'schema_version': 1,
+        'schema_version': 2,
         'exported_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'user_id': user_id,
         'counts': _counts_for_user(user_id),
@@ -158,6 +161,12 @@ def user_export():
             item.to_dict()
             for item in SkinAnalysis.query.filter(SkinAnalysis.user_id == user_id)
             .order_by(SkinAnalysis.created_at.desc())
+            .all()
+        ],
+        'tutorial_plans': [
+            item.to_dict()
+            for item in TutorialPlan.query.filter(TutorialPlan.user_id == user_id)
+            .order_by(TutorialPlan.created_at.desc())
             .all()
         ],
     }

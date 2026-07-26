@@ -4,6 +4,7 @@ import { MOOD_OPTIONS } from '../utils/moods'
 import {
   CalendarDays,
   Camera,
+  BookOpenCheck,
   ClipboardList,
   Clock3,
   ChevronRight,
@@ -103,7 +104,16 @@ function buildFaceRegionInsight(regionScores, regionGuide) {
   return `${FACE_DIM_LABELS[weakest.dim]}相对更需要关注。`
 }
 
-export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, viewHistoryId, forceHistoryMode, autoOpenCamera, onAnalysisComplete }) {
+export default function SkinAnalysisPanel({
+  photoFile,
+  previewUrl,
+  onClose,
+  viewHistoryId,
+  forceHistoryMode,
+  autoOpenCamera,
+  onAnalysisComplete,
+  onOpenTutorial,
+}) {
   const [step, setStep] = useState(viewHistoryId || forceHistoryMode ? 'loading' : (photoFile ? 'preview' : 'history'))
   const [result, setResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
@@ -336,7 +346,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
   )
   const canSaveAnalysisToDiary = !historyView && !selectedHistory && !viewHistoryId && !forceHistoryMode && result?.success
 
-  const handleFinish = async () => {
+  const handleFinish = async (openTutorial = false) => {
     if (canSaveAnalysisToDiary && saveToDiary) {
       setFeedbackSaving(true)
       try {
@@ -361,7 +371,11 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
       }
       setFeedbackSaving(false)
     }
+    const linkedAnalysisId = displayData?.id || result?.id || selectedHistory?.id
     onClose()
+    if (openTutorial && linkedAnalysisId) {
+      onOpenTutorial?.(linkedAnalysisId)
+    }
   }
 
   return (
@@ -765,6 +779,22 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
             )}
 
             {/* 操作按钮 */}
+            {!historyView && displayData?.face_data?.face_ratio?.ok && onOpenTutorial && (
+              <button
+                type="button"
+                className="skin-open-tutorial-action"
+                disabled={feedbackSaving}
+                onClick={() => handleFinish(true)}
+              >
+                <BookOpenCheck size={18} strokeWidth={1.7} />
+                <span>
+                  <strong>根据本次结果找教程</strong>
+                  <small>带上三庭五眼、肤质观察和已有产品</small>
+                </span>
+                <ChevronRight size={17} strokeWidth={1.8} />
+              </button>
+            )}
+
             {!historyView && <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
               {!viewHistoryId && !forceHistoryMode && (
                 <button
@@ -780,7 +810,7 @@ export default function SkinAnalysisPanel({ photoFile, previewUrl, onClose, view
                 className="btn btn-primary"
                 style={{ flex: viewHistoryId || forceHistoryMode ? 2 : 1 }}
                 disabled={feedbackSaving}
-                onClick={handleFinish}
+                onClick={() => handleFinish(false)}
               >
                 {feedbackSaving ? '保存中...' : viewHistoryId || forceHistoryMode ? '关闭' : '完成'}
               </button>
