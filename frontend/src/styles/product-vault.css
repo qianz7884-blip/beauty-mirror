@@ -547,6 +547,14 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
 }
 
+.bm-ratio-reference-compact {
+  gap: 10px;
+  padding: 11px;
+  border-color: rgba(123, 158, 176, 0.13);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
 .bm-face-ratio-reference-head {
   display: flex;
   align-items: baseline;
@@ -565,6 +573,105 @@ body {
   font-size: 11px;
   font-weight: 720;
   white-space: nowrap;
+}
+
+.bm-three-part-meter {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 18px;
+  background: rgba(230, 242, 244, 0.70);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.70);
+}
+
+.bm-three-part-meter span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 8px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.bm-three-part-meter span:nth-child(2) {
+  background: rgba(239, 247, 235, 0.78);
+}
+
+.bm-three-part-meter b,
+.bm-three-part-meter em,
+.bm-three-part-meter small {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bm-three-part-meter b {
+  color: #314d5f;
+  font-size: 11px;
+  font-weight: 820;
+}
+
+.bm-three-part-meter em {
+  color: #1b6281;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.bm-three-part-meter small {
+  color: #738796;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.bm-ratio-reference-pills {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.bm-ratio-reference-pills span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+  border: 1px solid rgba(126, 153, 174, 0.11);
+  border-radius: 15px;
+  background: rgba(247, 251, 250, 0.72);
+}
+
+.bm-ratio-reference-pills b,
+.bm-ratio-reference-pills em,
+.bm-ratio-reference-pills small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bm-ratio-reference-pills b {
+  color: #5f7182;
+  font-size: 10px;
+  font-weight: 780;
+}
+
+.bm-ratio-reference-pills em {
+  color: #22384a;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.bm-ratio-reference-pills small {
+  color: #8796a2;
+  font-size: 9px;
+  font-weight: 680;
 }
 
 .bm-face-ratio-reference-grid {
@@ -4761,5 +4868,684 @@ body {
   .bm-product-actions button {
     width: 30px;
     height: 30px;
+  }
+}
+
+/* Tutorial mirror redesign */
+.bm-tutorial-mirror {
+  color: #1f3447;
+}
+
+.bm-tutorial-mirror .bm-tutorial-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 126px;
+  padding: 30px 16px 8px;
+}
+
+.bm-tutorial-mirror .bm-tutorial-hero > div {
+  min-width: 0;
+}
+
+.bm-tutorial-mirror .bm-tutorial-hero h1 {
+  color: #172b3d;
+  font-size: clamp(34px, 9vw, 42px) !important;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.bm-tutorial-mirror .bm-flow-copy {
+  max-width: 300px;
+  margin-top: 8px;
+  color: #627382;
+  font-size: 14px;
+  font-weight: 620;
+  line-height: 1.45;
+}
+
+.bm-tutorial-brand-mark {
+  flex: 0 0 auto;
+  margin-top: 7px;
+  color: rgba(94, 163, 165, 0.72);
+  font-family: "Segoe Print", "Comic Sans MS", cursive;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.02;
+  transform: rotate(-6deg);
+}
+
+.bm-tutorial-mirror .bm-flow-content {
+  gap: 14px;
+  padding: 0 12px 24px;
+}
+
+.bm-tutorial-control-panel {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.92) !important;
+  border-radius: 24px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(247, 252, 253, 0.88)) !important;
+  box-shadow: 0 16px 34px rgba(74, 112, 143, 0.10) !important;
+  backdrop-filter: blur(16px) saturate(1.04) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.04) !important;
+}
+
+.bm-tutorial-choice-row {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 66px;
+  padding: 10px 12px;
+}
+
+.bm-tutorial-choice-row + .bm-tutorial-choice-row {
+  border-top: 1px solid rgba(123, 154, 176, 0.12);
+}
+
+.bm-tutorial-choice-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: #5f7688;
+  font-size: 13px;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.bm-tutorial-choice-label svg {
+  color: #75aeba;
+  flex: 0 0 auto;
+}
+
+.bm-tutorial-pill-group {
+  min-width: 0;
+}
+
+.bm-tutorial-mirror .bm-flow-panel .bm-segment,
+.bm-tutorial-mirror .bm-scene-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.bm-tutorial-mirror .bm-flow-panel .bm-segment button,
+.bm-tutorial-mirror .bm-scene-grid button {
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 8px;
+  border: 1px solid rgba(229, 218, 199, 0.78) !important;
+  border-radius: 999px !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(251, 247, 240, 0.86)) !important;
+  color: #516170;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78) !important;
+  font-size: 14px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.bm-tutorial-mirror .bm-scene-grid button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.bm-tutorial-mirror .bm-flow-panel .bm-segment button.active,
+.bm-tutorial-mirror .bm-scene-grid button.active {
+  border-color: rgba(117, 174, 154, 0.44) !important;
+  background:
+    linear-gradient(180deg, rgba(226, 244, 234, 0.96), rgba(211, 238, 228, 0.88)) !important;
+  color: #265f68 !important;
+  box-shadow:
+    0 8px 18px rgba(91, 144, 148, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.80) !important;
+}
+
+.bm-mirror-analysis-card {
+  display: grid;
+  gap: 12px;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.bm-mirror-stage {
+  position: relative;
+  min-height: 380px;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.90), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(230, 244, 244, 0.38));
+}
+
+.bm-mirror-stage::before {
+  content: '';
+  position: absolute;
+  left: 5%;
+  right: 4%;
+  bottom: 18px;
+  height: 56px;
+  border: 1px solid rgba(202, 182, 144, 0.62);
+  border-radius: 50%;
+  background:
+    linear-gradient(180deg, rgba(231, 240, 230, 0.74), rgba(198, 224, 217, 0.66));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 18px 32px rgba(85, 121, 126, 0.12);
+  z-index: 0;
+}
+
+.bm-mirror-stage::after {
+  content: '';
+  position: absolute;
+  right: 16px;
+  bottom: 30px;
+  width: 96px;
+  height: 16px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(237, 205, 178, 0.88), rgba(245, 236, 220, 0.96));
+  box-shadow: 0 9px 18px rgba(147, 116, 77, 0.10);
+  transform: rotate(-13deg);
+  z-index: 3;
+}
+
+.bm-mirror-note {
+  position: absolute;
+  left: 9px;
+  top: 74px;
+  z-index: 3;
+  width: 90px;
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border: 1px solid rgba(218, 194, 154, 0.64);
+  border-radius: 16px;
+  background: rgba(255, 250, 239, 0.86);
+  color: #7e786e;
+  box-shadow: 0 12px 24px rgba(118, 98, 67, 0.08);
+  transform: rotate(-7deg);
+}
+
+.bm-mirror-note span {
+  color: #7d7164;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.bm-mirror-note small {
+  color: #9b9082;
+  font-size: 10px;
+  font-weight: 680;
+  line-height: 1.3;
+}
+
+.bm-mirror-ip-sticker {
+  position: absolute;
+  left: -21px;
+  bottom: 28px;
+  z-index: 4;
+  width: min(40vw, 168px);
+  max-width: none;
+  filter: drop-shadow(0 14px 16px rgba(37, 63, 78, 0.16));
+}
+
+.bm-mirror-photo {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  z-index: 2;
+  width: min(68vw, 280px);
+  height: 318px;
+  min-height: 0 !important;
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid rgba(209, 184, 136, 0.76) !important;
+  border-radius: 48% 48% 32px 32px / 38% 38% 30px 30px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.70), rgba(223, 237, 238, 0.78)) !important;
+  box-shadow:
+    inset 0 0 0 8px rgba(255, 255, 255, 0.38),
+    0 18px 34px rgba(74, 112, 143, 0.13) !important;
+  transform: translateX(-50%);
+}
+
+.bm-mirror-photo.has-photo {
+  background: rgba(255, 255, 255, 0.84) !important;
+}
+
+.bm-mirror-photo img {
+  width: 100%;
+  height: 100%;
+  min-height: 0 !important;
+  max-height: none !important;
+  display: block;
+  object-fit: cover;
+  filter: saturate(0.98) contrast(1.01);
+}
+
+.bm-mirror-placeholder {
+  position: absolute;
+  inset: 34% 20% auto;
+  z-index: 3;
+  display: grid !important;
+  place-items: center;
+  gap: 6px;
+  margin: 0 !important;
+  color: #49687e;
+}
+
+.bm-mirror-placeholder svg {
+  color: #5d88aa;
+}
+
+.bm-mirror-placeholder strong {
+  color: #22384c;
+  font-size: 17px;
+  font-weight: 820;
+  white-space: nowrap;
+}
+
+.bm-mirror-placeholder small {
+  max-width: 160px;
+  color: #718493;
+  font-size: 11px;
+  line-height: 1.38;
+}
+
+.bm-mirror-guide-lines {
+  position: absolute;
+  inset: 18% 13% 17%;
+  z-index: 2;
+  display: grid !important;
+  grid-template-rows: repeat(3, 1fr);
+  margin: 0 !important;
+  pointer-events: none;
+}
+
+.bm-mirror-guide-lines::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  border-left: 1px dashed rgba(255, 255, 255, 0.70);
+}
+
+.bm-mirror-guide-lines b {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  border-top: 1px dashed rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 1px 8px rgba(38, 58, 70, 0.34);
+}
+
+.bm-mirror-guide-lines b:first-child {
+  border-top: 0;
+}
+
+.bm-mirror-actions {
+  position: absolute;
+  right: 13px;
+  top: 132px;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  width: 90px;
+}
+
+.bm-mirror-actions button {
+  display: grid;
+  place-items: center;
+  gap: 5px;
+  min-height: 72px;
+  padding: 8px 6px;
+  border: 1px solid rgba(214, 225, 222, 0.78);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #55748b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 760;
+  box-shadow: 0 10px 20px rgba(74, 112, 143, 0.11);
+  cursor: pointer;
+}
+
+.bm-mirror-actions button:disabled {
+  cursor: wait;
+  opacity: 0.66;
+}
+
+.bm-mirror-actions .bm-mirror-primary-action {
+  border-color: rgba(116, 181, 160, 0.46);
+  background: linear-gradient(180deg, #95cbb9, #77b49f);
+  color: #fff;
+}
+
+.bm-face-ratio-loading {
+  z-index: 8;
+}
+
+.bm-ratio-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  overflow: visible;
+}
+
+.bm-ratio-metric {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-height: 74px;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 12px 26px rgba(74, 112, 143, 0.09);
+}
+
+.bm-ratio-metric:first-child {
+  grid-column: 1 / -1;
+  min-height: 66px;
+  background:
+    linear-gradient(135deg, rgba(235, 248, 244, 0.94), rgba(255, 247, 232, 0.82));
+}
+
+.bm-ratio-metric + .bm-ratio-metric {
+  border-left: 1px solid rgba(255, 255, 255, 0.88);
+}
+
+.bm-ratio-metric > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #e5f4f2;
+  color: #4c999d;
+  font-size: 14px;
+  font-weight: 820;
+  line-height: 1;
+}
+
+.bm-ratio-metric:nth-child(3) > span {
+  background: #fff1e6;
+  color: #c48261;
+}
+
+.bm-ratio-metric div {
+  min-width: 0;
+}
+
+.bm-ratio-metric strong,
+.bm-ratio-metric em,
+.bm-ratio-metric small {
+  display: block;
+  min-width: 0;
+}
+
+.bm-ratio-metric strong {
+  color: #516170;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.bm-ratio-metric em {
+  margin-top: 3px;
+  color: #172b3d;
+  font-size: 14px;
+  line-height: 1.28;
+  font-style: normal;
+  font-weight: 820;
+  overflow-wrap: anywhere;
+}
+
+.bm-ratio-metric small {
+  margin-top: 2px;
+  color: #85929d;
+  font-size: 10px;
+  line-height: 1.25;
+  font-weight: 680;
+}
+
+.bm-mirror-result-info {
+  margin: 0 4px;
+}
+
+.bm-mirror-result-info .bm-face-ratio-note {
+  margin: 0;
+  text-align: center;
+}
+
+.bm-tutorial-mirror .bm-flow-routine-compact,
+.bm-tutorial-mirror .bm-video-match-card {
+  border-color: rgba(255, 255, 255, 0.88) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(239, 248, 252, 0.62)) !important;
+  box-shadow: 0 13px 28px rgba(74, 112, 143, 0.09) !important;
+}
+
+.bm-tutorial-mirror .bm-video-query-list button {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.bm-video-empty-state button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 34px;
+  margin-top: 10px;
+  padding: 0 12px;
+  border: 1px solid rgba(111, 151, 180, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #4f7592;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+@media (max-width: 480px) {
+  .bm-tutorial-mirror .bm-flow-content {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .bm-tutorial-choice-row {
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 6px;
+    min-height: 62px;
+    padding: 9px 10px;
+  }
+
+  .bm-tutorial-choice-label {
+    gap: 5px;
+    font-size: 12px;
+  }
+
+  .bm-tutorial-mirror .bm-flow-panel .bm-segment button,
+  .bm-tutorial-mirror .bm-scene-grid button {
+    min-height: 38px;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+
+  .bm-tutorial-mirror .bm-scene-grid button svg {
+    display: none;
+  }
+
+  .bm-mirror-stage {
+    min-height: 356px;
+    border-radius: 30px;
+  }
+
+  .bm-mirror-photo {
+    width: min(69vw, 258px);
+    height: 298px;
+  }
+
+  .bm-mirror-actions {
+    right: 11px;
+    top: 126px;
+    width: 80px;
+  }
+
+  .bm-mirror-actions button {
+    min-height: 66px;
+    border-radius: 18px;
+    font-size: 11px;
+  }
+
+  .bm-mirror-ip-sticker {
+    left: -24px;
+    bottom: 25px;
+    width: min(43vw, 154px);
+  }
+
+  .bm-mirror-note {
+    top: 68px;
+    width: 80px;
+    min-height: 76px;
+    padding: 10px 8px;
+  }
+
+  .bm-ratio-metric {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 6px;
+    min-height: 72px;
+    padding: 8px 7px;
+  }
+
+  .bm-ratio-metric > span {
+    width: 28px;
+    height: 28px;
+    font-size: 15px;
+  }
+
+  .bm-ratio-metric strong {
+    font-size: 11px;
+  }
+
+  .bm-ratio-metric em {
+    font-size: 12px;
+  }
+
+  .bm-ratio-metric small {
+    font-size: 9px;
+  }
+
+  .bm-ratio-reference-compact {
+    padding: 9px;
+    border-radius: 18px;
+  }
+
+  .bm-three-part-meter {
+    gap: 3px;
+    padding: 3px;
+  }
+
+  .bm-three-part-meter span {
+    padding: 7px 3px;
+    border-radius: 12px;
+  }
+
+  .bm-three-part-meter b {
+    font-size: 10px;
+  }
+
+  .bm-three-part-meter em {
+    font-size: 11px;
+  }
+
+  .bm-ratio-reference-pills {
+    gap: 5px;
+  }
+
+  .bm-ratio-reference-pills span {
+    padding: 7px 5px;
+    border-radius: 13px;
+  }
+
+  .bm-ratio-reference-pills em {
+    font-size: 11px;
+  }
+
+  .bm-ratio-reference-pills small {
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .bm-tutorial-brand-mark {
+    display: none;
+  }
+
+  .bm-mirror-stage {
+    min-height: 338px;
+  }
+
+  .bm-mirror-photo {
+    width: min(70vw, 236px);
+    height: 280px;
+  }
+
+  .bm-mirror-actions {
+    right: 8px;
+    top: 120px;
+    width: 72px;
+  }
+
+  .bm-mirror-actions button {
+    min-height: 58px;
+    font-size: 10px;
+  }
+
+  .bm-mirror-ip-sticker {
+    width: 138px;
+  }
+
+  .bm-mirror-note {
+    display: none;
+  }
+
+  .bm-ratio-reference-pills {
+    grid-template-columns: 1fr;
+  }
+
+  .bm-ratio-reference-pills span {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .bm-ratio-reference-pills small {
+    grid-column: 1 / -1;
   }
 }

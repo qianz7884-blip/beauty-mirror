@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Briefcase,
   Camera,
+  ChevronRight,
   Clock3,
   Copy,
   Image as ImageIcon,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react'
 import { analyzeFaceRatio, fetchProducts } from '../api'
 import { usePageBackground } from '../utils/backgroundSettings'
+import tutorialRatioWitchSticker from '../assets/illustrations/beauty-mirror-ip/tutorial-ratio-witch-sticker.png'
 
 const TIME_OPTIONS = [
   { id: 'quick', label: '5分钟救急', minutes: 5, keywords: '快速出门妆 懒人淡妆' },
@@ -193,6 +195,76 @@ function buildRatioReferenceRows(faceRatio) {
   ]
 }
 
+function buildThreePartSegments(faceRatio) {
+  if (!faceRatio?.ok) return []
+
+  const threePart = faceRatio.measurements?.three_part || {}
+  return [
+    ['upper', '上庭', '上庭均衡'],
+    ['middle', '中庭', '中庭均衡'],
+    ['lower', '下庭', '下庭均衡'],
+  ].map(([key, label, fallback]) => {
+    const item = threePart[key] || {}
+    const share = Number(item.share)
+    const sharePercent = Number.isFinite(share) ? Math.max(20, Math.min(46, share * 100)) : 33.3
+    return {
+      id: key,
+      label: item.label || label,
+      percent: formatRatioPercent(item.share),
+      normalized: `${formatRatioNumber(item.normalized)}x`,
+      status: item.status || getPrimaryRatioTag(faceRatio, tag => tag.startsWith(label), fallback),
+      width: `${sharePercent}%`,
+    }
+  })
+}
+
+function buildRatioMetricCards(faceRatio) {
+  if (!faceRatio?.ok) {
+    return [
+      { id: 'direction', icon: '✦', label: '比例方向', value: '等待正面照', helper: '上传后自动生成教程关键词' },
+      { id: 'three', icon: '三', label: '三庭', value: '待分析', helper: '上 / 中 / 下庭' },
+      { id: 'five', icon: '五', label: '五眼', value: '待分析', helper: '眼距与脸宽参考' },
+    ]
+  }
+
+  const measurements = faceRatio.measurements || {}
+  const threePart = measurements.three_part || {}
+  const fiveEye = measurements.five_eye || {}
+  const usefulTags = getUsefulRatioTags(faceRatio)
+  const direction = usefulTags[0] || faceRatio.primary_tags?.[0] || '整体比例接近均衡'
+  const threeValues = [
+    `上 ${formatRatioNumber(threePart.upper?.normalized)}`,
+    `中 ${formatRatioNumber(threePart.middle?.normalized)}`,
+    `下 ${formatRatioNumber(threePart.lower?.normalized)}`,
+  ].join(' · ')
+  const eyeSpacingRatio = formatRatioNumber(fiveEye.eye_spacing_ratio)
+  const faceEyeCount = formatRatioNumber(fiveEye.face_eye_count)
+
+  return [
+    {
+      id: 'direction',
+      icon: '✦',
+      label: '比例方向',
+      value: direction,
+      helper: '先按这个方向筛教程',
+    },
+    {
+      id: 'three',
+      icon: '三',
+      label: '三庭',
+      value: threeValues.includes('--') ? '参考已生成' : threeValues,
+      helper: '参考区间 0.88-1.12',
+    },
+    {
+      id: 'five',
+      icon: '五',
+      label: '五眼',
+      value: eyeSpacingRatio !== '--' ? `眼距 ${eyeSpacingRatio}x` : `${faceEyeCount} 个眼宽`,
+      helper: faceEyeCount !== '--' ? `脸宽约 ${faceEyeCount} 个眼宽` : '横向比例参考',
+    },
+  ]
+}
+
 export default function Tutorial() {
   const pageBackground = usePageBackground('tutorial')
   const [products, setProducts] = useState([])
@@ -226,6 +298,8 @@ export default function Tutorial() {
   const displayedRatioTags = (getUsefulRatioTags(faceRatio).length ? getUsefulRatioTags(faceRatio) : faceRatio?.ratio_tags || []).slice(0, 5)
   const ratioTips = faceRatio?.makeup_tips?.slice(0, 3) || []
   const ratioReferenceRows = useMemo(() => buildRatioReferenceRows(faceRatio), [faceRatio])
+  const threePartSegments = useMemo(() => buildThreePartSegments(faceRatio), [faceRatio])
+  const ratioMetricCards = useMemo(() => buildRatioMetricCards(faceRatio), [faceRatio])
   const videoRecommendations = useMemo(
     () => buildVideoRecommendations(faceRatio, activeGuide),
     [faceRatio, activeGuide],
@@ -289,7 +363,7 @@ export default function Tutorial() {
   }
 
   return (
-    <div className="bm-screen bm-tutorial" style={pageBackground.style}>
+    <div className="bm-screen bm-tutorial bm-tutorial-mirror" style={pageBackground.style}>
       {toast && (
         <div className="d-toast-container">
           <div className={`d-toast d-toast-${toast.type}`}>{toast.message}</div>
@@ -297,84 +371,85 @@ export default function Tutorial() {
       )}
 
       <section className="bm-hero bm-tutorial-hero">
-        <h1>教程推荐</h1>
-        <p className="bm-flow-copy">拍照分析比例，再按时间预算和场景找适合今天的视频教程。</p>
+        <div>
+          <h1>教程推荐</h1>
+          <p className="bm-flow-copy">按时间、场景和面部比例找到今天适合的教程</p>
+        </div>
+        <span className="bm-tutorial-brand-mark">Beauty<br />Mirror</span>
       </section>
 
       <div className="bm-flow-content">
-        <section className="bm-flow-panel">
-          <div className="bm-flow-time-label">
-            <Clock3 size={15} strokeWidth={1.7} />
-            <span>选择可投入时间</span>
-          </div>
-          <div className="bm-segment">
-            {TIME_OPTIONS.map(option => (
-              <button
-                key={option.id}
-                type="button"
-                className={option.id === timeId ? 'active' : ''}
-                onClick={() => setTimeId(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
+        <section className="bm-flow-panel bm-tutorial-control-panel" aria-label="教程筛选">
+          <div className="bm-tutorial-choice-row">
+            <div className="bm-tutorial-choice-label">
+              <Clock3 size={16} strokeWidth={1.7} />
+              <span>时间</span>
+            </div>
+            <div className="bm-segment bm-tutorial-pill-group">
+              {TIME_OPTIONS.map(option => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={option.id === timeId ? 'active' : ''}
+                  onClick={() => setTimeId(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="bm-flow-time-label bm-flow-scene-label">
-            <Sparkles size={15} strokeWidth={1.7} />
-            <span>选择使用场景</span>
-          </div>
-          <div className="bm-scene-grid">
-            {SCENES.map(scene => {
-              const SceneIcon = scene.icon
-              return (
-                <button
-                  key={scene.id}
-                  type="button"
-                  className={scene.id === sceneId ? 'active' : ''}
-                  onClick={() => setSceneId(scene.id)}
-                >
-                  <SceneIcon size={17} strokeWidth={1.7} />
-                  <span>{scene.label}</span>
-                </button>
-              )
-            })}
+          <div className="bm-tutorial-choice-row">
+            <div className="bm-tutorial-choice-label">
+              <Sparkles size={16} strokeWidth={1.7} />
+              <span>场景</span>
+            </div>
+            <div className="bm-scene-grid bm-tutorial-pill-group">
+              {SCENES.map(scene => {
+                const SceneIcon = scene.icon
+                return (
+                  <button
+                    key={scene.id}
+                    type="button"
+                    className={scene.id === sceneId ? 'active' : ''}
+                    onClick={() => setSceneId(scene.id)}
+                  >
+                    <SceneIcon size={17} strokeWidth={1.7} />
+                    <span>{scene.label}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </section>
 
-        <section className={`bm-face-ratio-card${faceRatio?.ok ? ' has-result' : ''}`}>
-          <div className="bm-face-ratio-head">
-            <span className="bm-soft-icon">
-              <Sparkles size={21} strokeWidth={1.7} />
+        <section className={`bm-face-ratio-card bm-mirror-analysis-card${faceRatio?.ok ? ' has-result' : ''}`}>
+          <div className="bm-mirror-stage">
+            <span className="bm-mirror-note" aria-hidden="true">
+              <span>你的比例</span>
+              <small>{analyzingFaceRatio ? '正在分析中...' : faceRatio?.ok ? '已生成教程方向' : '等待正面照'}</small>
             </span>
-            <div>
-              <p>面部比例推荐</p>
-              <h2>拍照分析三庭五眼倾向</h2>
-            </div>
-            {faceRatio?.ok && (
-              <button type="button" onClick={handleClearFaceRatio}>
-                <RotateCcw size={15} strokeWidth={1.8} />
-                <span>重测</span>
-              </button>
-            )}
-          </div>
-
-          <div className="bm-face-ratio-body">
+            <img className="bm-mirror-ip-sticker" src={tutorialRatioWitchSticker} alt="" aria-hidden="true" />
             <button
               type="button"
-              className={`bm-face-ratio-drop${facePhotoPreview ? ' has-photo' : ''}`}
+              className={`bm-face-ratio-drop bm-mirror-photo${facePhotoPreview ? ' has-photo' : ''}`}
               onClick={() => faceCameraRef.current?.click()}
               disabled={analyzingFaceRatio}
             >
               {facePhotoPreview ? (
                 <img src={facePhotoPreview} alt="面部比例分析预览" />
               ) : (
-                <>
-                  <Camera size={24} strokeWidth={1.6} />
-                  <span>拍一张正面照</span>
+                <span className="bm-mirror-placeholder">
+                  <Camera size={26} strokeWidth={1.6} />
+                  <strong>拍一张正面照</strong>
                   <small>自动生成比例标签和视频关键词</small>
-                </>
+                </span>
               )}
+              <span className="bm-mirror-guide-lines" aria-hidden="true">
+                <b>上庭</b>
+                <b>中庭</b>
+                <b>下庭</b>
+              </span>
               {analyzingFaceRatio && (
                 <span className="bm-face-ratio-loading">
                   <Loader2 size={20} strokeWidth={1.8} />
@@ -383,76 +458,99 @@ export default function Tutorial() {
               )}
             </button>
 
-            <div className="bm-face-ratio-info">
-              {faceRatio?.ok ? (
-                <>
-                  <div className="bm-face-ratio-status">
-                    <span>{faceRatio.confidence === 'high' ? '照片角度可用' : '结果仅作参考'}</span>
+            <div className="bm-mirror-actions" aria-label="面部比例分析操作">
+              <button
+                type="button"
+                className="bm-mirror-primary-action"
+                onClick={() => faceCameraRef.current?.click()}
+                disabled={analyzingFaceRatio}
+              >
+                <Camera size={18} strokeWidth={1.7} />
+                <span>拍照分析</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => faceAlbumRef.current?.click()}
+                disabled={analyzingFaceRatio}
+              >
+                <ImageIcon size={17} strokeWidth={1.7} />
+                <span>相册选择</span>
+              </button>
+              {faceRatio?.ok && (
+                <button type="button" onClick={handleClearFaceRatio}>
+                  <RotateCcw size={15} strokeWidth={1.8} />
+                  <span>重测</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bm-ratio-metric-strip" aria-label="面部比例参考数据">
+            {ratioMetricCards.map((item, index) => (
+              <div className="bm-ratio-metric" key={item.id}>
+                <span>{item.icon || (index === 0 ? '↻' : index === 1 ? '◉' : '⌄')}</span>
+                <div>
+                  <strong>{item.label}</strong>
+                  <em>{item.value}</em>
+                  <small>{item.helper}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bm-face-ratio-info bm-mirror-result-info">
+            {faceRatio?.ok ? (
+              <>
+                <p className="bm-face-ratio-summary">{faceRatio.summary}</p>
+                {displayedRatioTags.length > 0 && (
+                  <div className="bm-face-ratio-tags">
+                    {displayedRatioTags.map(tag => (
+                      <span key={tag}>{tag}</span>
+                    ))}
                   </div>
-                  <p className="bm-face-ratio-summary">{faceRatio.summary}</p>
-                  {displayedRatioTags.length > 0 && (
-                    <div className="bm-face-ratio-tags">
-                      {displayedRatioTags.map(tag => (
-                        <span key={tag}>{tag}</span>
-                      ))}
+                )}
+                {ratioReferenceRows.length > 0 && (
+                  <div className="bm-face-ratio-reference bm-ratio-reference-compact" aria-label="三庭五眼参考数据">
+                    <div className="bm-face-ratio-reference-head">
+                      <strong>参考依据</strong>
+                      <span>本次值 / 常见范围</span>
                     </div>
-                  )}
-                  {ratioReferenceRows.length > 0 && (
-                    <div className="bm-face-ratio-reference" aria-label="三庭五眼参考数据">
-                      <div className="bm-face-ratio-reference-head">
-                        <strong>参考数据</strong>
-                        <span>本次值 / 常见参考</span>
-                      </div>
-                      <div className="bm-face-ratio-reference-grid">
-                        {ratioReferenceRows.map(row => (
-                          <div className="bm-face-ratio-reference-row" key={row.id}>
-                            <span>{row.group}</span>
-                            <strong>{row.label}</strong>
-                            <b>{row.status}</b>
-                            <em>{row.value}</em>
-                            <small>参考 {row.reference}</small>
-                          </div>
+                    {threePartSegments.length > 0 && (
+                      <div className="bm-three-part-meter" aria-label="三庭占比">
+                        {threePartSegments.map(segment => (
+                          <span key={segment.id} style={{ flexBasis: segment.width }} title={segment.status}>
+                            <b>{segment.label}</b>
+                            <em>{segment.percent}</em>
+                            <small>{segment.normalized}</small>
+                          </span>
                         ))}
                       </div>
-                    </div>
-                  )}
-                  {ratioTips.length > 0 && (
-                    <ul className="bm-face-ratio-tips">
-                      {ratioTips.map(tip => (
-                        <li key={tip}>{tip}</li>
+                    )}
+                    <div className="bm-ratio-reference-pills">
+                      {ratioReferenceRows.filter(row => !row.id.startsWith('three-')).map(row => (
+                        <span key={row.id} title={row.status}>
+                          <b>{row.label}</b>
+                          <em>{row.value}</em>
+                          <small>参考 {row.reference}</small>
+                        </span>
                       ))}
-                    </ul>
-                  )}
-                </>
-              ) : (
-                <>
-                  <p className="bm-face-ratio-summary">
-                    上传正面照后，系统会把比例倾向转换成教程关键词。没有照片时也可以先按时间预算和场景看通用方向。
-                  </p>
-                  {faceRatioError && <p className="bm-face-ratio-error">{faceRatioError}</p>}
-                </>
-              )}
-
-              <div className="bm-face-ratio-actions">
-                <button
-                  type="button"
-                  onClick={() => faceCameraRef.current?.click()}
-                  disabled={analyzingFaceRatio}
-                >
-                  <Camera size={16} strokeWidth={1.7} />
-                  拍照分析
-                </button>
-                <button
-                  type="button"
-                  onClick={() => faceAlbumRef.current?.click()}
-                  disabled={analyzingFaceRatio}
-                >
-                  <ImageIcon size={16} strokeWidth={1.7} />
-                  相册选择
-                </button>
-              </div>
-              <p className="bm-face-ratio-note">三庭结果是关键点近似，不代表绝对脸型，只用于匹配教程方向。</p>
-            </div>
+                    </div>
+                  </div>
+                )}
+                {ratioTips.length > 0 && (
+                  <ul className="bm-face-ratio-tips">
+                    {ratioTips.map(tip => (
+                      <li key={tip}>{tip}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="bm-face-ratio-note">三庭结果是关键点近似，不代表绝对脸型，只用于匹配教程方向。</p>
+                {faceRatioError && <p className="bm-face-ratio-error">{faceRatioError}</p>}
+              </>
+            )}
           </div>
 
           <input
@@ -526,6 +624,10 @@ export default function Tutorial() {
             <div className="bm-video-empty-state">
               <Video size={23} strokeWidth={1.7} />
               <p>拍照分析后，会在这里生成 3 个视频搜索词。</p>
+              <button type="button" onClick={() => faceCameraRef.current?.click()}>
+                现在分析
+                <ChevronRight size={15} strokeWidth={1.8} />
+              </button>
             </div>
           )}
         </section>
