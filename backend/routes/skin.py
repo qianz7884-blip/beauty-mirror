@@ -4,7 +4,12 @@ import threading
 from flask import Blueprint, current_app, jsonify, request
 
 from models import SkinAnalysis, db
-from skin_analyzer import _prepare_analysis_image_bytes, analyze_skin, detect_face
+from skin_analyzer import (
+    _prepare_analysis_image_bytes,
+    analyze_skin,
+    detect_face,
+    prepare_face_parsing,
+)
 from upload_utils import delete_photo, save_photo_bytes
 
 from .common import error, get_current_user_id
@@ -45,13 +50,19 @@ def face_ratio_analysis():
 
     from face_ratio_analyzer import analyze_face_ratios
 
+    image_rgb, face_parse, face_parsing_summary = prepare_face_parsing(
+        analysis_image_bytes
+    )
     face_ratio = analyze_face_ratios(
         face_info['landmarks'],
         face_info['image_size'],
         image_bytes=analysis_image_bytes,
+        image_rgb=image_rgb,
+        face_parse=face_parse,
     )
     face_data = face_info.get('face_data', {})
     if isinstance(face_data, dict):
+        face_data['face_parsing'] = face_parsing_summary
         face_data['face_ratio'] = face_ratio
 
     return jsonify({

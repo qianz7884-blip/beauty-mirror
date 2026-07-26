@@ -15,6 +15,7 @@ def create_app():
     CORS(app)
 
     _ensure_local_paths(app)
+    _warm_face_parsing()
     db.init_app(app)
     register_routes(app)
 
@@ -25,6 +26,26 @@ def create_app():
         _seed_product_knowledge()
 
     return app
+
+
+def _warm_face_parsing():
+    """Load the ONNX session at startup so deployment problems are visible early."""
+    try:
+        from face_parsing import get_face_parsing_status
+
+        status = get_face_parsing_status(ensure_session=True)
+        if status.get('ready'):
+            print(
+                '[app] face parsing ready: '
+                f"{status.get('model_size_bytes', 0) / 1024 / 1024:.1f} MB"
+            )
+        else:
+            print(
+                '[app] face parsing unavailable; skin ROI will use geometry fallback: '
+                f"{status.get('session_error') or 'model missing or disabled'}"
+            )
+    except Exception as exc:
+        print(f'[app] face parsing warmup failed; geometry fallback remains available: {exc}')
 
 
 def _ensure_local_paths(app):

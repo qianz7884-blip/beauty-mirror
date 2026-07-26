@@ -21,6 +21,10 @@ services:
         value: 180
       - key: SKIN_ANALYSIS_CONCURRENCY
         value: 1
+      - key: FACE_PARSING_ENABLED
+        value: 1
+      - key: FACE_PARSING_INTRA_OP_THREADS
+        value: 1
       - key: GEMINI_TIMEOUT_MS
         value: 30000
       - key: SKIN_ANALYSIS_HEATMAP_MAX_START_MS

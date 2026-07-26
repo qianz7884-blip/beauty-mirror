@@ -9,6 +9,7 @@ skin-to-hair boundary.
 import hashlib
 import os
 import threading
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
@@ -18,6 +19,8 @@ from scipy.ndimage import binary_closing, binary_fill_holes, binary_opening
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_MODEL_PATH = os.path.join(MODULE_DIR, 'models', 'face_parsing_resnet18.onnx')
 DEFAULT_MODEL_URL = 'https://github.com/yakhyo/face-parsing/releases/download/weights/resnet18.onnx'
+DEFAULT_MODEL_SHA256 = '0d9bd318e46987c3bdbfacae9e2c0f461cae1c6ac6ea6d43bbe541a91727e33f'
+MIN_MODEL_BYTES = 40 * 1024 * 1024
 
 INPUT_SIZE = (512, 512)
 SKIN_CLASS_ID = 1
@@ -31,6 +34,8 @@ _IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 
 _SESSION = None
 _SESSION_ERROR = ''
 _SESSION_LOCK = threading.Lock()
+_INFERENCE_LOCK = threading.Lock()
+_LAST_INFERENCE_ERROR = ''
 _LAST_PARSE = {
     'key': None,
     'result': None,
@@ -41,20 +46,94 @@ def get_default_model_path():
     return os.environ.get('FACE_PARSING_ONNX_PATH') or DEFAULT_MODEL_PATH
 
 
+def get_model_url():
+    return os.environ.get('FACE_PARSING_MODEL_URL') or DEFAULT_MODEL_URL
+
+
+def get_expected_model_sha256():
+    explicit = os.environ.get('FACE_PARSING_MODEL_SHA256', '').strip().lower()
+    if explicit:
+        return explicit
+    return DEFAULT_MODEL_SHA256 if get_model_url() == DEFAULT_MODEL_URL else ''
+
+
 def is_face_parsing_enabled():
     return os.environ.get('FACE_PARSING_ENABLED', '1').lower() not in ('0', 'false', 'no', 'off')
 
 
-def get_face_parsing_status():
+def get_face_parsing_status(ensure_session=False):
     model_path = get_default_model_path()
+    model_exists = os.path.exists(model_path)
+    if ensure_session and model_exists and is_face_parsing_enabled():
+        _get_session()
+
     return {
         'enabled': is_face_parsing_enabled(),
         'model_path': model_path,
-        'model_exists': os.path.exists(model_path),
+        'model_exists': model_exists,
+        'model_size_bytes': int(os.path.getsize(model_path)) if model_exists else 0,
         'session_ready': _SESSION is not None,
         'session_error': _SESSION_ERROR,
-        'model_url': DEFAULT_MODEL_URL,
+        'inference_error': _LAST_INFERENCE_ERROR,
+        'ready': bool(is_face_parsing_enabled() and model_exists and _SESSION is not None),
+        'model_url': get_model_url(),
     }
+
+
+def model_file_sha256(path=None):
+    target = Path(path or get_default_model_path())
+    digest = hashlib.sha256()
+    with target.open('rb') as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def validate_model_file(path=None, load_session=False):
+    """Validate the downloaded artifact before it is used in a deployment."""
+    target = Path(path or get_default_model_path())
+    if not target.is_file():
+        raise FileNotFoundError(f'face parsing model not found: {target}')
+    if target.stat().st_size < MIN_MODEL_BYTES:
+        raise ValueError(
+            f'face parsing model is unexpectedly small: {target.stat().st_size} bytes'
+        )
+
+    expected_sha256 = get_expected_model_sha256()
+    actual_sha256 = model_file_sha256(target)
+    if expected_sha256 and actual_sha256 != expected_sha256:
+        raise ValueError(
+            f'face parsing model checksum mismatch: expected {expected_sha256}, got {actual_sha256}'
+        )
+
+    info = {
+        'path': str(target),
+        'size_bytes': int(target.stat().st_size),
+        'sha256': actual_sha256,
+        'session_validated': False,
+    }
+    if load_session:
+        import onnxruntime as ort
+
+        session = ort.InferenceSession(str(target), providers=['CPUExecutionProvider'])
+        input_shape = list(session.get_inputs()[0].shape)
+        if input_shape[-2:] != [INPUT_SIZE[1], INPUT_SIZE[0]]:
+            raise ValueError(f'unexpected face parsing input shape: {input_shape}')
+
+        input_name = session.get_inputs()[0].name
+        output = session.run(
+            [session.get_outputs()[0].name],
+            {input_name: np.zeros((1, 3, INPUT_SIZE[1], INPUT_SIZE[0]), dtype=np.float32)},
+        )[0]
+        output_shape = list(output.shape)
+        if len(output_shape) != 4 or output_shape[1] < 19:
+            raise ValueError(f'unexpected face parsing output shape: {output_shape}')
+        info.update({
+            'session_validated': True,
+            'input_shape': input_shape,
+            'output_shape': output_shape,
+        })
+    return info
 
 
 def _get_session():
@@ -78,7 +157,15 @@ def _get_session():
         try:
             import onnxruntime as ort
 
-            _SESSION = ort.InferenceSession(model_path, providers=['CPUExecutionProvider'])
+            options = ort.SessionOptions()
+            options.intra_op_num_threads = max(1, int(os.environ.get('FACE_PARSING_INTRA_OP_THREADS', '1')))
+            options.inter_op_num_threads = 1
+            options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            _SESSION = ort.InferenceSession(
+                model_path,
+                sess_options=options,
+                providers=['CPUExecutionProvider'],
+            )
             _SESSION_ERROR = ''
             print(f'[face_parsing] ONNX model loaded: {model_path}')
         except Exception as exc:
@@ -151,8 +238,11 @@ def _clean_binary_mask(mask, close_size=3, open_size=2, fill=True):
 
 def parse_face(image_rgb):
     """Return semantic class map plus skin/hair masks, or None when unavailable."""
+    global _LAST_INFERENCE_ERROR
+
     arr = _as_rgb_array(image_rgb)
     if arr is None:
+        _LAST_INFERENCE_ERROR = 'invalid RGB image'
         return None
 
     session = _get_session()
@@ -160,33 +250,65 @@ def parse_face(image_rgb):
         return None
 
     key = _parse_cache_key(arr)
-    if _LAST_PARSE['key'] == key and _LAST_PARSE['result'] is not None:
-        return _LAST_PARSE['result']
+    with _INFERENCE_LOCK:
+        if _LAST_PARSE['key'] == key and _LAST_PARSE['result'] is not None:
+            return _LAST_PARSE['result']
 
-    try:
-        input_name = session.get_inputs()[0].name
-        output = session.run(None, {input_name: _preprocess(arr)})[0]
-        label_map = _resize_label_map(_output_to_label_map(output), (arr.shape[1], arr.shape[0]))
+        try:
+            input_name = session.get_inputs()[0].name
+            output = session.run(None, {input_name: _preprocess(arr)})[0]
+            label_map = _resize_label_map(_output_to_label_map(output), (arr.shape[1], arr.shape[0]))
 
-        skin_mask = _clean_binary_mask(label_map == SKIN_CLASS_ID, close_size=5, open_size=2, fill=True)
-        hair_mask = _clean_binary_mask(label_map == HAIR_CLASS_ID, close_size=5, open_size=2, fill=False)
+            skin_mask = _clean_binary_mask(label_map == SKIN_CLASS_ID, close_size=5, open_size=2, fill=True)
+            hair_mask = _clean_binary_mask(label_map == HAIR_CLASS_ID, close_size=5, open_size=2, fill=False)
 
-        result = {
-            'ok': True,
-            'source': 'face_parsing_onnx',
-            'model_path': get_default_model_path(),
-            'class_map': label_map,
-            'skin_mask': skin_mask,
-            'hair_mask': hair_mask,
-            'skin_pixel_count': int(np.sum(skin_mask > 0)),
-            'hair_pixel_count': int(np.sum(hair_mask > 0)),
+            result = {
+                'ok': True,
+                'source': 'face_parsing_onnx',
+                'model_path': get_default_model_path(),
+                'class_map': label_map,
+                'skin_mask': skin_mask,
+                'hair_mask': hair_mask,
+                'skin_pixel_count': int(np.sum(skin_mask > 0)),
+                'hair_pixel_count': int(np.sum(hair_mask > 0)),
+            }
+            _LAST_PARSE['key'] = key
+            _LAST_PARSE['result'] = result
+            _LAST_INFERENCE_ERROR = ''
+            return result
+        except Exception as exc:
+            _LAST_INFERENCE_ERROR = str(exc)
+            print(f'[face_parsing] inference failed: {exc}')
+            return None
+
+
+def summarize_face_parse(face_parse):
+    """Return JSON-safe observability data without exposing full pixel masks."""
+    status = get_face_parsing_status()
+    if not face_parse or not face_parse.get('ok'):
+        reason = (
+            status.get('inference_error')
+            or status.get('session_error')
+            or ('model_missing' if not status.get('model_exists') else 'face_parsing_unavailable')
+        )
+        return {
+            'available': False,
+            'enabled': bool(status.get('enabled')),
+            'model_exists': bool(status.get('model_exists')),
+            'session_ready': bool(status.get('session_ready')),
+            'source': 'mediapipe_geometry_fallback',
+            'reason': reason,
         }
-        _LAST_PARSE['key'] = key
-        _LAST_PARSE['result'] = result
-        return result
-    except Exception as exc:
-        print(f'[face_parsing] inference failed: {exc}')
-        return None
+
+    return {
+        'available': True,
+        'enabled': True,
+        'model_exists': True,
+        'session_ready': True,
+        'source': face_parse.get('source', 'face_parsing_onnx'),
+        'skin_pixel_count': int(face_parse.get('skin_pixel_count', 0)),
+        'hair_pixel_count': int(face_parse.get('hair_pixel_count', 0)),
+    }
 
 
 def _value(landmark, name):

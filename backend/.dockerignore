@@ -9,3 +9,4 @@ debug_heatmap/
 knowledge_base/chroma_data/
 test_*.png
 test_*.jpg
+models/face_parsing_*.onnx

@@ -50,6 +50,7 @@ ROI_DEBUG_DIR = os.environ.get(
     os.path.join(os.path.dirname(__file__), 'debug_roi'),
 )
 ROI_UNRELIABLE_WARNING = '该区域 ROI 无法可靠生成'
+_FACE_PARSE_UNSET = object()
 
 
 def _log_array_memory(label, arr):
@@ -522,7 +523,13 @@ def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_
         return None
 
 
-def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
+def extract_all_regions(
+        image_bytes,
+        landmarks,
+        image_size,
+        max_side=180,
+        image_rgb=None,
+        face_parse=_FACE_PARSE_UNSET):
     """
     一次性提取所有 8 个面部区域。
 
@@ -534,8 +541,15 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
     返回:
         dict: {region_name: roi_bytes, ...}，提取失败的区域为 None
     """
-    img = load_image(image_bytes).convert('RGB')
-    img_np = np.array(img, dtype=np.uint8)
+    if image_rgb is None:
+        img = load_image(image_bytes).convert('RGB')
+        img_np = np.array(img, dtype=np.uint8)
+    else:
+        img_np = np.asarray(image_rgb, dtype=np.uint8)
+        if img_np.ndim != 3 or img_np.shape[2] < 3:
+            raise ValueError(f'ROI image_rgb 格式异常: shape={img_np.shape}')
+        img_np = np.ascontiguousarray(img_np[:, :, :3])
+        img = Image.fromarray(img_np, mode='RGB')
     _log_array_memory('roi.input_rgb', img_np)
     debug_id = f'roi_{int(time.time() * 1000)}'
 
@@ -543,6 +557,7 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
         landmarks,
         image_size,
         image_rgb=img_np,
+        face_parse=face_parse,
         debug=DEBUG_ROI,
         debug_prefix=debug_id,
         return_debug=True,
@@ -907,6 +922,7 @@ def build_improved_face_skin_mask(
         landmarks,
         image_size,
         image_rgb=None,
+        face_parse=_FACE_PARSE_UNSET,
         debug=False,
         debug_prefix=None,
         return_debug=False):
@@ -962,11 +978,12 @@ def build_improved_face_skin_mask(
     semantic_hair_mask = None
     hairline_info = None
 
-    if image_rgb is not None:
+    if image_rgb is not None or face_parse is not _FACE_PARSE_UNSET:
         try:
             from face_parsing import estimate_hairline, parse_face
 
-            face_parse = parse_face(image_rgb)
+            if face_parse is _FACE_PARSE_UNSET:
+                face_parse = parse_face(image_rgb)
             if face_parse and face_parse.get('ok'):
                 raw_skin = np.asarray(face_parse.get('skin_mask'), dtype=np.uint8)
                 raw_hair = np.asarray(face_parse.get('hair_mask'), dtype=np.uint8)
@@ -1011,7 +1028,14 @@ def build_improved_face_skin_mask(
                             f'bbox={semantic_bbox}, area={semantic_area}, '
                             f'hairline={hairline_info.get("available") if isinstance(hairline_info, dict) else None}'
                         )
+                    else:
+                        metrics['semantic_fallback_reason'] = 'semantic_skin_area_too_small'
+                else:
+                    metrics['semantic_fallback_reason'] = 'semantic_mask_shape_mismatch'
+            else:
+                metrics['semantic_fallback_reason'] = 'face_parsing_unavailable'
         except Exception as exc:
+            metrics['semantic_fallback_reason'] = f'face_parsing_error: {exc}'
             print(f'[face_regions] semantic face parsing unavailable, using geometry mask: {exc}')
 
     if skin_mask_source == 'mediapipe_geometry':
