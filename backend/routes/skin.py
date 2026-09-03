@@ -45,10 +45,13 @@ def face_ratio_analysis():
 
     from face_ratio_analyzer import analyze_face_ratios
 
+    use_hairline_value = request.form.get('use_hairline', request.args.get('use_hairline', '1'))
+    use_hairline = str(use_hairline_value).lower() not in ('0', 'false', 'no', 'off')
     face_ratio = analyze_face_ratios(
         face_info['landmarks'],
         face_info['image_size'],
         image_bytes=analysis_image_bytes,
+        estimate_hairline=use_hairline,
     )
     face_data = face_info.get('face_data', {})
     if isinstance(face_data, dict):

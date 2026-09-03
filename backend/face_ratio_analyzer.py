@@ -139,7 +139,10 @@ def _load_image_rgb(image_bytes):
         return None
 
 
-def _estimate_hairline(landmarks, image_size, image_bytes=None, image_rgb=None):
+def _estimate_hairline(landmarks, image_size, image_bytes=None, image_rgb=None, enabled=True):
+    if not enabled:
+        return {'available': False, 'reason': 'hairline_skipped'}
+
     try:
         from face_parsing import estimate_hairline
 
@@ -258,7 +261,14 @@ def _confidence(quality_flags, face_height, face_width):
     return 'high'
 
 
-def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None):
+def analyze_face_ratios(
+    landmarks,
+    image_size,
+    image_bytes=None,
+    image_rgb=None,
+    estimate_hairline=True,
+    hairline_override=None,
+):
     """
     分析面部比例倾向。
 
@@ -310,19 +320,24 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
             'mouth_center': _mean_point(landmarks, MOUTH_CENTER_INDICES, image_size),
         }
 
-        hairline = _estimate_hairline(
-            landmarks,
-            image_size,
-            image_bytes=image_bytes,
-            image_rgb=image_rgb,
-        )
+        if isinstance(hairline_override, dict):
+            hairline = hairline_override
+        else:
+            hairline = _estimate_hairline(
+                landmarks,
+                image_size,
+                image_bytes=image_bytes,
+                image_rgb=image_rgb,
+                enabled=estimate_hairline,
+            )
         hairline_available = bool(isinstance(hairline, dict) and hairline.get('available'))
+        hairline_reason = hairline.get('reason') if isinstance(hairline, dict) else ''
         if hairline_available:
             points['forehead_top'] = (points['nose_tip'][0], float(hairline['y']))
             upper_source = 'face_parsing_hairline'
         else:
             points['forehead_top'] = points['mesh_forehead_top']
-            upper_source = 'mediapipe_forehead_approx'
+            upper_source = 'hairline_skipped' if hairline_reason == 'hairline_skipped' else 'mediapipe_forehead_approx'
 
         face_height = abs(points['chin'][1] - points['forehead_top'][1])
         face_width = _horizontal(points['face_left'], points['face_right'])
@@ -435,7 +450,7 @@ def analyze_face_ratios(landmarks, image_size, image_bytes=None, image_rgb=None)
         ] or ['面部比例整体均衡']
 
         quality_flags, pose_metrics = _quality_flags(points, face_height, face_width)
-        if not hairline_available:
+        if not hairline_available and hairline_reason != 'hairline_skipped':
             quality_flags.insert(0, '未识别到清晰发际线，请露出额头和发际线后重拍')
         makeup_tips = _make_tips(primary_tags)
 

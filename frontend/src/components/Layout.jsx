@@ -12,10 +12,10 @@ const TABS = [
 
 export default function Layout({ children }) {
   const { pathname } = useLocation()
-  const { style } = useThemeSettings()
+  const { settings, style } = useThemeSettings()
 
   return (
-    <div className="app-container bm-app-shell" style={style}>
+    <div className="app-container bm-app-shell" data-theme={settings.presetId || 'blue'} style={style}>
       <main className="app-content">{children}</main>
       <nav className="tab-bar" aria-label="主导航">
         {TABS.map(tab => {

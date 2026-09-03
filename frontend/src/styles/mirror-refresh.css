@@ -1,19 +1,19 @@
-﻿/* ============================
+/* ============================
    Luxury mirror assistant refresh
    ============================ */
 
 :root {
-  --mirror-pearl: #eef6fb;
+  --mirror-pearl: var(--bm-color-page-soft);
   --mirror-cream: #dde8f0;
   --mirror-blush: #d5ddea;
   --mirror-rose: #7b9ec7;
-  --mirror-gold: #6ea6cf;
+  --mirror-gold: var(--bm-color-brand-blue);
   --mirror-lilac: #cfdce8;
-  --mirror-ink: #1f2933;
-  --mirror-muted: #758393;
-  --mirror-line: rgba(111, 151, 180, 0.18);
+  --mirror-ink: var(--bm-color-text-primary);
+  --mirror-muted: var(--bm-color-text-muted);
+  --mirror-line: var(--bm-color-border-soft);
   --mirror-glass: rgba(237, 246, 251, 0.78);
-  --mirror-shadow: 0 18px 48px rgba(74, 112, 143, 0.10);
+  --mirror-shadow: 0 18px 48px rgba(var(--bm-rgb-shadow), 0.10);
 }
 
 /* body 背景由 foundation.css 统一控制 */
@@ -61,8 +61,8 @@
 }
 
 .toast-error {
-  background: #eef6fb;
-  color: #647789;
+  background: var(--bm-color-page-soft);
+  color: var(--bm-color-muted-soft);
   border-color: #ead2d5;
 }
 
@@ -71,14 +71,14 @@
   max-width: var(--max-w);
   border-radius: 26px 26px 0 0;
   padding: 22px 20px 30px;
-  background: rgba(237, 246, 251, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 -18px 54px rgba(40, 67, 86, 0.18);
+  background: var(--bm-modal-bg);
+  border: 1px solid var(--bm-card-border);
+  box-shadow: var(--bm-shadow-sheet);
 }
 
 .mirror-sheet-note {
   color: var(--mirror-muted);
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   line-height: 1.6;
   margin: -8px 0 14px;
 }
@@ -90,19 +90,18 @@
   gap: 12px;
   padding: 15px 14px;
   margin-top: 8px;
-  border: 1px solid var(--mirror-line);
-  border-radius: 18px;
-  background: #fff;
+  border: 1px solid var(--bm-card-border);
+  border-radius: var(--bm-radius-xl);
+  background: var(--bm-surface-soft);
   color: var(--mirror-ink);
   font: inherit;
   cursor: pointer;
 }
 
 .bm-home-product-sheet {
-  background:
-    linear-gradient(180deg, rgba(248, 252, 255, 0.98), rgba(239, 247, 252, 0.96));
-  border-color: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 -18px 48px rgba(40, 67, 86, 0.18);
+  background: var(--bm-modal-bg);
+  border-color: var(--bm-card-border);
+  box-shadow: var(--bm-shadow-sheet);
 }
 
 .bm-home-product-sheet .modal-header {
@@ -112,7 +111,7 @@
 .bm-home-product-sheet .modal-header h3 {
   margin: 0;
   color: #132d44;
-  font-size: 22px;
+  font-size: var(--bm-font-size-title);
   line-height: 1.2;
   font-weight: 780;
 }
@@ -120,15 +119,15 @@
 .bm-home-product-sheet .modal-close {
   width: 40px;
   height: 40px;
-  background: rgba(255, 255, 255, 0.56);
+  background: var(--bm-card-bg-raised);
   color: #708295;
-  box-shadow: 0 8px 20px rgba(74, 112, 143, 0.08);
+  box-shadow: var(--bm-shadow-soft);
 }
 
 .bm-home-product-sheet .mirror-sheet-note {
   margin: -6px 0 16px;
-  color: #657585;
-  font-size: 13px;
+  color: var(--bm-color-muted-mid);
+  font-size: var(--bm-font-size-base);
   line-height: 1.6;
 }
 
@@ -146,12 +145,12 @@
   justify-content: center;
   gap: 6px;
   padding: 13px 8px 11px;
-  border: 1px solid rgba(126, 153, 174, 0.16);
+  border: 1px solid var(--bm-card-border);
   border-radius: 15px;
-  background: rgba(255, 255, 255, 0.62);
-  color: #24445e;
+  background: var(--bm-surface-soft);
+  color: var(--bm-color-ink-blue);
   font: inherit;
-  box-shadow: 0 10px 22px rgba(74, 112, 143, 0.06);
+  box-shadow: var(--bm-shadow-soft);
   cursor: pointer;
 }
 
@@ -176,8 +175,8 @@
 }
 
 .product-record-card strong {
-  color: #24445e;
-  font-size: 14px;
+  color: var(--bm-color-ink-blue);
+  font-size: var(--bm-font-size-control);
   line-height: 1.15;
   font-weight: 780;
   white-space: nowrap;
@@ -185,7 +184,7 @@
 
 .product-record-card span {
   color: #7d8c98;
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
   line-height: 1.25;
 }
 
@@ -201,11 +200,11 @@
   }
 
   .product-record-card strong {
-    font-size: 13px;
+    font-size: var(--bm-font-size-base);
   }
 
   .product-record-card span {
-    font-size: 10px;
+    font-size: var(--bm-font-size-xs);
   }
 }
 
@@ -216,7 +215,7 @@
   align-items: flex-start;
   padding: 14px;
   margin-bottom: 12px;
-  border-radius: 22px;
+  border-radius: var(--bm-radius-2xl);
   background: rgba(237, 246, 251, 0.84);
   border: 1px solid var(--mirror-line);
   box-shadow: 0 14px 34px rgba(97, 74, 68, 0.08);
@@ -232,7 +231,7 @@
 .vault-product-photo {
   width: 82px;
   height: 82px;
-  border-radius: 18px;
+  border-radius: var(--bm-radius-xl);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -250,20 +249,20 @@
   gap: 8px;
   margin-bottom: 4px;
   color: var(--mirror-muted);
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
 }
 
 .vault-product-topline em {
   font-style: normal;
   color: #557489;
   background: rgba(218, 236, 248, 0.62);
-  border-radius: 999px;
+  border-radius: var(--bm-radius-pill);
   padding: 2px 8px;
 }
 
 .vault-product-info h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--bm-font-size-lg);
   line-height: 1.35;
   color: var(--mirror-ink);
 }
@@ -271,7 +270,7 @@
 .vault-product-brand {
   margin: 3px 0 0;
   color: #758393;
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
 }
 
 .vault-product-meta {
@@ -284,15 +283,15 @@
 .vault-product-meta span {
   color: var(--mirror-muted);
   background: rgba(220, 236, 248, 0.72);
-  border-radius: 999px;
+  border-radius: var(--bm-radius-pill);
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
 }
 
 .vault-product-note {
   margin: 8px 0 0;
   color: var(--mirror-muted);
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   line-height: 1.5;
 }
 
@@ -302,8 +301,8 @@
   top: 78px;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
-  border: 2px solid #eef6fb;
+  border-radius: var(--bm-radius-circle);
+  border: 2px solid var(--bm-color-page-soft);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.10);
 }
 
@@ -317,7 +316,7 @@
   height: 32px;
   border-radius: 13px;
   border: 1px solid var(--mirror-line);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--bm-glass-surface);
   color: #758393;
   cursor: pointer;
 }
@@ -325,11 +324,11 @@
 .soft-error {
   padding: 11px 14px;
   margin-bottom: 16px;
-  border-radius: 14px;
-  background: #eef6fb;
+  border-radius: var(--bm-radius-md);
+  background: var(--bm-color-page-soft);
   border: 1px solid rgba(111, 151, 180, 0.22);
-  color: #647789;
-  font-size: 13px;
+  color: var(--bm-color-muted-soft);
+  font-size: var(--bm-font-size-base);
   line-height: 1.5;
 }
 
@@ -342,9 +341,9 @@
   display: grid;
   gap: 7px;
   padding: 14px;
-  border-radius: 18px;
+  border-radius: var(--bm-radius-xl);
   background: rgba(237, 246, 251, 0.86);
-  border: 1px solid rgba(111, 151, 180, 0.18);
+  border: 1px solid var(--bm-line-blue);
 }
 
 .mirror-advice-card p {
@@ -353,7 +352,7 @@
   gap: 8px;
   margin: 0;
   color: var(--mirror-ink);
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   line-height: 1.5;
 }
 
@@ -373,10 +372,10 @@
   min-height: 38px;
   border: 1px solid var(--mirror-line);
   border-radius: 15px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--bm-glass-surface);
   color: var(--mirror-muted);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   cursor: pointer;
 }
 
@@ -393,14 +392,14 @@
 .mirror-result-subtitle {
   margin: -6px 0 12px;
   color: #6f8191;
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   line-height: 1.45;
 }
 
 .skin-summary-row {
   padding: 10px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
+  border-radius: var(--bm-radius-lg);
+  background: var(--bm-glass-surface);
   border: 1px solid rgba(129, 164, 190, 0.16);
 }
 
@@ -428,7 +427,7 @@
 }
 
 .mirror-advice-card {
-  border-radius: 14px;
+  border-radius: var(--bm-radius-md);
   background: rgba(255, 255, 255, 0.9);
   border-color: rgba(111, 151, 180, 0.2);
   box-shadow: 0 10px 24px rgba(72, 118, 150, 0.06);
@@ -444,9 +443,9 @@
 
 .mirror-advice-actions button {
   border-color: rgba(111, 151, 180, 0.22);
-  border-radius: 14px;
+  border-radius: var(--bm-radius-md);
   background: rgba(255, 255, 255, 0.78);
-  color: #647789;
+  color: var(--bm-color-muted-soft);
 }
 
 .mirror-advice-actions button.active {
@@ -458,8 +457,8 @@
 .mirror-detail-panel {
   margin: 12px 0;
   border: 1px solid rgba(111, 151, 180, 0.2);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.68);
+  border-radius: var(--bm-radius-md);
+  background: var(--bm-glass-surface-soft);
   overflow: hidden;
 }
 
@@ -470,7 +469,7 @@
   gap: 10px;
   padding: 12px 14px;
   color: #355f78;
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   font-weight: 600;
   cursor: pointer;
   list-style: none;
@@ -497,7 +496,7 @@
 }
 
 .skin-heatmap-img {
-  border-color: rgba(111, 151, 180, 0.18);
+  border-color: var(--bm-line-blue);
   background: #f7fbfd;
 }
 
@@ -515,11 +514,11 @@
 .face-region-tags button {
   padding: 4px 9px;
   border: 1px solid rgba(111, 151, 180, 0.16);
-  border-radius: 999px;
+  border-radius: var(--bm-radius-pill);
   background: rgba(229, 241, 248, 0.9);
   color: #557489;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   font-weight: 650;
   cursor: pointer;
 }
@@ -527,7 +526,7 @@
 .face-region-tags button.active {
   border-color: rgba(79, 127, 164, 0.38);
   background: rgba(220, 236, 248, 0.96);
-  color: #315f84;
+  color: var(--bm-color-action);
   box-shadow: 0 7px 16px rgba(74, 112, 143, 0.10);
 }
 
@@ -537,7 +536,7 @@
   margin: 0 0 10px;
   padding: 11px 12px;
   border: 1px solid rgba(111, 151, 180, 0.16);
-  border-radius: 16px;
+  border-radius: var(--bm-radius-lg);
   background: rgba(248, 252, 255, 0.74);
 }
 
@@ -550,12 +549,12 @@
 
 .face-region-detail strong {
   color: #263d4c;
-  font-size: 14px;
+  font-size: var(--bm-font-size-control);
 }
 
 .face-region-detail span {
   color: #5d88aa;
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   font-weight: 720;
   white-space: nowrap;
 }
@@ -563,14 +562,14 @@
 .face-region-detail p {
   margin: 0;
   color: #6d7f8f;
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   line-height: 1.45;
 }
 
 .face-reference-note {
   margin: 4px 0 0;
   color: #7d8f9d;
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   line-height: 1.5;
   text-align: center;
 }
@@ -601,18 +600,6 @@
   border-color: rgba(124, 165, 141, 0.2);
 }
 
-.heatmap-low {
-  background: #cddce5;
-}
-
-.heatmap-mid {
-  background: #b8d3df;
-}
-
-.heatmap-high {
-  background: #b9d9c8;
-}
-
 .companion-section-title,
 .section-label {
   color: #4b89b0;
@@ -628,11 +615,11 @@
 .mirror-status-pill {
   margin: 14px 0 0;
   padding: 11px 13px;
-  border-radius: 16px;
+  border-radius: var(--bm-radius-lg);
   background: rgba(237, 246, 251, 0.76);
   border: 1px solid var(--mirror-line);
   color: var(--mirror-ink);
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   line-height: 1.55;
   box-shadow: 0 10px 24px rgba(97, 74, 68, 0.06);
 }

@@ -6,10 +6,11 @@ import {
   Clock3,
   Copy,
   ExternalLink,
+  Heart,
   Image as ImageIcon,
   Loader2,
-  Moon,
   Package,
+  PartyPopper,
   RotateCcw,
   Sparkles,
   Sun,
@@ -21,9 +22,9 @@ import { compressPhoto } from '../utils/skinAnalysisView'
 import tutorialRatioWitchSticker from '../assets/illustrations/beauty-mirror-ip/tutorial-ratio-witch-sticker.png'
 
 const TIME_OPTIONS = [
-  { id: 'quick', label: '5分钟救急', minutes: 5, keywords: '快速出门妆 懒人淡妆' },
-  { id: 'daily', label: '15分钟日常', minutes: 15, keywords: '通勤妆 自然精致妆' },
-  { id: 'complete', label: '30分钟完整', minutes: 30, keywords: '完整妆容 约会拍照妆' },
+  { id: 'quick', label: '5分钟救急', minutes: 5, keywords: '镜前急救 提气色 局部补救' },
+  { id: 'daily', label: '15分钟日常', minutes: 15, keywords: '基础日常妆 通勤自然妆' },
+  { id: 'complete', label: '30分钟完整', minutes: 30, keywords: '完整日常妆 约会拍照妆' },
 ]
 
 const PHOTO_CAPTURE_TIPS = [
@@ -49,31 +50,129 @@ const VIDEO_PLATFORMS = [
 const SCENES = [
   {
     id: 'commute',
-    label: '通勤前',
-    title: '快速出门教程',
-    icon: Sun,
-    focus: '自然、干净、减少步骤',
-  },
-  {
-    id: 'office',
-    label: '办公室光',
-    title: '自然精致教程',
+    label: '通勤',
+    title: '通勤自然妆教程',
     icon: Briefcase,
-    focus: '底妆清透、边界干净',
+    focus: '干净、自然、耐看，减少复杂步骤',
+    searchFocus: '通勤妆 自然底妆 持妆',
   },
   {
-    id: 'evening',
-    label: '晚间出门',
-    title: '完整氛围教程',
-    icon: Moon,
-    focus: '加强层次、但不过度',
+    id: 'date',
+    label: '约会',
+    title: '约会氛围妆教程',
+    icon: Heart,
+    focus: '提气色、柔和、有亲近感',
+    searchFocus: '约会妆 氛围感 腮红 唇妆',
+  },
+  {
+    id: 'party',
+    label: '聚会',
+    title: '聚会上镜妆教程',
+    icon: PartyPopper,
+    focus: '加强眼妆和轮廓，上镜不吃妆',
+    searchFocus: '聚会妆 上镜 持妆 眼妆',
+  },
+  {
+    id: 'daily',
+    label: '日常',
+    title: '日常基础妆教程',
+    icon: Sun,
+    focus: '简单稳定，适合反复练习',
+    searchFocus: '日常妆 新手 基础步骤',
   },
 ]
 
 const PRODUCT_PRIORITY = {
-  commute: ['防晒', '底妆', '眉眼', '唇妆'],
-  office: ['底妆', '遮瑕', '定妆', '眉眼', '唇妆'],
-  evening: ['底妆', '遮瑕', '眉眼', '腮红修容', '唇妆'],
+  commute: ['防晒', '底妆', '定妆', '眉眼', '唇妆'],
+  date: ['底妆', '遮瑕', '腮红修容', '眉眼', '唇妆'],
+  party: ['底妆', '遮瑕', '定妆', '眉眼', '腮红修容', '唇妆'],
+  daily: ['防晒', '底妆', '眉眼', '唇妆'],
+}
+
+const CATEGORY_ALIASES = {
+  防晒: ['防晒', '防晒霜', '隔离'],
+  底妆: ['底妆', '粉底', '粉霜', '气垫', '妆前乳', '隔离'],
+  遮瑕: ['遮瑕', '遮瑕膏', '遮瑕液'],
+  定妆: ['定妆', '散粉', '粉饼', '定妆喷雾'],
+  眉眼: ['眉眼', '眉笔', '眼影', '眼线', '睫毛', '睫毛膏'],
+  腮红修容: ['腮红修容', '腮红', '修容', '高光', '阴影'],
+  唇妆: ['唇妆', '口红', '唇膏', '唇釉', '唇蜜'],
+}
+
+const TIME_STAGE_BLUEPRINTS = {
+  quick: [
+    { minute: 0, label: '妆前整理', category: '防晒', action: '快速保湿或防晒，压掉明显浮油' },
+    { minute: 1, label: '局部底妆', category: '底妆', action: '只处理泛红、暗沉和鼻翼边界' },
+    { minute: 3, label: '眉眼提神', category: '眉眼', action: '补眉尾和睫毛根部，不铺复杂眼影' },
+    { minute: 4, label: '唇颊提气色', category: '唇妆', action: '唇色优先，少量带到脸颊统一气色' },
+  ],
+  daily: [
+    { minute: 0, label: '妆前 / 防晒', category: '防晒', action: '让皮肤稳定，后续底妆更服帖' },
+    { minute: 2, label: '薄底妆', category: '底妆', action: '从面中铺开，边缘少量带过' },
+    { minute: 5, label: '局部遮瑕', category: '遮瑕', action: '只点压眼下、鼻翼、痘印' },
+    { minute: 8, label: '眉眼定神', category: '眉眼', action: '眉毛和眼线控制在自然范围' },
+    { minute: 11, label: '腮红 / 修容', category: '腮红修容', action: '少量多次调整气色和轮廓' },
+    { minute: 13, label: '唇妆', category: '唇妆', action: '和腮红保持同一气色方向' },
+  ],
+  complete: [
+    { minute: 0, label: '妆前准备', category: '防晒', action: '保湿、防晒、等待成膜' },
+    { minute: 4, label: '完整底妆', category: '底妆', action: '分区上妆，控制厚度和边界' },
+    { minute: 9, label: '遮瑕校正', category: '遮瑕', action: '暗沉、瑕疵、眼下分开处理' },
+    { minute: 13, label: '定妆', category: '定妆', action: 'T 区和易脱妆区优先' },
+    { minute: 16, label: '眉眼', category: '眉眼', action: '眼影、眼线、睫毛按场景加强' },
+    { minute: 22, label: '腮红 / 修容', category: '腮红修容', action: '调整面中、颧骨和下颌线' },
+    { minute: 26, label: '唇妆', category: '唇妆', action: '完成整体色彩平衡' },
+  ],
+}
+
+function productMatchesCategory(product, category) {
+  const aliases = CATEGORY_ALIASES[category] || [category]
+  const fields = [
+    product.category,
+    product.name,
+    product.usage_steps,
+    product.product_features,
+  ].filter(Boolean).map(value => String(value))
+
+  return aliases.some(alias => (
+    fields.some(field => field.includes(alias) || alias.includes(field))
+  ))
+}
+
+function getProductsForCategory(products, category, limit = 2) {
+  const seen = new Set()
+  return products
+    .filter(product => productMatchesCategory(product, category))
+    .filter(product => {
+      const key = product.id || product.name
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .slice(0, limit)
+}
+
+function formatTimelineMinute(minute) {
+  const value = Number(minute)
+  if (!Number.isFinite(value)) return '--:--'
+  return `${String(Math.max(0, Math.floor(value))).padStart(2, '0')}:00`
+}
+
+function buildTutorialTimeline(guide, products) {
+  const blueprint = TIME_STAGE_BLUEPRINTS[guide?.timeId] || TIME_STAGE_BLUEPRINTS.daily
+  return blueprint.map((step, index) => ({
+    ...step,
+    id: `${guide?.timeId || 'daily'}-${guide?.sceneId || 'commute'}-${index}`,
+    products: getProductsForCategory(products, step.category, 2),
+  }))
+}
+
+function buildProductRecommendations(guide, products) {
+  const priority = PRODUCT_PRIORITY[guide?.sceneId] || PRODUCT_PRIORITY.commute
+  return priority.map(category => ({
+    category,
+    products: getProductsForCategory(products, category, 3),
+  }))
 }
 
 function buildGuide(timeId, sceneId, products) {
@@ -81,23 +180,28 @@ function buildGuide(timeId, sceneId, products) {
   const scene = SCENES.find(item => item.id === sceneId) || SCENES[0]
   const priority = PRODUCT_PRIORITY[scene.id] || PRODUCT_PRIORITY.commute
   const pickedProducts = []
+  const productMatches = priority.map(category => ({
+    category,
+    products: getProductsForCategory(products, category, 2),
+  }))
 
-  priority.forEach(category => {
-    const found = products.find(product => {
-      const productCategory = product.category || ''
-      if (!productCategory) return false
-      return productCategory === category || productCategory.includes(category) || category.includes(productCategory)
+  productMatches.forEach(item => {
+    item.products.forEach(product => {
+      const key = product.id || product.name
+      if (product && !pickedProducts.some(current => (current.id || current.name) === key)) {
+        pickedProducts.push(product)
+      }
     })
-    if (found && !pickedProducts.some(item => item.id === found.id)) {
-      pickedProducts.push(found)
-    }
   })
 
   return {
     ...scene,
+    timeId: time.id,
+    sceneId: scene.id,
     time: time.label,
     minutes: time.minutes,
     timeKeywords: time.keywords,
+    productMatches,
     products: pickedProducts.slice(0, 5).map(product => product.name),
   }
 }
@@ -113,31 +217,25 @@ function getUsefulRatioTags(faceRatio) {
 }
 
 function buildVideoRecommendations(faceRatio, guide) {
-  if (!faceRatio?.ok || !guide) return []
+  if (!guide) return []
 
   const sourceTags = [
     ...getUsefulRatioTags(faceRatio),
-    ...(faceRatio.video_query_tags || []),
+    ...(faceRatio?.video_query_tags || []),
   ].filter(Boolean)
   const uniqueTags = [...new Set(sourceTags)]
-  const mainTag = uniqueTags[0] || '清透自然'
-  const secondTag = uniqueTags[1] || '新手友好'
-  const thirdTag = uniqueTags[2] || '面部比例修饰'
-  const timePart = guide.time.replace(/\s/g, '')
   const timeKeywords = guide.timeKeywords || '日常新手妆'
+  const categoryPart = (PRODUCT_PRIORITY[guide.sceneId] || PRODUCT_PRIORITY.commute).slice(0, 3).join(' ')
+  const supportTags = uniqueTags.slice(0, 2)
 
   return [
     {
-      title: '比例修饰教程',
-      query: `${mainTag} ${guide.label} 妆容教程`,
-    },
-    {
-      title: '时间预算教程',
-      query: `${timePart} ${timeKeywords} ${guide.label} ${secondTag} 教程`,
-    },
-    {
-      title: '局部手法教程',
-      query: `${thirdTag} 腮红 修容 眼妆 教程`,
+      title: '主推视频方向',
+      query: `${guide.label} ${timeKeywords} ${guide.searchFocus} ${categoryPart} 化妆教程`,
+      subtitle: `${guide.label} · ${guide.time} · ${guide.focus}`,
+      assist: faceRatio?.ok && supportTags.length
+        ? `辅助参考：${supportTags.join('、')}`
+        : '辅助增强可补充三庭五眼和脸型手法',
     },
   ]
 }
@@ -650,11 +748,14 @@ export default function Tutorial() {
     () => buildGuide(timeId, sceneId, products),
     [timeId, sceneId, products],
   )
-  const Icon = activeGuide.icon
   const displayedRatioTags = (getUsefulRatioTags(faceRatio).length ? getUsefulRatioTags(faceRatio) : faceRatio?.ratio_tags || []).slice(0, 5)
   const ratioTips = faceRatio?.makeup_tips?.slice(0, 3) || []
   const ratioQualityFlags = faceRatio?.quality_flags || []
+  const hairlineReason = faceRatio?.measurements?.three_part?.upper?.source
+    || faceRatio?.measurements?.hairline?.reason
+    || ''
   const needsHairlineRetake = faceRatio?.measurements?.three_part?.upper?.hairline_available === false
+    && hairlineReason !== 'hairline_skipped'
   const ratioRetakeMessages = ratioQualityFlags.length > 0
     ? ratioQualityFlags
     : needsHairlineRetake ? ['请露出额头和发际线后重拍'] : []
@@ -665,6 +766,15 @@ export default function Tutorial() {
   const videoRecommendations = useMemo(
     () => buildVideoRecommendations(faceRatio, activeGuide),
     [faceRatio, activeGuide],
+  )
+  const primaryVideo = videoRecommendations[0]
+  const tutorialTimeline = useMemo(
+    () => buildTutorialTimeline(activeGuide, products),
+    [activeGuide, products],
+  )
+  const productRecommendations = useMemo(
+    () => buildProductRecommendations(activeGuide, products),
+    [activeGuide, products],
   )
 
   const showToast = (message, type = 'success') => {
@@ -690,6 +800,7 @@ export default function Tutorial() {
       const analysisFile = await compressPhoto(file, 1024)
       const formData = new FormData()
       formData.append('photo', analysisFile)
+      formData.append('use_hairline', '1')
       const data = await analyzeFaceRatio(formData)
       const nextRatio = data.face_ratio
 
@@ -702,6 +813,8 @@ export default function Tutorial() {
     } catch (error) {
       if (error.code === 'ECONNABORTED') {
         setFaceRatioError('分析超时了。请换一张更清晰的正脸照，或稍后重试；第一次加载模型会更慢。')
+      } else if (error.request && !error.response) {
+        setFaceRatioError('比例增强暂时连接失败；上面的基础教程推荐仍可正常使用。请确认后端已启动后再试。')
       } else {
         setFaceRatioError(error.response?.data?.message || error.response?.data?.error || error.message || '面部比例分析失败')
       }
@@ -740,7 +853,7 @@ export default function Tutorial() {
       <section className="bm-hero bm-tutorial-hero">
         <div>
           <h1>教程推荐</h1>
-          <p className="bm-flow-copy">按时间、场景和面部比例找到今天适合的教程</p>
+          <p className="bm-flow-copy">先按时间和场景找教程，拍照比例分析只作为增强参考</p>
         </div>
         <span className="bm-tutorial-brand-mark">Beauty<br />Mirror</span>
       </section>
@@ -790,7 +903,110 @@ export default function Tutorial() {
           </div>
         </section>
 
-        <section className={`bm-face-ratio-card bm-mirror-analysis-card${faceRatio?.ok ? ' has-result' : ''}`}>
+        <section className="bm-tutorial-primary-card">
+          <div className="bm-tutorial-primary-head">
+            <span className="bm-soft-icon"><Video size={21} strokeWidth={1.6} /></span>
+            <div>
+              <p>{activeGuide.label} · {activeGuide.focus}</p>
+              <h2>{activeGuide.title}</h2>
+            </div>
+            <span className="bm-time-chip"><Clock3 size={14} />{activeGuide.time}</span>
+          </div>
+
+          {primaryVideo && (
+            <div className="bm-tutorial-main-video">
+              <button
+                type="button"
+                className="bm-video-query-copy"
+                onClick={() => handleCopyVideoQuery(primaryVideo.query)}
+              >
+                <Video size={18} strokeWidth={1.7} />
+                <span>
+                  <strong>{primaryVideo.title}</strong>
+                  <small>{primaryVideo.query}</small>
+                </span>
+                <Copy size={15} strokeWidth={1.8} />
+              </button>
+              <div className="bm-video-platform-links" aria-label="打开平台搜索">
+                {VIDEO_PLATFORMS.map(platform => (
+                  <a
+                    key={platform.id}
+                    href={platform.buildUrl(primaryVideo.query)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${platform.label} 搜索 ${primaryVideo.query}`}
+                  >
+                    {platform.label}
+                    <ExternalLink size={12} strokeWidth={1.8} />
+                  </a>
+                ))}
+              </div>
+              <p>{primaryVideo.assist}</p>
+            </div>
+          )}
+        </section>
+
+        <section className="bm-tutorial-timeline-card">
+          <div className="bm-flow-section-head">
+            <div className="bm-flow-section-title">时间节点</div>
+            <span>{activeGuide.time}</span>
+          </div>
+          <ol className="bm-tutorial-timeline">
+            {tutorialTimeline.map(step => (
+              <li key={step.id}>
+                <time>{formatTimelineMinute(step.minute)}</time>
+                <div>
+                  <strong>{step.label}</strong>
+                  <span>{step.action}</span>
+                  <small>
+                    {step.products.length > 0
+                      ? `产品库：${step.products.map(product => product.name).join(' / ')}`
+                      : `产品库暂无${step.category}，先按教程同类产品替换`}
+                  </small>
+                </div>
+                <em>{step.category}</em>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="bm-tutorial-products-card">
+          <div className="bm-flow-section-head">
+            <div className="bm-flow-section-title">产品替换</div>
+            <span>{activeGuide.label}</span>
+          </div>
+          <div className="bm-tutorial-product-grid">
+            {productRecommendations.map(item => (
+              <article className="bm-tutorial-product-match" key={item.category}>
+                <span className="bm-tutorial-product-category"><Package size={15} />{item.category}</span>
+                {item.products.length > 0 ? (
+                  <div className="bm-tutorial-product-chips">
+                    {item.products.map(product => (
+                      <span key={product.id || product.name}>
+                        <strong>{product.name}</strong>
+                        <small>{product.category || item.category}</small>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p>暂无同类产品</p>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <details className="bm-tutorial-assist-details">
+          <summary>
+            <span className="bm-soft-icon"><Sparkles size={18} strokeWidth={1.7} /></span>
+            <span>
+              <strong>辅助增强：三庭五眼 / 脸型</strong>
+              <small>需要更细的局部手法时再拍照分析</small>
+            </span>
+            <ChevronRight className="bm-assist-chevron" size={18} strokeWidth={1.8} />
+          </summary>
+
+          <section className={`bm-face-ratio-card bm-mirror-analysis-card${faceRatio?.ok ? ' has-result' : ''}`}>
           <div className="bm-mirror-stage">
             <span className="bm-mirror-note" aria-hidden="true">
               <span>你的比例</span>
@@ -814,7 +1030,7 @@ export default function Tutorial() {
               ) : (
                 <span className="bm-mirror-placeholder">
                   <Camera size={26} strokeWidth={1.6} />
-                  <strong>正脸平视拍一张</strong>
+                  <strong>可选：拍照增强推荐</strong>
                   <small>鼻梁居中，露出发际线、眉毛和下巴</small>
                 </span>
               )}
@@ -895,8 +1111,8 @@ export default function Tutorial() {
 
           <div className="bm-photo-capture-guide" aria-label="拍照提示">
             <div>
-              <strong>拍照提示</strong>
-              <span>越接近正脸，三庭五眼线越准</span>
+              <strong>比例增强</strong>
+              <span>不拍照也能看基础教程，拍照后用发际线增强三庭判断</span>
             </div>
             <ul>
               {PHOTO_CAPTURE_TIPS.map(tip => (
@@ -980,7 +1196,7 @@ export default function Tutorial() {
               </>
             ) : (
               <>
-                <p className="bm-face-ratio-note">发际线清晰时才判断上庭；识别不到时只用中庭、下庭和五眼匹配教程方向。</p>
+                <p className="bm-face-ratio-note">比例增强需要清晰发际线；不拍照也不影响上面的基础教程推荐。</p>
                 {faceRatioError && <p className="bm-face-ratio-error">{faceRatioError}</p>}
               </>
             )}
@@ -1001,85 +1217,8 @@ export default function Tutorial() {
             className="bm-hidden-file"
             onChange={handleFaceRatioPhotoSelected}
           />
-        </section>
-
-        <section className="bm-routine-card bm-flow-routine bm-flow-routine-compact">
-          <div className="bm-routine-head">
-            <span className="bm-soft-icon"><Icon size={21} strokeWidth={1.6} /></span>
-            <div>
-              <p>{activeGuide.label} · {activeGuide.focus}</p>
-              <h2>{activeGuide.title}</h2>
-            </div>
-            <span className="bm-time-chip"><Clock3 size={14} />{activeGuide.time}</span>
-          </div>
-
-          {activeGuide.products.length > 0 && (
-            <div className="bm-product-strip bm-flow-product-strip">
-              <span className="bm-flow-product-label"><Package size={15} /> 可用产品</span>
-              <div className="bm-flow-product-chips">
-                {activeGuide.products.map(product => (
-                  <span key={product}>{product}</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className={`bm-video-match-card${faceRatio?.ok ? '' : ' is-empty'}`}>
-          <div className="bm-flow-section-head">
-            <div className="bm-flow-section-title">推荐视频方向</div>
-            <span>{activeGuide.label} · {activeGuide.time}</span>
-          </div>
-
-          {faceRatio?.ok ? (
-            <>
-              <p className="bm-video-match-copy">
-                按你的比例标签、时间预算和使用场景生成搜索词。后面有视频库时，这里可以直接展示对应教程。
-              </p>
-              <div className="bm-video-query-list">
-                {videoRecommendations.map(item => (
-                  <div className="bm-video-query-card" key={item.query}>
-                    <button
-                      type="button"
-                      className="bm-video-query-copy"
-                      onClick={() => handleCopyVideoQuery(item.query)}
-                    >
-                      <Video size={17} strokeWidth={1.7} />
-                      <span>
-                        <strong>{item.title}</strong>
-                        <small>{item.query}</small>
-                      </span>
-                      <Copy size={15} strokeWidth={1.8} />
-                    </button>
-                    <div className="bm-video-platform-links" aria-label="打开平台搜索">
-                      {VIDEO_PLATFORMS.map(platform => (
-                        <a
-                          key={platform.id}
-                          href={platform.buildUrl(item.query)}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label={`${platform.label} 搜索 ${item.query}`}
-                        >
-                          {platform.label}
-                          <ExternalLink size={12} strokeWidth={1.8} />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="bm-video-empty-state">
-              <Video size={23} strokeWidth={1.7} />
-              <p>拍照分析后，会在这里生成 3 个视频搜索词。</p>
-              <button type="button" onClick={() => faceCameraRef.current?.click()}>
-                现在分析
-                <ChevronRight size={15} strokeWidth={1.8} />
-              </button>
-            </div>
-          )}
-        </section>
+          </section>
+        </details>
       </div>
     </div>
   )

@@ -364,16 +364,6 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
     landmarks = face_info['landmarks']
     img_size = face_info['image_size']
 
-    try:
-        from face_ratio_analyzer import analyze_face_ratios
-
-        face_ratio = analyze_face_ratios(landmarks, img_size, image_bytes=analysis_image_bytes)
-        if isinstance(face_data, dict):
-            face_data['face_ratio'] = face_ratio
-        print(f'[skin_analyzer] 面部比例分析完成: {face_ratio.get("ratio_tags", []) if isinstance(face_ratio, dict) else []}')
-    except Exception as exc:
-        print(f'[skin_analyzer] 面部比例分析失败，跳过: {exc}')
-
     # Step 1.5: ROI 本地分析（只执行一次；超出预算则不注入 Gemini prompt）
     from feature_extractor import FeatureExtractor
     extractor = FeatureExtractor()
@@ -381,16 +371,18 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
     roi_analysis_elapsed_ms = 0.0
     roi_prompt_enabled = False
     region_rois = {}
+    roi_meta = {}
     roi_prompt_context = ''
     roi_analysis_error = ''
 
     try:
         from face_regions import extract_all_regions
-        region_rois = extract_all_regions(
+        region_rois, roi_meta = extract_all_regions(
             analysis_image_bytes,
             landmarks,
             img_size,
             max_side=ROI_FEATURE_MAX_SIDE,
+            return_meta=True,
         )
         roi_analysis_elapsed_ms = (time.perf_counter() - roi_analysis_started) * 1000
 
@@ -433,6 +425,23 @@ def analyze_skin(image_bytes, db_session=None, user_id=None):
         print(f'[skin_analyzer] ROI 分析失败，降级为原 prompt: {e}')
         roi_analysis_error = str(e)
         feature_json = extractor._make_default_result()
+
+    try:
+        from face_ratio_analyzer import analyze_face_ratios
+
+        roi_hairline = roi_meta.get('hairline') if isinstance(roi_meta, dict) else None
+        face_ratio = analyze_face_ratios(
+            landmarks,
+            img_size,
+            image_bytes=analysis_image_bytes,
+            estimate_hairline=os.environ.get('FACE_RATIO_HAIRLINE_ENABLED', '1').lower() in ('1', 'true', 'yes', 'on'),
+            hairline_override=roi_hairline if isinstance(roi_hairline, dict) else None,
+        )
+        if isinstance(face_data, dict):
+            face_data['face_ratio'] = face_ratio
+        print(f'[skin_analyzer] 面部比例分析完成: {face_ratio.get("ratio_tags", []) if isinstance(face_ratio, dict) else []}')
+    except Exception as exc:
+        print(f'[skin_analyzer] 面部比例分析失败，跳过: {exc}')
 
     if not roi_prompt_enabled:
         roi_prompt_context = ''

@@ -522,7 +522,7 @@ def extract_region_roi(image_bytes, landmarks, region_name, image_size, padding_
         return None
 
 
-def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
+def extract_all_regions(image_bytes, landmarks, image_size, max_side=180, return_meta=False):
     """
     一次性提取所有 8 个面部区域。
 
@@ -618,6 +618,11 @@ def extract_all_regions(image_bytes, landmarks, image_size, max_side=180):
             debug_id,
         )
 
+    if return_meta:
+        return regions, {
+            'hairline': mask_debug.get('hairline') if isinstance(mask_debug, dict) else None,
+            'metrics': mask_debug.get('metrics', {}) if isinstance(mask_debug, dict) else {},
+        }
     return regions
 
 

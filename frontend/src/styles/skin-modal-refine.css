@@ -1,0 +1,190 @@
+.skin-analysis-sheet {
+  background:
+    linear-gradient(180deg, rgba(250, 253, 255, 0.96), rgba(242, 248, 252, 0.93)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.82) !important;
+  box-shadow:
+    0 18px 46px rgba(50, 83, 110, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74) !important;
+  backdrop-filter: blur(8px) saturate(1.03) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(1.03) !important;
+}
+
+.skin-analysis-sheet .skin-entry-panel {
+  padding: 0 2px 4px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.skin-analysis-sheet .skin-entry-visual,
+.skin-analysis-sheet .skin-entry-visual-wide {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.skin-analysis-sheet .skin-entry-visual img {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.skin-analysis-sheet .skin-entry-copy {
+  max-width: 310px;
+  color: #687d8d;
+}
+
+.skin-analysis-sheet .skin-entry-actions {
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.skin-analysis-sheet .skin-entry-action,
+.skin-analysis-sheet .skin-entry-action.primary {
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px solid rgba(126, 153, 174, 0.18) !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(247, 251, 254, 0.42)) !important;
+  box-shadow: 0 10px 24px rgba(72, 107, 134, 0.07) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.skin-analysis-sheet .skin-entry-action.primary {
+  border-color: rgba(93, 143, 183, 0.22) !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.68), rgba(241, 249, 254, 0.48)) !important;
+}
+
+.skin-analysis-sheet .skin-result {
+  padding: 0 2px 6px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.skin-analysis-sheet .skin-summary-row {
+  margin-bottom: 14px;
+  padding: 2px 0 4px;
+  border: 0;
+  background: transparent;
+}
+
+.skin-analysis-sheet .mirror-result-subtitle {
+  margin: -2px 0 13px;
+  color: #687d8d;
+}
+
+.skin-analysis-sheet .companion-section {
+  margin-bottom: 16px;
+}
+
+.skin-analysis-sheet .companion-section-title {
+  margin-bottom: 8px;
+  color: #60778a;
+}
+
+.skin-analysis-sheet .companion-status-card,
+.skin-analysis-sheet .mirror-advice-card,
+.skin-analysis-sheet .mirror-detail-panel,
+.skin-analysis-sheet .skin-summary,
+.skin-analysis-sheet .skin-rec-item,
+.skin-analysis-sheet .companion-obs-item,
+.skin-analysis-sheet .companion-routine-block,
+.skin-analysis-sheet .companion-trend {
+  border: 1px solid rgba(126, 153, 174, 0.17) !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.60), rgba(247, 251, 254, 0.40)) !important;
+  box-shadow: 0 10px 24px rgba(72, 107, 134, 0.06) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.skin-analysis-sheet .companion-status-card {
+  margin-bottom: 16px;
+}
+
+.skin-analysis-sheet .mirror-advice-list,
+.skin-analysis-sheet .companion-routine,
+.skin-analysis-sheet .companion-observations {
+  gap: 9px;
+}
+
+.skin-analysis-sheet .mirror-detail-panel {
+  overflow: hidden;
+}
+
+.skin-analysis-sheet .mirror-detail-panel > div {
+  padding: 0 14px 14px;
+}
+
+.skin-analysis-sheet .skin-heatmap-img {
+  background: rgba(255, 255, 255, 0.38);
+  border-color: rgba(126, 153, 174, 0.16);
+}
+
+.skin-analysis-sheet .face-region-detail {
+  border-color: rgba(126, 153, 174, 0.15);
+  background: rgba(255, 255, 255, 0.38);
+  box-shadow: none;
+}
+
+.skin-analysis-sheet .skin-history-gallery {
+  padding: 0 2px 6px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.skin-analysis-sheet .skin-history-gallery-head {
+  padding: 0;
+}
+
+.skin-analysis-sheet .skin-history-gallery-head strong {
+  color: #132d44;
+}
+
+.skin-analysis-sheet .skin-history-gallery-head span {
+  color: #7b8d9b;
+}
+
+.skin-analysis-sheet .skin-history-empty {
+  min-height: 98px;
+  display: grid;
+  place-items: center;
+  margin-top: 8px;
+  padding: 24px 16px !important;
+  border: 1px solid rgba(126, 153, 174, 0.14) !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.54), rgba(247, 251, 254, 0.34)) !important;
+  box-shadow: 0 8px 20px rgba(72, 107, 134, 0.05) !important;
+  color: #7d8f9d;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.skin-analysis-sheet .skin-history-grid {
+  padding: 2px 2px 4px;
+}
+
+.skin-analysis-sheet .skin-history-tile,
+.skin-analysis-sheet .skin-history-item {
+  border: 1px solid rgba(126, 153, 174, 0.16) !important;
+  border-radius: 18px !important;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(247, 251, 254, 0.38)) !important;
+  box-shadow: 0 10px 24px rgba(72, 107, 134, 0.06) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

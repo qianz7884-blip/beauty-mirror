@@ -70,9 +70,32 @@ function hexToRgb(hex) {
   }
 }
 
+function rgbToString({ r, g, b }) {
+  return `${r}, ${g}, ${b}`
+}
+
 function rgba(hex, alpha) {
   const { r, g, b } = hexToRgb(hex)
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function rgbaRgb(rgb, alpha) {
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`
+}
+
+function mixHex(baseHex, topHex, baseWeight = 0.5) {
+  const base = hexToRgb(baseHex)
+  const top = hexToRgb(topHex)
+  const topWeight = 1 - baseWeight
+  const next = {
+    r: Math.round(base.r * baseWeight + top.r * topWeight),
+    g: Math.round(base.g * baseWeight + top.g * topWeight),
+    b: Math.round(base.b * baseWeight + top.b * topWeight),
+  }
+
+  return `#${[next.r, next.g, next.b]
+    .map(value => value.toString(16).padStart(2, '0'))
+    .join('')}`
 }
 
 function normalizeThemeSettings(settings = {}) {
@@ -93,9 +116,9 @@ export function getActiveTheme(settings) {
   const normalized = normalizeThemeSettings(settings)
   if (normalized.presetId === 'custom') {
     return {
-      ...DEFAULT_THEME,
       id: 'custom',
       label: '自定义',
+      ...normalized.custom,
     }
   }
   return THEME_PRESETS.find(item => item.id === normalized.presetId) || DEFAULT_THEME
@@ -128,14 +151,74 @@ export function subscribeThemeSettings(listener) {
 export function getThemeStyle(settings) {
   const normalized = normalizeThemeSettings(settings)
   const theme = getActiveTheme(settings)
+  const primaryRgb = hexToRgb(theme.primary)
+  const deepRgb = hexToRgb(theme.deep)
+  const accentRgb = hexToRgb(theme.accent)
+  const washRgb = hexToRgb(theme.wash)
+  const pageStart = mixHex(theme.wash, '#ffffff', 0.58)
+  const pageMid = mixHex(theme.wash, theme.primary, 0.88)
+  const pageEnd = mixHex(theme.wash, '#ffffff', 0.72)
+  const surfaceRgb = hexToRgb(mixHex(theme.wash, '#ffffff', 0.70))
+  const surfaceSoftRgb = hexToRgb(mixHex(theme.wash, theme.primary, 0.90))
+  const surfaceRaisedRgb = hexToRgb(mixHex(theme.wash, '#ffffff', 0.50))
+  const cardRgb = hexToRgb(mixHex(theme.wash, '#ffffff', 0.62))
+  const cardSoftRgb = hexToRgb(mixHex(theme.wash, theme.primary, 0.88))
   const style = {
     '--bm-blue': theme.primary,
     '--bm-blue-deep': theme.deep,
     '--bm-mint': theme.accent,
+    '--bm-theme-primary-rgb': rgbToString(primaryRgb),
+    '--bm-theme-deep-rgb': rgbToString(deepRgb),
+    '--bm-theme-accent-rgb': rgbToString(accentRgb),
+    '--bm-theme-wash-rgb': rgbToString(washRgb),
+    '--bm-rgb-line': rgbToString(primaryRgb),
+    '--bm-rgb-shadow': rgbToString(deepRgb),
+    '--bm-rgb-sheet-shadow': rgbToString(deepRgb),
     '--bm-line': rgba(theme.primary, 0.18),
-    '--bm-shadow': `0 18px 48px ${rgba(theme.deep, 0.14)}`,
+    '--bm-shadow': `0 18px 48px ${rgbaRgb(deepRgb, 0.14)}`,
     '--bm-page-base': theme.wash,
-    '--bm-page-gradient': `linear-gradient(180deg, #ffffff 0%, ${theme.wash} 180px, #fbfdff 360px, transparent 580px)`,
+    '--bm-page-bg': theme.wash,
+    '--bm-page-bg-secondary': pageEnd,
+    '--bm-page-bg-tint': pageMid,
+    '--bm-page-gradient': `linear-gradient(180deg, ${pageStart} 0%, ${theme.wash} 180px, ${pageEnd} 360px, transparent 580px)`,
+    '--bm-surface': rgbaRgb(surfaceRgb, 0.76),
+    '--bm-surface-soft': rgbaRgb(surfaceSoftRgb, 0.58),
+    '--bm-surface-raised': rgbaRgb(surfaceRaisedRgb, 0.88),
+    '--bm-surface-glass': rgbaRgb(surfaceRgb, 0.64),
+    '--bm-card-bg': rgbaRgb(cardRgb, 0.82),
+    '--bm-card-bg-soft': rgbaRgb(cardSoftRgb, 0.58),
+    '--bm-card-bg-raised': rgbaRgb(surfaceRaisedRgb, 0.92),
+    '--bm-card-border': rgbaRgb(primaryRgb, 0.18),
+    '--bm-card-border-strong': rgbaRgb(primaryRgb, 0.26),
+    '--bm-nav-bg': rgbaRgb(surfaceRaisedRgb, 0.90),
+    '--bm-modal-bg': rgbaRgb(surfaceRaisedRgb, 0.94),
+    '--bm-input-bg': rgbaRgb(cardRgb, 0.82),
+    '--bm-chip-bg': rgbaRgb(primaryRgb, 0.11),
+    '--bm-chip-bg-active': rgbaRgb(primaryRgb, 0.19),
+    '--bm-accent': theme.primary,
+    '--bm-accent-soft': rgbaRgb(primaryRgb, 0.13),
+    '--bm-text-primary': 'var(--bm-color-text-primary)',
+    '--bm-text-secondary': 'var(--bm-color-text-muted-mid)',
+    '--bm-text-muted': 'var(--bm-color-text-muted)',
+    '--bm-divider': rgbaRgb(deepRgb, 0.12),
+    '--bm-shadow-soft': `0 8px 18px ${rgbaRgb(deepRgb, 0.08)}`,
+    '--bm-shadow-card': `0 12px 28px ${rgbaRgb(deepRgb, 0.09)}`,
+    '--bm-shadow-panel': `0 18px 46px ${rgbaRgb(deepRgb, 0.12)}`,
+    '--bm-shadow-glass': `0 16px 40px ${rgbaRgb(deepRgb, 0.10)}`,
+    '--bm-shadow-sheet': `0 -18px 48px ${rgbaRgb(deepRgb, 0.16)}`,
+    '--bm-glass': 'var(--bm-surface-glass)',
+    '--bm-glass-strong': 'var(--bm-surface-raised)',
+    '--bm-glass-surface': 'var(--bm-surface)',
+    '--bm-glass-surface-soft': 'var(--bm-surface-soft)',
+    '--bm-glass-surface-strong': 'var(--bm-surface-raised)',
+    '--bm-glass-surface-muted': 'var(--bm-card-bg-soft)',
+    '--bm-line-blue': 'var(--bm-card-border)',
+    '--bm-line-blue-soft': 'var(--bm-divider)',
+    '--bm-line-blue-mid': 'var(--bm-card-border-strong)',
+    '--bm-color-page': 'var(--bm-page-bg)',
+    '--bm-color-page-soft': 'var(--bm-page-bg-secondary)',
+    '--bm-color-page-tint': 'var(--bm-page-bg-tint)',
+    '--card-bg': 'var(--bm-card-bg)',
     '--primary': theme.accent,
     '--primary-light': rgba(theme.accent, 0.20),
     '--primary-dark': theme.deep,

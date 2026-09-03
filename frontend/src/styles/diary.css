@@ -1,6 +1,6 @@
 /* ============================================================
-   DIARY — 日记模块
-   蓝色玻璃质感 · 与其他页面统一
+   Diary module
+   Blue glass UI aligned with the rest of the app
    ============================================================ */
 
 .diary-v2 {
@@ -20,7 +20,7 @@
   background-repeat: no-repeat;
 }
 
-/* ── Calendar header ── */
+/* Calendar header */
 .dv-diary-head {
   display: flex;
   align-items: flex-start;
@@ -41,7 +41,7 @@
 .dv-diary-head p {
   margin: 7px 0 0;
   color: #627589;
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   line-height: 1.45;
 }
 
@@ -50,11 +50,11 @@
   min-height: 34px;
   padding: 7px 12px;
   border: 1px solid rgba(255, 255, 255, 0.82);
-  border-radius: 999px;
+  border-radius: var(--bm-radius-pill);
   background: rgba(255, 255, 255, 0.58);
-  color: #315f84;
+  color: var(--bm-color-action);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   font-weight: 760;
   box-shadow: 0 10px 22px rgba(74, 112, 143, 0.10);
   backdrop-filter: blur(16px);
@@ -72,7 +72,7 @@
   border: 1px solid rgba(255, 255, 255, 0.88);
   border-radius: 26px;
   background:
-    radial-gradient(circle at 24% 8%, rgba(255, 255, 255, 0.72), transparent 26%),
+    radial-gradient(circle at 24% 8%, var(--bm-glass-surface), transparent 26%),
     rgba(255, 255, 255, 0.64);
   box-shadow: 0 18px 46px rgba(74, 112, 143, 0.13);
   backdrop-filter: blur(22px);
@@ -93,10 +93,10 @@
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 50%;
+  border-radius: var(--bm-radius-circle);
   background: rgba(255, 255, 255, 0.56);
-  color: #315f84;
-  box-shadow: 0 8px 18px rgba(74, 112, 143, 0.10);
+  color: var(--bm-color-action);
+  box-shadow: var(--bm-shadow-soft);
   cursor: pointer;
 }
 
@@ -110,7 +110,7 @@
 
 .dv-month-side {
   color: #758596;
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   line-height: 1;
   text-align: center;
   white-space: nowrap;
@@ -139,7 +139,7 @@
 
 .dv-heatmap-week-labels span {
   color: #718496;
-  font-size: 10px;
+  font-size: var(--bm-font-size-xs);
   line-height: var(--heatmap-cell);
   text-align: left;
   white-space: nowrap;
@@ -214,7 +214,7 @@
   gap: 6px 10px;
   max-width: 300px;
   color: #718496;
-  font-size: 9px;
+  font-size: var(--bm-font-size-2xs);
   line-height: 1;
 }
 
@@ -228,7 +228,7 @@
 .dv-heatmap-mood-key i {
   width: 8px;
   height: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.68);
+  border: 1px solid var(--bm-glass-surface-soft);
   border-radius: 2px;
   box-shadow: 0 2px 5px rgba(74, 112, 143, 0.08);
 }
@@ -264,7 +264,7 @@
 .dv-day-feed-head span {
   display: block;
   color: #758596;
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
   font-weight: 760;
   line-height: 1.3;
 }
@@ -272,7 +272,7 @@
 .dv-day-feed-head h2 {
   margin: 3px 0 0;
   color: #172638;
-  font-size: 18px;
+  font-size: var(--bm-font-size-xl);
   line-height: 1.25;
   font-weight: 780;
 }
@@ -282,13 +282,13 @@
   min-height: 32px;
   padding: 7px 12px;
   border: 1px solid rgba(255, 255, 255, 0.82);
-  border-radius: 999px;
+  border-radius: var(--bm-radius-pill);
   background: rgba(255, 255, 255, 0.62);
-  color: #315f84;
+  color: var(--bm-color-action);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   font-weight: 760;
-  box-shadow: 0 8px 18px rgba(74, 112, 143, 0.10);
+  box-shadow: var(--bm-shadow-soft);
   cursor: pointer;
 }
 
@@ -300,10 +300,10 @@
   gap: 7px;
   padding: 16px 18px 20px;
   border: 1px solid rgba(174, 205, 226, 0.42);
-  border-radius: 22px;
+  border-radius: var(--bm-radius-2xl);
   background:
     linear-gradient(135deg, rgba(235, 247, 255, 0.76), rgba(220, 237, 249, 0.58));
-  color: #647789;
+  color: var(--bm-color-muted-soft);
   text-align: center;
   box-shadow: 0 12px 32px rgba(74, 112, 143, 0.09);
   backdrop-filter: blur(16px);
@@ -321,17 +321,17 @@
 
 .dv-day-empty strong {
   color: #1d3147;
-  font-size: 15px;
+  font-size: var(--bm-font-size-body);
   line-height: 1.3;
 }
 
 .dv-day-empty span {
   max-width: 250px;
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   line-height: 1.55;
 }
 
-/* ── Feed 流 ── */
+/* Feed */
 .dv-feed {
   display: flex;
   flex-direction: column;
@@ -343,12 +343,12 @@
   margin: 0;
 }
 
-/* ── Feed 卡片 ── */
+/* Feed card */
 .dv-card {
   background: var(--bm-glass);
-  border-radius: 20px;
+  border-radius: var(--bm-radius-card);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--bm-glass-surface-strong);
   box-shadow: 0 12px 32px rgba(74, 112, 143, 0.10);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -360,7 +360,7 @@
   box-shadow: 0 4px 16px rgba(74, 112, 143, 0.12);
 }
 
-/* 封面图 */
+/* Cover image */
 .dv-cover {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -377,23 +377,23 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  background: linear-gradient(135deg, #eef6fb, #e6f1f8);
+  background: linear-gradient(135deg, var(--bm-color-page-soft), #e6f1f8);
   border: 1.5px dashed rgba(111, 151, 180, 0.22);
   border-radius: 20px 20px 0 0;
   color: var(--bm-soft);
 }
 
 .dv-cover-placeholder-text {
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
   color: var(--bm-soft);
 }
 
-/* 卡片内容区 */
+/* Card body */
 .dv-card-body {
   padding: 12px 14px 10px;
 }
 
-/* 日期 + 心情行 */
+/* Date and mood row */
 .dv-card-header {
   display: flex;
   align-items: center;
@@ -402,33 +402,33 @@
 }
 
 .dv-card-date {
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   font-weight: 600;
   color: var(--bm-ink);
 }
 
-/* 心情彩色 Badge */
+/* Mood badge */
 .dv-mood-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 3px 10px;
-  border-radius: 18px;
-  font-size: 11px;
+  border-radius: var(--bm-radius-xl);
+  font-size: var(--bm-font-size-sm);
   font-weight: 600;
 }
 
 .dv-mood-dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--bm-radius-circle);
   display: inline-block;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.56);
 }
 
-/* 正文预览 */
+/* Content preview */
 .dv-content-preview {
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   color: #5d6b78;
   line-height: 1.6;
   margin: 0 0 10px;
@@ -438,7 +438,7 @@
   overflow: hidden;
 }
 
-/* 底部元信息行 */
+/* Metadata row */
 .dv-meta-row {
   display: flex;
   align-items: center;
@@ -450,14 +450,14 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
   color: var(--bm-soft);
   background: rgba(74, 112, 143, 0.06);
   padding: 2px 8px;
-  border-radius: 8px;
+  border-radius: var(--bm-radius-xs);
 }
 
-/* 标签行 */
+/* Tags row */
 .dv-tags-row {
   display: flex;
   flex-wrap: wrap;
@@ -465,17 +465,15 @@
 }
 
 .dv-tag-chip {
-  font-size: 10px;
+  font-size: var(--bm-font-size-xs);
   font-weight: 500;
   color: var(--bm-blue-deep);
   background: rgba(74, 112, 143, 0.07);
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--bm-radius-sm);
 }
 
-/* ═══════════════════════════════════════════
-   DIARY DETAIL · 日记详情页
-   ═══════════════════════════════════════════ */
+/* Diary detail */
 
 .dv-detail {
   min-height: 100vh;
@@ -513,12 +511,12 @@
   gap: 4px;
   background: none;
   border: none;
-  font-size: 15px;
+  font-size: var(--bm-font-size-body);
   font-weight: 500;
   color: var(--bm-ink);
   cursor: pointer;
   padding: 6px 10px;
-  border-radius: 20px;
+  border-radius: var(--bm-radius-card);
   transition: background 0.15s;
   font-family: inherit;
 }
@@ -538,7 +536,7 @@
   width: 34px;
   height: 34px;
   border-radius: 17px;
-  border: 1px solid rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--bm-glass-surface-strong);
   background: var(--bm-glass);
   color: var(--bm-ink);
   box-shadow: 0 4px 12px rgba(74, 112, 143, 0.08);
@@ -549,17 +547,17 @@
   background: rgba(74, 112, 143, 0.10);
 }
 
-/* 详情封面 */
+/* Detail cover */
 .dv-detail-cover {
   width: 100%;
   max-height: 320px;
   object-fit: cover;
   display: block;
   background: linear-gradient(135deg, #e8f0f5, #dde8f0);
-  border-radius: 16px;
+  border-radius: var(--bm-radius-lg);
 }
 
-/* 详情内容区 */
+/* Detail body */
 .dv-detail-body {
   padding: 18px 16px;
   margin-top: -14px;
@@ -573,40 +571,40 @@
   z-index: 1;
 }
 
-/* 详情心情 */
+/* Detail mood */
 .dv-detail-mood {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 5px 14px;
-  border-radius: 18px;
-  font-size: 13px;
+  border-radius: var(--bm-radius-xl);
+  font-size: var(--bm-font-size-base);
   font-weight: 600;
 }
 
 .dv-detail-date {
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
   color: var(--bm-soft);
   margin-top: 6px;
   margin-bottom: 14px;
 }
 
-/* 详情正文 */
+/* Detail content */
 .dv-detail-content {
-  font-size: 14px;
+  font-size: var(--bm-font-size-control);
   color: var(--bm-ink);
   line-height: 1.75;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-/* 详情产品区 */
+/* Detail products */
 .dv-detail-section {
   margin-top: 20px;
 }
 
 .dv-detail-section-title {
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
   font-weight: 600;
   color: var(--bm-soft);
   text-transform: uppercase;
@@ -629,7 +627,7 @@
   align-items: center;
   gap: 5px;
   padding: 10px 14px;
-  border-radius: 14px;
+  border-radius: var(--bm-radius-md);
   background: rgba(74, 112, 143, 0.04);
   border: 1px solid var(--bm-line);
   cursor: pointer;
@@ -644,14 +642,14 @@
 .dv-detail-product-thumb {
   width: 42px;
   height: 42px;
-  border-radius: 10px;
+  border-radius: var(--bm-radius-sm);
   background-size: cover;
   background-position: center;
   background-color: #e6eef4;
 }
 
 .dv-detail-product-name {
-  font-size: 10px;
+  font-size: var(--bm-font-size-xs);
   color: var(--bm-ink);
   font-weight: 500;
   text-align: center;
@@ -661,13 +659,13 @@
   white-space: nowrap;
 }
 
-/* 详情肤质分析卡片 */
+/* Detail skin analysis */
 .dv-detail-analysis-card {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  border-radius: 18px;
+  border-radius: var(--bm-radius-xl);
   background: rgba(74, 112, 143, 0.05);
   border: 1px solid var(--bm-line);
 }
@@ -684,13 +682,13 @@
 }
 
 .dv-detail-analysis-type {
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   font-weight: 600;
   color: var(--bm-ink);
 }
 
 .dv-detail-analysis-date {
-  font-size: 10px;
+  font-size: var(--bm-font-size-xs);
   color: var(--bm-soft);
   margin-top: 2px;
 }
@@ -704,11 +702,11 @@
 .dv-detail-analysis-btn {
   flex: 1;
   padding: 7px 10px;
-  border-radius: 14px;
+  border-radius: var(--bm-radius-md);
   border: 1px solid var(--bm-line);
   background: var(--bm-glass);
   color: var(--bm-blue-deep);
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
@@ -718,7 +716,7 @@
   background: rgba(74, 112, 143, 0.08);
 }
 
-/* 创建按钮弹窗 */
+/* Create action sheet */
 .dv-create-actions {
   background: rgba(247, 252, 255, 0.76);
   border-radius: 22px 22px 0 0;
@@ -741,7 +739,7 @@
   font-family: inherit;
   text-align: left;
   transition: background 0.15s;
-  border-radius: 14px;
+  border-radius: var(--bm-radius-md);
   margin-top: 3px;
 }
 .dv-create-action-item:active {
@@ -754,27 +752,25 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--bm-radius-base);
   background: rgba(74, 112, 143, 0.08);
   color: var(--bm-blue-deep);
   flex-shrink: 0;
 }
 
 .dv-create-action-label {
-  font-size: 14px;
+  font-size: var(--bm-font-size-control);
   font-weight: 600;
   color: var(--bm-ink);
 }
 
 .dv-create-action-sub {
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
   color: var(--bm-soft);
   margin-top: 2px;
 }
 
-/* ═══════════════════════════════════════════
-   DIARY FORM · 日记表单
-   ═══════════════════════════════════════════ */
+/* Diary form */
 
 .dv-form-overlay {
   position: fixed;
@@ -811,7 +807,7 @@
 }
 
 .dv-form-header h3 {
-  font-size: 16px;
+  font-size: var(--bm-font-size-lg);
   font-weight: 700;
   color: var(--bm-ink);
   margin: 0;
@@ -828,7 +824,7 @@
   background: rgba(74, 112, 143, 0.08);
   color: var(--bm-soft);
   cursor: pointer;
-  font-size: 18px;
+  font-size: var(--bm-font-size-xl);
   font-family: inherit;
 }
 
@@ -847,11 +843,11 @@
 .dv-form-submit {
   width: 100%;
   padding: 13px;
-  border-radius: 16px;
+  border-radius: var(--bm-radius-lg);
   border: none;
   background: linear-gradient(135deg, #4f8db5, #3f7298);
   color: #fff;
-  font-size: 15px;
+  font-size: var(--bm-font-size-body);
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s, transform 0.1s;
@@ -872,7 +868,7 @@
 }
 
 .dv-form-section-label {
-  font-size: 11px;
+  font-size: var(--bm-font-size-sm);
   font-weight: 600;
   color: var(--bm-soft);
   text-transform: uppercase;
@@ -880,13 +876,13 @@
   margin: 0 0 8px;
 }
 
-/* Section 1: 封面照片 */
+/* Section 1: cover photo */
 .dv-form-photo-area {
   width: 100%;
   aspect-ratio: 4 / 3;
-  border-radius: 18px;
+  border-radius: var(--bm-radius-xl);
   overflow: hidden;
-  background: linear-gradient(135deg, #eef6fb, #e5f0f7);
+  background: linear-gradient(135deg, var(--bm-color-page-soft), #e5f0f7);
   border: 1.5px dashed rgba(111, 151, 180, 0.22);
   display: flex;
   flex-direction: column;
@@ -911,7 +907,7 @@
 }
 
 .dv-form-photo-text {
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   color: var(--bm-soft);
   font-weight: 500;
 }
@@ -929,10 +925,10 @@
   justify-content: center;
   gap: 5px;
   padding: 9px;
-  border-radius: 12px;
+  border-radius: var(--bm-radius-base);
   border: 1px solid var(--bm-line);
   background: var(--bm-glass);
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   font-weight: 500;
   color: var(--bm-ink);
   cursor: pointer;
@@ -943,7 +939,7 @@
   background: rgba(74, 112, 143, 0.06);
 }
 
-/* Section 2: 心情 */
+/* Section 2: mood */
 .dv-mood-selector {
   display: flex;
   gap: 6px;
@@ -956,7 +952,7 @@
   align-items: center;
   gap: 3px;
   padding: 8px 12px;
-  border-radius: 14px;
+  border-radius: var(--bm-radius-md);
   border: 1.5px solid var(--bm-line);
   background: var(--bm-glass);
   cursor: pointer;
@@ -975,27 +971,27 @@
 .dv-mood-swatch {
   width: 22px;
   height: 22px;
-  border-radius: 8px;
+  border-radius: var(--bm-radius-xs);
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.55),
     0 4px 12px rgba(97, 74, 68, 0.10);
 }
 
 .dv-mood-option-label {
-  font-size: 10px;
+  font-size: var(--bm-font-size-xs);
   font-weight: 600;
   white-space: nowrap;
 }
 
-/* Section 3: 正文 */
+/* Section 3: content */
 .dv-form-textarea {
   width: 100%;
   min-height: 120px;
   padding: 12px 14px;
-  border-radius: 18px;
+  border-radius: var(--bm-radius-xl);
   border: 1px solid var(--bm-line);
   background: var(--bm-glass);
-  font-size: 14px;
+  font-size: var(--bm-font-size-control);
   line-height: 1.65;
   color: var(--bm-ink);
   resize: vertical;
@@ -1010,7 +1006,7 @@
   color: #a0aeb8;
 }
 
-/* Section 4: 产品选择 */
+/* Section 4: products */
 .dv-form-products-grid {
   display: flex;
   flex-wrap: wrap;
@@ -1023,7 +1019,7 @@
   align-items: center;
   gap: 4px;
   padding: 8px 10px;
-  border-radius: 14px;
+  border-radius: var(--bm-radius-md);
   border: 1px solid var(--bm-line);
   background: var(--bm-glass);
   cursor: pointer;
@@ -1044,14 +1040,14 @@
 .dv-form-product-chip-thumb {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--bm-radius-sm);
   background-size: cover;
   background-position: center;
   background-color: #e6eef4;
 }
 
 .dv-form-product-chip-name {
-  font-size: 10px;
+  font-size: var(--bm-font-size-xs);
   color: var(--bm-ink);
   font-weight: 500;
   text-align: center;
@@ -1061,13 +1057,13 @@
   white-space: nowrap;
 }
 
-/* Section 5: 肤质分析关联 */
+/* Section 5: skin analysis link */
 .dv-form-analysis-card {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: 18px;
+  border-radius: var(--bm-radius-xl);
   background: var(--bm-glass);
   border: 1px solid var(--bm-line);
 }
@@ -1083,24 +1079,24 @@
 }
 
 .dv-form-analysis-type {
-  font-size: 13px;
+  font-size: var(--bm-font-size-base);
   font-weight: 600;
   color: var(--bm-ink);
 }
 
 .dv-form-analysis-date {
-  font-size: 10px;
+  font-size: var(--bm-font-size-xs);
   color: var(--bm-soft);
   margin-top: 2px;
 }
 
 .dv-form-analysis-none {
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   color: var(--bm-soft);
   font-style: italic;
 }
 
-/* Section 6: 标签 */
+/* Section 6: tags */
 .dv-form-tags-grid {
   display: flex;
   flex-wrap: wrap;
@@ -1109,10 +1105,10 @@
 
 .dv-form-tag-chip {
   padding: 6px 14px;
-  border-radius: 16px;
+  border-radius: var(--bm-radius-lg);
   border: 1px solid var(--bm-line);
   background: var(--bm-glass);
-  font-size: 12px;
+  font-size: var(--bm-font-size-md);
   font-weight: 500;
   color: var(--bm-soft);
   cursor: pointer;
@@ -1128,14 +1124,14 @@
   border-color: rgba(47, 120, 173, 0.25);
 }
 
-/* ── Loading ── */
+/* Loading */
 .d-loading-spinner {
   width: 40px;
   height: 40px;
   margin: 0 auto;
   border: 3px solid var(--bm-line);
   border-top-color: var(--bm-blue-deep);
-  border-radius: 50%;
+  border-radius: var(--bm-radius-circle);
   animation: dSpin 0.8s linear infinite;
 }
 
