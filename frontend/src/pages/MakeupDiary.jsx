@@ -19,98 +19,21 @@ import {
   X,
 } from 'lucide-react'
 import { usePageBackground } from '../utils/backgroundSettings'
-import { MOOD_OPTIONS, getMoodInfo } from '../utils/moods'
+import { MOOD_OPTIONS } from '../utils/moods'
 import diaryEmptyIllustration from '../assets/illustrations/beauty-mirror-ip/diary-empty-resting.png'
-
-const HEATMAP_WEEKDAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const HEATMAP_MIN_WEEKS = 24
-
-function toDateKey(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function parseDateKey(dateKey) {
-  const [year, month, day] = String(dateKey || '').split('-').map(Number)
-  if (!year || !month || !day) return new Date()
-  return new Date(year, month - 1, day)
-}
-
-function getMonthStart(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-function formatMonthTitle(date) {
-  return `${date.getFullYear()}年${date.getMonth() + 1}月`
-}
-
-function formatDayTitle(dateKey) {
-  const date = parseDateKey(dateKey)
-  return `${date.getMonth() + 1}月${date.getDate()}日`
-}
-
-function formatMonthShort(date) {
-  return `${date.getMonth() + 1}月`
-}
-
-function hexToRgba(hex, alpha) {
-  const value = String(hex || '').replace('#', '')
-  if (value.length !== 6) return `rgba(123,158,199,${alpha})`
-  const r = parseInt(value.slice(0, 2), 16)
-  const g = parseInt(value.slice(2, 4), 16)
-  const b = parseInt(value.slice(4, 6), 16)
-  return `rgba(${r},${g},${b},${alpha})`
-}
-
-function startOfWeek(date) {
-  const start = new Date(date)
-  const mondayOffset = (start.getDay() + 6) % 7
-  start.setDate(start.getDate() - mondayOffset)
-  return start
-}
-
-function buildHeatmapWindow(monthDate, diaryCountByDate, moodByDate) {
-  const monthStart = getMonthStart(monthDate)
-  const year = monthStart.getFullYear()
-  const month = monthStart.getMonth()
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const leadingDays = (monthStart.getDay() + 6) % 7
-  const weeksInMonth = Math.ceil((leadingDays + daysInMonth) / 7)
-  const weekCount = Math.max(HEATMAP_MIN_WEEKS, weeksInMonth)
-  const paddingWeeksBefore = Math.floor((weekCount - weeksInMonth) / 2)
-  const windowStart = startOfWeek(monthStart)
-  windowStart.setDate(windowStart.getDate() - paddingWeeksBefore * 7)
-
-  const cells = Array.from({ length: weekCount * 7 }, (_, index) => {
-    const date = new Date(windowStart)
-    date.setDate(windowStart.getDate() + index)
-    const dateKey = toDateKey(date)
-    const count = diaryCountByDate[dateKey] || 0
-    const mood = moodByDate[dateKey] || null
-    return {
-      date,
-      dateKey,
-      inMonth: date.getFullYear() === year && date.getMonth() === month,
-      count,
-      mood,
-    }
-  })
-
-  const weeks = []
-  for (let index = 0; index < cells.length; index += 7) {
-    const weekCells = cells.slice(index, index + 7)
-    weeks.push({
-      id: weekCells[0].dateKey,
-      cells: weekCells,
-    })
-  }
-
-  return {
-    weeks,
-  }
-}
+import {
+  HEATMAP_WEEKDAY_LABELS,
+  buildDiaryCalendarData,
+  buildHeatmapWindow,
+  formatDayTitle,
+  formatMonthShort,
+  formatMonthTitle,
+  getInitialDiaryDate,
+  getMonthStart,
+  hexToRgba,
+  parseDateKey,
+  toDateKey,
+} from './diary/diaryLogic'
 
 function HeatmapDayCell({ cell, selectedDate, todayKey, onSelect }) {
   const selected = cell.dateKey === selectedDate
@@ -239,9 +162,7 @@ export default function MakeupDiary() {
     if (loading || didInitDateRef.current) return
     const diaries = data?.diaries || []
     const today = toDateKey(new Date())
-    const initialDate = diaries.some(d => d.created_date === today)
-      ? today
-      : (diaries[0]?.created_date || today)
+    const initialDate = getInitialDiaryDate(diaries, today)
 
     setSelectedDate(initialDate)
     setVisibleMonth(getMonthStart(parseDateKey(initialDate)))
@@ -327,28 +248,11 @@ export default function MakeupDiary() {
   /* ── Render ── */
   const diaries = data?.diaries || []
   const pageStyle = pageBackground.style
-  const diariesByDate = useMemo(() => {
-    return diaries.reduce((acc, diary) => {
-      const key = diary.created_date || toDateKey(new Date(diary.created_at || Date.now()))
-      if (!acc[key]) acc[key] = []
-      acc[key].push(diary)
-      return acc
-    }, {})
-  }, [diaries])
-  const diaryCountByDate = useMemo(() => {
-    return diaries.reduce((acc, diary) => {
-      const key = diary.created_date || toDateKey(new Date(diary.created_at || Date.now()))
-      acc[key] = (acc[key] || 0) + 1
-      return acc
-    }, {})
-  }, [diaries])
-  const moodByDate = useMemo(() => {
-    return diaries.reduce((acc, diary) => {
-      const key = diary.created_date || toDateKey(new Date(diary.created_at || Date.now()))
-      if (!acc[key]) acc[key] = getMoodInfo(diary.mood_info?.key || diary.mood)
-      return acc
-    }, {})
-  }, [diaries])
+  const {
+    diariesByDate,
+    diaryCountByDate,
+    moodByDate,
+  } = useMemo(() => buildDiaryCalendarData(diaries, new Date()), [diaries])
   const heatmap = useMemo(
     () => buildHeatmapWindow(visibleMonth, diaryCountByDate, moodByDate),
     [visibleMonth, diaryCountByDate, moodByDate],

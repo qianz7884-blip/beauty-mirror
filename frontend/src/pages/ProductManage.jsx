@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowLeft, CalendarDays, Check, ChevronRight, Edit3, Grid2X2, Pencil, PlusCircle, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
-import { fetchProducts, createProduct, updateProduct, updateProductUsage, deleteProduct, getAnonymousUserId, getPhotoUrl } from '../api'
+import { Grid2X2, Search, SlidersHorizontal } from 'lucide-react'
+import { createProduct, updateProduct, updateProductUsage, deleteProduct, getPhotoUrl } from '../api'
 import ProductCategoryManager from '../components/ProductCategoryManager'
 import ProductForm from '../components/ProductForm'
 import RecognizePanel from '../components/RecognizePanel'
@@ -32,16 +32,6 @@ import placeholderSample from '../assets/illustrations/product-placeholders/samp
 import placeholderOther from '../assets/illustrations/product-placeholders/other.png'
 import { DEFAULT_CATEGORIES, loadCustomCategories, saveCustomCategories } from '../categories'
 import {
-  DEFAULT_SHADE_SWATCHES,
-  getDetailProfile,
-  getProductExpiryDate,
-  getProductUsagePercent,
-  getProductStatus,
-  formatProductPrice,
-  groupByCategory,
-  isHexColor,
-  addMonthsToDate,
-  normalizePriceInput,
   loadShadeRecords,
   loadUsageRecords,
   saveShadeRecords,
@@ -49,97 +39,21 @@ import {
 } from '../utils/productCatalog'
 import { getRequestErrorMessage } from '../utils/productEntry'
 import { usePageBackground } from '../utils/backgroundSettings'
-
-const PRODUCT_CACHE_KEY = 'beauty_mirror_products_cache_v1'
-let productMemoryCache = null
-let productMemoryCacheUserId = ''
-
-function normalizeProductList(data) {
-  return Array.isArray(data) ? data : []
-}
-
-function parseTagText(value) {
-  return String(value || '')
-    .split(/[、,，/]/)
-    .map(item => item.trim())
-    .filter(Boolean)
-}
-
-function serializeTagText(value) {
-  return parseTagText(value).join('、')
-}
-
-function toggleTagValue(value, option) {
-  const selected = parseTagText(value)
-  const next = selected.includes(option)
-    ? selected.filter(item => item !== option)
-    : [...selected, option]
-  return serializeTagText(next)
-}
-
-const RECOMMENDATION_TAG_FIELDS = [
-  {
-    field: 'usage_steps',
-    label: '适合步骤',
-    options: ['护肤', '妆前', '底妆', '遮瑕', '定妆', '眼妆', '唇妆', '补妆'],
-  },
-  {
-    field: 'product_features',
-    label: '产品特点',
-    options: ['保湿', '清爽', '控油', '修护', '提亮', '遮瑕', '持妆', '舒缓'],
-  },
-  {
-    field: 'suitable_regions',
-    label: '适合区域',
-    options: ['T区', '鼻翼', '眼下', '唇周', '脸颊', '下颌', '全脸'],
-  },
-  {
-    field: 'suitable_scenes',
-    label: '适合场景',
-    options: ['通勤', '办公室', '晚间出门', '拍照', '干燥天气', '潮湿天气'],
-  },
-  {
-    field: 'user_feedback',
-    label: '我的反馈',
-    options: ['好用', '持妆好', '不卡粉', '容易卡粉', '搓泥', '闷痘', '太油', '太干'],
-  },
-]
-
-const PRODUCT_KNOWLEDGE_FIELDS = [
-  { field: 'ingredients', label: '核心成分' },
-  { field: 'efficacy', label: '功效说明' },
-  { field: 'usage_instructions', label: '使用方法' },
-  { field: 'suitable_skin', label: '适合肤质' },
-]
-
-function readProductCache() {
-  const userId = getAnonymousUserId()
-  if (productMemoryCacheUserId === userId && productMemoryCache) return productMemoryCache
-  if (typeof window === 'undefined') return []
-
-  try {
-    const cached = JSON.parse(window.sessionStorage.getItem(`${PRODUCT_CACHE_KEY}_${userId}`) || '[]')
-    productMemoryCache = normalizeProductList(cached)
-    productMemoryCacheUserId = userId
-    return productMemoryCache
-  } catch {
-    return []
-  }
-}
-
-function writeProductCache(products) {
-  const userId = getAnonymousUserId()
-  const nextProducts = normalizeProductList(products)
-  productMemoryCache = nextProducts
-  productMemoryCacheUserId = userId
-
-  if (typeof window === 'undefined') return
-  try {
-    window.sessionStorage.setItem(`${PRODUCT_CACHE_KEY}_${userId}`, JSON.stringify(nextProducts))
-  } catch {
-    // Cache is only for smoother navigation; ignore storage failures.
-  }
-}
+import {
+  ALL_PRODUCTS_CATEGORY,
+} from './product/productData'
+import {
+  buildProductCardDisplayData,
+  buildProductDetailDraft,
+  buildProductDetailViewData,
+  buildProductFormData,
+  buildProductListView,
+  countLowStockProducts,
+  updateProductDraftField,
+} from './product/productLogic'
+import { useProductCollection } from './product/useProductCollection'
+import { ProductDetailView } from './product/ProductDetailView'
+import { ProductListCard } from './product/ProductListCard'
 
 function getPlaceholderKind(category = '') {
   const text = category || ''
@@ -373,11 +287,17 @@ function ProductListSkeleton() {
 export default function ProductManage() {
   const pageBackground = usePageBackground('products')
   const [searchParams, setSearchParams] = useSearchParams()
-  const [products, setProducts] = useState(() => readProductCache())
-  const [loading, setLoading] = useState(() => readProductCache().length === 0)
-  const [loadError, setLoadError] = useState('')
+  const {
+    products,
+    loading,
+    loadError,
+    reloadProducts,
+    replaceProduct,
+    updateProductUsage: updateProductUsageInCollection,
+    upsertProduct,
+  } = useProductCollection()
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('全部')
+  const [category, setCategory] = useState(ALL_PRODUCTS_CATEGORY)
   const [showSearch, setShowSearch] = useState(false)
   const [viewMode, setViewMode] = useState('list')
   const [showForm, setShowForm] = useState(false)
@@ -405,24 +325,9 @@ export default function ProductManage() {
   const [petAnimating, setPetAnimating] = useState(false)
 
   const productCategories = [...DEFAULT_CATEGORIES, ...customCategories]
-  const filterCategories = ['全部', ...productCategories]
+  const filterCategories = [ALL_PRODUCTS_CATEGORY, ...productCategories]
 
-  const load = useCallback(() => {
-    setLoading(true)
-    setLoadError('')
-    fetchProducts()
-      .then((data) => {
-        const nextProducts = normalizeProductList(data)
-        setProducts(nextProducts)
-        writeProductCache(nextProducts)
-      })
-      .catch((err) => {
-        setLoadError(getRequestErrorMessage(err, '无法加载产品，请检查后端是否启动'))
-      })
-      .finally(() => setLoading(false))
-  }, [])
-
-  useEffect(() => { load() }, [load])
+  useEffect(() => { reloadProducts() }, [reloadProducts])
 
   useEffect(() => {
     if (searchParams.get('add') !== '1') return
@@ -548,7 +453,7 @@ export default function ProductManage() {
       setShowForm(false)
       setEditingProduct(null)
       setInitialValues({})
-      load()
+      reloadProducts()
       if (isEditingSelected && nextProduct) setSelectedProduct(nextProduct)
     } catch (err) {
       showToast(getRequestErrorMessage(err), 'error')
@@ -556,72 +461,14 @@ export default function ProductManage() {
     }
   }
 
-  const buildProductFormData = (values, baseProduct = {}) => {
-    const formData = new FormData()
-    formData.append('name', (values.name ?? baseProduct.name ?? '').trim())
-    formData.append('brand', (values.brand ?? baseProduct.brand ?? '').trim())
-    formData.append('category', values.category ?? baseProduct.category ?? '其他')
-    formData.append('color', (values.color ?? baseProduct.color ?? '').trim())
-    formData.append('volume', (values.volume ?? baseProduct.volume ?? '').trim())
-    formData.append('production_date', values.production_date ?? baseProduct.production_date ?? '')
-    formData.append('shelf_life_months', values.shelf_life_months ?? baseProduct.shelf_life_months ?? 0)
-    formData.append('purchase_date', values.purchase_date ?? baseProduct.purchase_date ?? '')
-    formData.append(
-      'expiry_date',
-      values.expiry_date
-        || baseProduct.expiry_date
-        || addMonthsToDate(values.production_date ?? baseProduct.production_date, values.shelf_life_months ?? baseProduct.shelf_life_months)
-        || '',
-    )
-    formData.append('price', values.price ?? baseProduct.price ?? 0)
-    formData.append('notes', (values.notes ?? baseProduct.notes ?? '').trim())
-    formData.append('usage_percent', values.usage_percent ?? baseProduct.usage_percent ?? 0)
-    formData.append('ingredients', baseProduct.ingredients || '')
-    formData.append('efficacy', baseProduct.efficacy || '')
-    formData.append('suitable_skin', baseProduct.suitable_skin || '')
-    formData.append('usage_instructions', baseProduct.usage_instructions || '')
-    formData.append('usage_steps', values.usage_steps ?? baseProduct.usage_steps ?? '')
-    formData.append('product_features', values.product_features ?? baseProduct.product_features ?? '')
-    formData.append('suitable_regions', values.suitable_regions ?? baseProduct.suitable_regions ?? '')
-    formData.append('suitable_scenes', values.suitable_scenes ?? baseProduct.suitable_scenes ?? '')
-    formData.append('user_feedback', values.user_feedback ?? baseProduct.user_feedback ?? '')
-    formData.append('source', baseProduct.source || 'manual')
-    return formData
-  }
-
   const startDetailEdit = () => {
     if (!selectedProduct) return
-    setDetailDraft({
-      name: selectedProduct.name || '',
-      brand: selectedProduct.brand || '',
-      category: selectedProduct.category || '其他',
-      color: selectedProduct.color || '',
-      volume: selectedProduct.volume || '',
-      production_date: selectedProduct.production_date || '',
-      shelf_life_months: selectedProduct.shelf_life_months || '',
-      purchase_date: selectedProduct.purchase_date || '',
-      expiry_date: selectedProduct.expiry_date || '',
-      price: normalizePriceInput(selectedProduct.price),
-      notes: selectedProduct.notes || '',
-      usage_percent: getProductUsagePercent(selectedProduct, usageRecords),
-      usage_steps: selectedProduct.usage_steps || '',
-      product_features: selectedProduct.product_features || '',
-      suitable_regions: selectedProduct.suitable_regions || '',
-      suitable_scenes: selectedProduct.suitable_scenes || '',
-      user_feedback: selectedProduct.user_feedback || '',
-    })
+    setDetailDraft(buildProductDetailDraft(selectedProduct, usageRecords))
     setDetailEditing(true)
   }
 
   const updateDetailDraft = (field, value) => {
-    setDetailDraft(prev => {
-      const next = { ...prev, [field]: value }
-      if (field === 'production_date' || field === 'shelf_life_months') {
-        const nextExpiry = addMonthsToDate(next.production_date, next.shelf_life_months)
-        if (nextExpiry) next.expiry_date = nextExpiry
-      }
-      return next
-    })
+    setDetailDraft(prev => updateProductDraftField(prev, field, value))
   }
 
   const cancelDetailEdit = () => {
@@ -641,13 +488,7 @@ export default function ProductManage() {
         selectedProduct.id,
         buildProductFormData(detailDraft, selectedProduct),
       )
-      setProducts(prev => {
-        const next = prev.map(product => (
-          product.id === savedProduct.id ? { ...product, ...savedProduct } : product
-        ))
-        writeProductCache(next)
-        return next
-      })
+      replaceProduct(savedProduct)
       setSelectedProduct(savedProduct)
       setDetailEditing(false)
       setDetailDraft({})
@@ -680,7 +521,7 @@ export default function ProductManage() {
   const handleRecognizeSaved = () => {
     setRecognizePhoto(null)
     showToast('产品添加成功')
-    load()
+    reloadProducts()
   }
 
   const startVoiceEntry = () => {
@@ -690,14 +531,10 @@ export default function ProductManage() {
 
   const handleCatalogAdded = (product) => {
     if (product) {
-      setProducts(prev => {
-        const next = [product, ...prev.filter(item => item.id !== product.id)]
-        writeProductCache(next)
-        return next
-      })
+      upsertProduct(product)
     }
     showToast('已加入化妆柜')
-    load()
+    reloadProducts()
   }
 
   const handleVoiceResult = (values) => {
@@ -710,7 +547,7 @@ export default function ProductManage() {
     try {
       await deleteProduct(id)
       showToast('产品已删除')
-      load()
+      reloadProducts()
     } catch {
       showToast('删除失败', 'error')
     }
@@ -737,7 +574,7 @@ export default function ProductManage() {
     const updated = customCategories.filter(cat => cat !== name)
     setCustomCategories(updated)
     saveCustomCategories(updated)
-    if (category === name) setCategory('全部')
+    if (category === name) setCategory(ALL_PRODUCTS_CATEGORY)
     showToast('分类已删除')
   }
 
@@ -748,13 +585,7 @@ export default function ProductManage() {
       saveUsageRecords(next)
       return next
     })
-    setProducts(prev => {
-      const next = prev.map(product => (
-        product.id === productId ? { ...product, usage_percent: nextValue } : product
-      ))
-      writeProductCache(next)
-      return next
-    })
+    updateProductUsageInCollection(productId, nextValue)
     setSelectedProduct(prev => (
       prev?.id === productId ? { ...prev, usage_percent: nextValue } : prev
     ))
@@ -765,13 +596,7 @@ export default function ProductManage() {
     const nextValue = applyUsageRecord(productId, value)
     try {
       const savedProduct = await updateProductUsage(productId, nextValue)
-      setProducts(prev => {
-        const next = prev.map(product => (
-          product.id === productId ? { ...product, ...savedProduct } : product
-        ))
-        writeProductCache(next)
-        return next
-      })
+      replaceProduct(savedProduct)
       setSelectedProduct(prev => (
         prev?.id === productId ? { ...prev, ...savedProduct } : prev
       ))
@@ -790,138 +615,52 @@ export default function ProductManage() {
 
   const renderProductCard = (product) => {
     const photoUrl = product.photo ? getPhotoUrl(product.photo, 'products') : ''
-    const usagePercent = getProductUsagePercent(product, usageRecords)
-    const displayProduct = { ...product, usage_percent: usagePercent }
-    const recommendationTags = [
-      ...parseTagText(product.product_features),
-      ...parseTagText(product.suitable_regions),
-      ...parseTagText(product.usage_steps),
-    ].slice(0, 3)
+    const displayData = buildProductCardDisplayData(product, usageRecords)
 
     return (
-      <article key={product.id} className={`bm-product-card ${viewMode === 'grid' ? 'bm-product-grid-card' : ''}`}>
-        <button
-          type="button"
-          className={`bm-product-photo ${photoUrl ? '' : 'is-placeholder'}`}
-          onClick={() => photoUrl && setViewImage(photoUrl)}
-          style={photoUrl ? { backgroundImage: `url(${photoUrl})` } : undefined}
-          aria-label={photoUrl ? '查看产品图片' : `${product.category || '产品'}占位插画`}
-        >
-          {!photoUrl && (
-            <img
-              className="bm-category-placeholder"
-              src={getProductPlaceholderImage(product.category)}
-              alt=""
-              aria-hidden="true"
-            />
-          )}
-        </button>
-        <button type="button" className="bm-product-info" onClick={() => setSelectedProduct(displayProduct)}>
-          <span className="bm-product-status">{getProductStatus(displayProduct)}</span>
-          <h3>{product.name}</h3>
-          <p>{product.brand || '未记录品牌'}</p>
-          <div className="bm-product-tags">
-            {product.volume && <span>容量 {product.volume}</span>}
-            {product.color && <span>色号 {product.color}</span>}
-            {usagePercent > 0 && <span>已用 {usagePercent}%</span>}
-            {formatProductPrice(product.price) && <span>¥{formatProductPrice(product.price)}</span>}
-          </div>
-          {recommendationTags.length > 0 && (
-            <div className="vault-product-rec-tags">
-              {recommendationTags.map(tag => <span key={tag}>{tag}</span>)}
-            </div>
-          )}
-        </button>
-        <div className="bm-product-actions">
-          <button
-            type="button"
-            aria-label="编辑"
-            onClick={() => {
-              setSelectedProduct(displayProduct)
-              setDetailDraft({
-                name: product.name || '',
-                brand: product.brand || '',
-                category: product.category || '其他',
-                color: product.color || '',
-                volume: product.volume || '',
-                purchase_date: product.purchase_date || '',
-                expiry_date: product.expiry_date || '',
-                price: normalizePriceInput(product.price),
-                notes: product.notes || '',
-                usage_percent: usagePercent,
-                usage_steps: product.usage_steps || '',
-                product_features: product.product_features || '',
-                suitable_regions: product.suitable_regions || '',
-                suitable_scenes: product.suitable_scenes || '',
-                user_feedback: product.user_feedback || '',
-              })
-              setDetailEditing(true)
-            }}
-          >
-            <Edit3 size={17} strokeWidth={1.7} />
-          </button>
-          <button type="button" aria-label="删除" onClick={() => handleDelete(product.id)}>
-            <Trash2 size={17} strokeWidth={1.7} />
-          </button>
-        </div>
-      </article>
+      <ProductListCard
+        key={product.id}
+        displayData={displayData}
+        photoUrl={photoUrl}
+        placeholderImage={getProductPlaceholderImage(product.category)}
+        product={product}
+        viewMode={viewMode}
+        onDelete={() => handleDelete(product.id)}
+        onEdit={() => {
+          setSelectedProduct(displayData.displayProduct)
+          setDetailDraft(buildProductDetailDraft(product, usageRecords, { includeLifecycleFields: false }))
+          setDetailEditing(true)
+        }}
+        onImageOpen={() => photoUrl && setViewImage(photoUrl)}
+        onOpen={() => setSelectedProduct(displayData.displayProduct)}
+      />
     )
   }
 
-  const normalizedSearch = search.trim().toLowerCase()
-  const visibleProducts = useMemo(() => (
-    products.filter(product => {
-      const matchesCategory = category === '全部' || product.category === category
-      if (!matchesCategory) return false
-      if (!normalizedSearch) return true
-
-      return [
-        product.name,
-        product.brand,
-        product.category,
-        product.volume,
-        product.color,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedSearch)
-    })
-  ), [products, category, normalizedSearch])
-  const grouped = !normalizedSearch && category === '全部' ? groupByCategory(visibleProducts) : null
-  const isInitialLoading = loading && products.length === 0
-  const isEmpty = !isInitialLoading && visibleProducts.length === 0
+  const {
+    normalizedSearch,
+    visibleProducts,
+    grouped,
+    isInitialLoading,
+    isEmpty,
+  } = useMemo(() => (
+    buildProductListView(products, { category, search, loading })
+  ), [products, category, search, loading])
   const lowStockCount = useMemo(() => (
-    products.filter(product => getProductUsagePercent(product, usageRecords) >= 80).length
+    countLowStockProducts(products, usageRecords)
   ), [products, usageRecords])
   const petReminderText = lowStockCount > 0
     ? `还有 ${lowStockCount} 件产品快用完啦`
     : '现在没有快用完的产品'
-  const showPetReminder = !isInitialLoading && !loadError && products.length > 0 && category === '全部'
+  const showPetReminder = !isInitialLoading && !loadError && products.length > 0 && category === ALL_PRODUCTS_CATEGORY
   if (selectedProduct) {
     const photoUrl = selectedProduct.photo ? getPhotoUrl(selectedProduct.photo, 'products') : ''
-    const usagePercent = getProductUsagePercent(selectedProduct, usageRecords)
-    const detailUsagePercent = detailEditing
-      ? Math.max(0, Math.min(100, Number(detailDraft.usage_percent) || 0))
-      : usagePercent
-    const detailProduct = { ...selectedProduct, usage_percent: detailUsagePercent }
-    const status = getProductStatus(detailProduct)
-    const expiryDate = getProductExpiryDate(selectedProduct)
-    const colorIsHex = isHexColor(selectedProduct.color)
-    const selectedShade = shadeRecords[selectedProduct.id] || (colorIsHex ? selectedProduct.color : DEFAULT_SHADE_SWATCHES[0])
-    const detailProfile = getDetailProfile(selectedProduct)
-    const showShadeRow = detailProfile.kind === 'shade'
-    const recommendationTags = [
-      { label: '适合步骤', items: parseTagText(selectedProduct.usage_steps) },
-      { label: '产品特点', items: parseTagText(selectedProduct.product_features) },
-      { label: '适合区域', items: parseTagText(selectedProduct.suitable_regions) },
-      { label: '适合场景', items: parseTagText(selectedProduct.suitable_scenes) },
-      { label: '我的反馈', items: parseTagText(selectedProduct.user_feedback) },
-    ].filter(group => group.items.length > 0)
-    const knowledgeDetails = PRODUCT_KNOWLEDGE_FIELDS.map(({ field, label }) => ({
-      label,
-      value: selectedProduct[field],
-    })).filter(item => String(item.value || '').trim())
+    const detailViewData = buildProductDetailViewData(selectedProduct, {
+      detailDraft,
+      detailEditing,
+      shadeRecords,
+      usageRecords,
+    })
 
     return (
       <div className="bm-screen bm-product-detail-page" style={pageBackground.style}>
@@ -931,341 +670,36 @@ export default function ProductManage() {
           </div>
         )}
 
-        <section className="bm-detail-hero">
-          <button
-            type="button"
-            className="bm-detail-back"
-            onClick={() => {
+        <ProductDetailView
+          actions={{
+            onBack: () => {
               setSelectedProduct(null)
               cancelDetailEdit()
-            }}
-            aria-label="返回产品列表"
-          >
-            <ArrowLeft size={22} strokeWidth={1.8} />
-          </button>
-          <span className="bm-detail-count">1 / 1</span>
-          <button
-            type="button"
-            className={`bm-detail-main-photo ${photoUrl ? '' : 'is-placeholder'}`}
-            style={photoUrl ? { backgroundImage: `url(${photoUrl})` } : undefined}
-            onClick={() => photoUrl && setViewImage(photoUrl)}
-            aria-label="查看产品大图"
-          >
-            {!photoUrl && (
-              <img
-                className="bm-category-placeholder"
-                src={getProductPlaceholderImage(selectedProduct.category)}
-                alt=""
-                aria-hidden="true"
-              />
-            )}
-          </button>
-        </section>
-
-        <section className="bm-detail-content">
-          <div className="bm-detail-heading">
-            <div>
-              {detailEditing ? (
-                <input
-                  className="bm-detail-title-input"
-                  value={detailDraft.name || ''}
-                  onChange={event => updateDetailDraft('name', event.target.value)}
-                  placeholder="产品名称"
-                />
-              ) : (
-                <h1>{selectedProduct.name || '未命名产品'}</h1>
-              )}
-              {detailEditing ? (
-                <input
-                  className="bm-detail-subtitle-input"
-                  value={detailDraft.brand || ''}
-                  onChange={event => updateDetailDraft('brand', event.target.value)}
-                  placeholder="品牌"
-                />
-              ) : (
-                <p>{detailProfile.summary || selectedProduct.category || '未记录分类'}</p>
-              )}
-            </div>
-            <span className={`bm-detail-status ${status === '快用完' ? 'is-low' : status === '已过期' ? 'is-expired' : ''}`}>
-              {status}
-            </span>
-          </div>
-
-          <div className="bm-detail-facts" aria-label="产品信息">
-            <div>
-              <span>品牌</span>
-              {detailEditing ? (
-                <input value={detailDraft.brand || ''} onChange={event => updateDetailDraft('brand', event.target.value)} placeholder="品牌" />
-              ) : (
-                <strong>{selectedProduct.brand || '未记录'}</strong>
-              )}
-            </div>
-            <div>
-              <span>分类</span>
-              {detailEditing ? (
-                <select value={detailDraft.category || '其他'} onChange={event => updateDetailDraft('category', event.target.value)}>
-                  {DEFAULT_CATEGORIES.concat(customCategories).map(item => (
-                    <option key={item} value={item}>{item}</option>
-                  ))}
-                </select>
-              ) : (
-                <strong>{selectedProduct.category || '其他'}</strong>
-              )}
-            </div>
-            <div>
-              <span>规格</span>
-              {detailEditing ? (
-                <input value={detailDraft.volume || ''} onChange={event => updateDetailDraft('volume', event.target.value)} placeholder="30ml" />
-              ) : (
-                <strong>{selectedProduct.volume || '未记录'}</strong>
-              )}
-            </div>
-            <div>
-              <span>颜色 / 色号</span>
-              {detailEditing ? (
-                <input value={detailDraft.color || ''} onChange={event => updateDetailDraft('color', event.target.value)} placeholder="色号" />
-              ) : (
-                <strong>{selectedProduct.color || '未记录'}</strong>
-              )}
-            </div>
-            <div>
-              <span>生产日期</span>
-              {detailEditing ? (
-                <input type="date" value={detailDraft.production_date || ''} onChange={event => updateDetailDraft('production_date', event.target.value)} />
-              ) : (
-                <strong>{selectedProduct.production_date || '未记录'}</strong>
-              )}
-            </div>
-            <div>
-              <span>保质期（月）</span>
-              {detailEditing ? (
-                <input type="number" min="0" max="240" step="1" value={detailDraft.shelf_life_months || ''} onChange={event => updateDetailDraft('shelf_life_months', event.target.value)} placeholder="36" />
-              ) : (
-                <strong>{selectedProduct.shelf_life_months ? `${selectedProduct.shelf_life_months}个月` : '未记录'}</strong>
-              )}
-            </div>
-            <div>
-              <span>购买日期</span>
-              {detailEditing ? (
-                <input type="date" value={detailDraft.purchase_date || ''} onChange={event => updateDetailDraft('purchase_date', event.target.value)} />
-              ) : (
-                <strong>{selectedProduct.purchase_date || '未记录'}</strong>
-              )}
-            </div>
-            <div>
-              <span>预计到期</span>
-              {detailEditing ? (
-                <input type="date" value={detailDraft.expiry_date || ''} onChange={event => updateDetailDraft('expiry_date', event.target.value)} />
-              ) : (
-                <strong>{selectedProduct.expiry_date || expiryDate || '未记录'}</strong>
-              )}
-            </div>
-            <div>
-              <span>价格</span>
-              {detailEditing ? (
-                <input type="number" min="0" step="0.01" value={detailDraft.price ?? ''} onChange={event => updateDetailDraft('price', event.target.value)} placeholder="0" />
-              ) : (
-                <strong>{formatProductPrice(selectedProduct.price) ? `¥${formatProductPrice(selectedProduct.price)}` : '未记录'}</strong>
-              )}
-            </div>
-          </div>
-
-          <div className="bm-detail-panel">
-            <div className="bm-detail-panel-title">
-              <strong>{detailProfile.title}</strong>
-              <span>{detailProfile.value}</span>
-            </div>
-            {showShadeRow ? (
-              <div className="bm-shade-row">
-                {[...new Set([colorIsHex ? selectedProduct.color : null, ...DEFAULT_SHADE_SWATCHES].filter(Boolean))].map(shade => (
-                  <button
-                    key={shade}
-                    type="button"
-                    className={`bm-shade ${selectedShade === shade ? 'active' : ''}`}
-                    style={{ background: shade }}
-                    onClick={() => updateShadeRecord(selectedProduct.id, shade)}
-                    aria-label={`选择色号 ${shade}`}
-                  />
-                ))}
-                <label className="bm-shade-picker" aria-label="自定义色号颜色">
-                  <input
-                    type="color"
-                    value={selectedShade}
-                    onChange={event => updateShadeRecord(selectedProduct.id, event.target.value)}
-                  />
-                  <span>自选</span>
-                </label>
-              </div>
-            ) : (
-              <p className="bm-detail-field-copy">{detailProfile.value}</p>
-            )}
-          </div>
-
-          <div className="bm-detail-panel">
-            <div className="bm-detail-panel-title">
-              <strong>使用记录</strong>
-              <span>手动滑动记录</span>
-            </div>
-            <p className="bm-usage-copy">已使用 {detailUsagePercent}%</p>
-            <input
-              className="bm-usage-slider"
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={detailUsagePercent}
-              style={{ '--usage-value': `${detailUsagePercent}%` }}
-              onChange={event => {
-                if (detailEditing) {
-                  updateDetailDraft('usage_percent', event.target.value)
-                } else {
-                  applyUsageRecord(selectedProduct.id, event.target.value)
-                }
-              }}
-              onPointerUp={event => {
-                if (!detailEditing) persistUsageRecord(selectedProduct.id, event.currentTarget.value)
-              }}
-              onKeyUp={event => {
-                if (!detailEditing) persistUsageRecord(selectedProduct.id, event.currentTarget.value)
-              }}
-              onBlur={event => {
-                if (!detailEditing) persistUsageRecord(selectedProduct.id, event.currentTarget.value)
-              }}
-              aria-label="调整产品使用进度"
-            />
-          </div>
-
-          <div className="bm-detail-panel">
-            <div className="bm-detail-panel-title">
-              <strong>产品库信息</strong>
-              <span>{knowledgeDetails.length ? '随产品库一起带入' : '还未录入'}</span>
-            </div>
-            {knowledgeDetails.length ? (
-              <div className="bm-detail-knowledge">
-                {knowledgeDetails.map(item => (
-                  <div key={item.label}>
-                    <span>{item.label}</span>
-                    <p>{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="bm-detail-field-copy">这件产品还没有录入成分、功效或使用方法，后面补产品库表格后会一起带进来。</p>
-            )}
-          </div>
-
-          <div className="bm-detail-panel">
-            <div className="bm-detail-panel-title">
-              <strong>推荐标签</strong>
-              <span>{recommendationTags.length ? '用于镜前建议' : '还未设置'}</span>
-            </div>
-            {detailEditing ? (
-              <div className="bm-detail-tag-edit">
-                {RECOMMENDATION_TAG_FIELDS.map(({ field, label, options }) => {
-                  const selected = parseTagText(detailDraft[field])
-                  return (
-                  <div key={field} className="bm-detail-tag-picker">
-                    <span>{label}</span>
-                    <div className="product-tag-picker">
-                      {options.map(option => (
-                        <button
-                          key={option}
-                          type="button"
-                          className={selected.includes(option) ? 'active' : ''}
-                          onClick={() => updateDetailDraft(field, toggleTagValue(detailDraft[field], option))}
-                        >
-                          {option}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  )
-                })}
-              </div>
-            ) : recommendationTags.length ? (
-              <div className="bm-detail-tag-groups">
-                {recommendationTags.map(group => (
-                  <div key={group.label}>
-                    <span>{group.label}</span>
-                    <div>
-                      {group.items.map(item => <em key={item}>{item}</em>)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="bm-detail-field-copy">编辑产品后添加步骤、特点、区域和场景，镜前建议会更容易选到它。</p>
-            )}
-          </div>
-
-          <div className="bm-detail-list">
-            <div>
-              <CalendarDays size={17} strokeWidth={1.7} />
-              <span>备注</span>
-              {detailEditing ? (
-                <textarea
-                  value={detailDraft.notes || ''}
-                  onChange={event => updateDetailDraft('notes', event.target.value)}
-                  placeholder="使用感受、适合肤质..."
-                />
-              ) : (
-                <p>{selectedProduct.notes || '还没有记录使用感、妆效或回购想法。'}</p>
-              )}
-              <button
-                type="button"
-                aria-label="编辑备注"
-                onClick={startDetailEdit}
-              >
-                <Pencil size={16} strokeWidth={1.7} />
-              </button>
-            </div>
-            {expiryDate && (
-              <div>
-                <CalendarDays size={17} strokeWidth={1.7} />
-                <span>预计到期</span>
-                <p>{expiryDate}</p>
-                <ChevronRight size={16} strokeWidth={1.7} />
-              </div>
-            )}
-          </div>
-        </section>
-
-        <div className="bm-detail-actions">
-          {detailEditing ? (
-            <>
-              <button type="button" onClick={cancelDetailEdit}>
-                <X size={18} strokeWidth={1.8} />
-                取消
-              </button>
-              <button type="button" className="primary" onClick={saveDetailEdit} disabled={detailSaving}>
-                <Check size={18} strokeWidth={1.8} />
-                {detailSaving ? '保存中' : '保存'}
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" onClick={startDetailEdit}>
-                <Pencil size={18} strokeWidth={1.8} />
-                编辑
-              </button>
-              <button
-                type="button"
-                className="primary"
-                onClick={() => {
-                  persistUsageRecord(selectedProduct.id, usagePercent + 5)
-                  showToast('已记录一次使用')
-                }}
-              >
-                <PlusCircle size={18} strokeWidth={1.8} />
-                记录使用
-              </button>
-            </>
-          )}
-        </div>
-
-        {viewImage && (
-          <ImageViewer src={viewImage} onClose={() => setViewImage(null)} />
-        )}
+            },
+            onCancelEdit: cancelDetailEdit,
+            onDraftChange: updateDetailDraft,
+            onImageOpen: () => photoUrl && setViewImage(photoUrl),
+            onImageViewerClose: () => setViewImage(null),
+            onRecordUsage: (nextUsagePercent) => {
+              persistUsageRecord(selectedProduct.id, nextUsagePercent)
+              showToast('已记录一次使用')
+            },
+            onSaveEdit: saveDetailEdit,
+            onShadeChange: shade => updateShadeRecord(selectedProduct.id, shade),
+            onStartEdit: startDetailEdit,
+            onUsageChange: value => applyUsageRecord(selectedProduct.id, value),
+            onUsageCommit: value => persistUsageRecord(selectedProduct.id, value),
+          }}
+          categories={DEFAULT_CATEGORIES.concat(customCategories)}
+          detailDraft={detailDraft}
+          detailEditing={detailEditing}
+          detailSaving={detailSaving}
+          detailViewData={detailViewData}
+          photoUrl={photoUrl}
+          placeholderImage={getProductPlaceholderImage(selectedProduct.category)}
+          selectedProduct={selectedProduct}
+          viewImage={viewImage}
+        />
       </div>
     )
   }
@@ -1379,7 +813,7 @@ export default function ProductManage() {
         <section className="bm-product-empty">
           <h2>产品加载失败</h2>
           <p>{loadError}</p>
-          <button className="bm-empty-category" type="button" onClick={load}>
+          <button className="bm-empty-category" type="button" onClick={reloadProducts}>
             重试
           </button>
         </section>

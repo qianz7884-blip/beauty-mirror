@@ -1,0 +1,168 @@
+/* ============================
+   Shared surface and compatibility typography pass
+   ============================ */
+
+:root {
+  --bm-glass-alpha: 0.64;
+  --bm-glass-strong-alpha: 0.76;
+  --bm-glass-border: var(--bm-card-border);
+  --bm-glass-blur: blur(10px) saturate(1.02);
+}
+
+:where(
+  .modal-sheet,
+  .product-form-sheet,
+  .product-category-menu,
+  .bm-catalog-sheet,
+  .bm-catalog-card,
+  .bm-catalog-fallback,
+  .bm-vault-add-popover,
+  .bm-home-card,
+  .bm-routine-card,
+  .bm-flow-panel,
+  .bm-profile-id-card,
+  .bm-profile-status,
+  .bm-profile .bm-menu-card,
+  .bm-settings-sheet,
+  .bm-setting-group,
+  .bm-avatar-setting-row,
+  .bm-reminder-panel,
+  .bm-detail-card,
+  .bm-detail-section,
+  .dv-card,
+  .dv-detail-body,
+  .dv-detail-section,
+  .dv-form-sheet,
+  .skin-analysis-sheet,
+  .skin-entry-panel,
+  .skin-result,
+  .skin-summary,
+  .skin-history-section,
+  .skin-history-gallery,
+  .companion-status-card
+) {
+  border: 1px solid var(--bm-glass-border) !important;
+  background: var(--bm-card-bg-raised) !important;
+  box-shadow: var(--bm-shadow-glass) !important;
+  backdrop-filter: var(--bm-glass-blur) !important;
+  -webkit-backdrop-filter: var(--bm-glass-blur) !important;
+  background-clip: padding-box;
+}
+
+:where(
+  .form-input,
+  .product-form .form-input,
+  .product-category-trigger,
+  .bm-catalog-search,
+  .bm-catalog-tabs button,
+  .bm-catalog-add,
+  .bm-detail-field,
+  .bm-detail-product-chip,
+  .bm-segment,
+  .bm-segment button,
+  .bm-scene-grid,
+  .bm-scene-grid button,
+  .bm-flow-empty,
+  .bm-reminder-toggle,
+  .bm-sms-bubble > div,
+  .bm-sms-empty,
+  .bm-theme-grid button,
+  .bm-custom-theme-upload,
+  .dv-today-btn,
+  .dv-detail-action-btn,
+  .dv-detail-product-chip,
+  .dv-form-section,
+  .dv-form-photo-area,
+  .dv-form-textarea,
+  .dv-form-product-chip,
+  .dv-form-analysis-card,
+  .dv-form-analysis-none,
+  .dv-form-tag-chip,
+  .skin-entry-action,
+  .skin-rec-item,
+  .skin-history-toggle,
+  .skin-history-item,
+  .skin-history-tile,
+  .skin-history-empty,
+  .skin-diary-save-option,
+  .companion-obs-item,
+  .companion-routine-block,
+  .companion-trend,
+  .mirror-sheet-action
+) {
+  border: 1px solid var(--bm-card-border) !important;
+  background: var(--bm-card-bg) !important;
+  box-shadow: var(--bm-shadow-card) !important;
+  backdrop-filter: blur(8px) saturate(1.02) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(1.02) !important;
+  background-clip: padding-box;
+}
+
+:where(
+  .bm-segment button.active,
+  .bm-scene-grid button.active,
+  .bm-catalog-tabs button.active,
+  .product-category-menu button.active,
+  .dv-form-product-chip.dv-product-selected,
+  .dv-form-tag-chip.dv-tag-selected,
+  .skin-diary-save-option.active,
+  .skin-history-tile.selected,
+  .skin-type-option.selected
+) {
+  border-color: var(--bm-card-border-strong) !important;
+  background: var(--bm-chip-bg-active) !important;
+  backdrop-filter: var(--bm-glass-blur) !important;
+  -webkit-backdrop-filter: var(--bm-glass-blur) !important;
+}
+
+body {
+  font-size: var(--bm-font-size-body);
+}
+
+:where(
+  .bm-home-hero h1,
+  .bm-vault-title-row h1,
+  .dv-diary-head h1,
+  .bm-profile-hero h1,
+  .bm-tutorial-hero h1
+) {
+  font-size: clamp(31px, 8vw, 36px) !important;
+}
+
+:where(
+  .bm-home-card .bm-card-copy strong,
+  .bm-profile-id-title,
+  .bm-menu-copy strong,
+  .bm-setting-group-head strong,
+  .bm-product-info h3,
+  .bm-detail-heading h1,
+  .dv-day-feed-head h2,
+  .dv-card-date,
+  .product-record-card strong
+) {
+  font-size: calc(1em + 1px);
+}
+
+:where(
+  .bm-subtitle,
+  .bm-vault-title-row p,
+  .dv-diary-head p,
+  .bm-home-card .bm-card-copy span,
+  .bm-menu-copy small,
+  .bm-setting-group-head small,
+  .bm-product-meta,
+  .bm-detail-facts span,
+  .bm-detail-facts strong,
+  .dv-month-side,
+  .dv-day-feed-head span,
+  .dv-content-preview,
+  .dv-meta-item,
+  .form-label,
+  .form-input,
+  .product-form .form-input,
+  .product-category-trigger,
+  .product-record-card span,
+  .tab-item span
+) {
+  font-size: calc(1em + 1px) !important;
+}

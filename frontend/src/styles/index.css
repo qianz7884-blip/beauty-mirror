@@ -3,6 +3,9 @@
 @import './diary.css';
 @import './mirror-refresh.css';
 @import './app-shell.css';
+@import './profile.css';
+@import './shared-surfaces.css';
+@import './product-list.css';
 @import './product-vault.css';
 @import './home-detect.css';
 @import './skin-modal-refine.css';

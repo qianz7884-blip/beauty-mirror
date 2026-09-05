@@ -2,16 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Bell,
   Camera,
-  Check,
   ChevronRight,
   ChevronUp,
-  Copy,
   Database,
-  Download,
-  MessageSquare,
   Paintbrush,
   Palette,
-  RefreshCw,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
@@ -33,17 +28,26 @@ import {
 } from '../utils/themeSettings'
 import { buildProductReminders } from '../utils/productReminders'
 import profileIpSticker from '../assets/illustrations/beauty-mirror-ip/ip-avatar-only.png'
-
-const SKIN_TYPES = ['干性', '油性', '混合', '敏感', '中性']
-const SKIN_TYPE_KEY = 'beauty_mirror_skin_type'
-const PROFILE_IMAGE_KEY = 'beauty_mirror_profile_image'
-const REMINDER_KEY = 'beauty_mirror_reminder'
-const REMINDER_SETTINGS_KEY = 'beauty_mirror_product_reminder_settings_v1'
-
-function formatLocalUserId(userId) {
-  if (!userId) return '读取中'
-  return userId.length > 14 ? `${userId.slice(0, 6)}...${userId.slice(-6)}` : userId
-}
+import {
+  PROFILE_SKIN_TYPES,
+  readProfileImagePreference,
+  readReminderEnabledPreference,
+  readReminderSettings,
+  readSkinTypePreference,
+  removeProfileImagePreference,
+  saveProfileImagePreference,
+  saveReminderEnabledPreference,
+  saveReminderSettings,
+  saveSkinTypePreference,
+} from './profile/profilePreferences'
+import {
+  getPreferenceStatus,
+  getProfileImageStatus,
+  getReminderHighlightValue,
+  getReminderMenuBadge,
+} from './profile/profileLogic'
+import { ProfileReminderPanel } from './profile/ProfileReminderPanel'
+import { ProfileUserDataPanel } from './profile/ProfileUserDataPanel'
 
 function MenuItem({ icon: Icon, label, desc, badge, onClick }) {
   return (
@@ -59,197 +63,11 @@ function MenuItem({ icon: Icon, label, desc, badge, onClick }) {
   )
 }
 
-function readReminderSettings() {
-  try {
-    const raw = localStorage.getItem(REMINDER_SETTINGS_KEY)
-    const parsed = raw ? JSON.parse(raw) : {}
-    return {
-      expiringWithinDays: Number(parsed.expiringWithinDays || 30),
-      lowRemainingPercent: Number(parsed.lowRemainingPercent || 30),
-    }
-  } catch {
-    return {
-      expiringWithinDays: 30,
-      lowRemainingPercent: 30,
-    }
-  }
-}
-
-function saveReminderSettings(settings) {
-  localStorage.setItem(REMINDER_SETTINGS_KEY, JSON.stringify(settings))
-  return settings
-}
-
-function ReminderToggle({ checked, icon: Icon, title, desc, onChange }) {
-  return (
-    <label className="bm-reminder-toggle">
-      <span className="bm-reminder-toggle-icon"><Icon size={17} strokeWidth={1.8} /></span>
-      <span>
-        <strong>{title}</strong>
-        <small>{desc}</small>
-      </span>
-      <span className="bm-bg-toggle-control">
-        <input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} />
-        <span aria-hidden="true" />
-      </span>
-    </label>
-  )
-}
-
-function ReminderPreview({ reminders, reminderOn }) {
-  if (!reminderOn) {
-    return (
-      <div className="bm-sms-empty">
-        <MessageSquare size={18} strokeWidth={1.8} />
-        <span>护理提醒已关闭，开启后这里会显示短信提醒。</span>
-      </div>
-    )
-  }
-
-  if (reminders.length === 0) {
-    return (
-      <div className="bm-sms-empty">
-        <Check size={18} strokeWidth={1.8} />
-        <span>当前没有临期或低余量产品。</span>
-      </div>
-    )
-  }
-
-  return (
-    <div className="bm-sms-list" aria-label="短信形式的护肤提醒">
-      {reminders.slice(0, 6).map(item => (
-        <article className={`bm-sms-bubble ${item.level === 'urgent' ? 'urgent' : ''}`} key={item.id}>
-          <span className="bm-sms-avatar"><Bell size={15} strokeWidth={1.8} /></span>
-          <div>
-            <strong>{item.title}</strong>
-            <p>{item.message}</p>
-          </div>
-        </article>
-      ))}
-    </div>
-  )
-}
-
-function ReminderPanel({
-  reminderOn,
-  reminderSettings,
-  reminders,
-  onReminderOnChange,
-  onSettingsChange,
-}) {
-  return (
-    <div className="bm-reminder-panel">
-      <ReminderToggle
-        checked={reminderOn}
-        icon={Bell}
-        title="开启提醒"
-        desc={`临期 ${reminderSettings.expiringWithinDays} 天内、剩余低于 ${reminderSettings.lowRemainingPercent}% 时提醒`}
-        onChange={onReminderOnChange}
-      />
-
-      <div className="bm-reminder-controls">
-        <label>
-          <span>临期天数</span>
-          <input
-            type="number"
-            min="1"
-            max="180"
-            value={reminderSettings.expiringWithinDays}
-            onChange={event => onSettingsChange({ expiringWithinDays: Number(event.target.value || 30) })}
-          />
-        </label>
-        <label>
-          <span>剩余提醒线</span>
-          <input
-            type="number"
-            min="1"
-            max="90"
-            value={reminderSettings.lowRemainingPercent}
-            onChange={event => onSettingsChange({ lowRemainingPercent: Number(event.target.value || 30) })}
-          />
-        </label>
-      </div>
-
-      <ReminderPreview reminders={reminders} reminderOn={reminderOn} />
-    </div>
-  )
-}
-
-function UserDataPanel({
-  session,
-  userId,
-  message,
-  onCopy,
-  onExport,
-  onReset,
-  onRefresh,
-}) {
-  const counts = session?.counts || {}
-  const database = session?.database || {}
-
-  return (
-    <div className="bm-user-panel">
-      <div className="bm-user-panel-head">
-        <span className="bm-reminder-toggle-icon"><Database size={17} strokeWidth={1.8} /></span>
-        <div>
-          <strong>本地数据</strong>
-          <small>{session?.last_activity_at ? `最近记录 ${session.last_activity_at}` : '当前浏览器身份'}</small>
-        </div>
-        <button type="button" onClick={onRefresh} aria-label="刷新本地数据">
-          <RefreshCw size={16} strokeWidth={1.8} />
-        </button>
-      </div>
-
-      <div className="bm-user-id-line">
-        <span>当前身份</span>
-        <code>{formatLocalUserId(userId)}</code>
-      </div>
-
-      <div className="bm-user-stat-grid">
-        <span>
-          <strong>{counts.products ?? 0}</strong>
-          <small>产品</small>
-        </span>
-        <span>
-          <strong>{counts.diaries ?? 0}</strong>
-          <small>日记</small>
-        </span>
-        <span>
-          <strong>{counts.skin_analyses ?? 0}</strong>
-          <small>肤况</small>
-        </span>
-      </div>
-
-      <div className={`bm-user-db ${database.writable === false ? 'warning' : 'ok'}`}>
-        <Database size={16} strokeWidth={1.7} />
-        <span>{database.message || '数据库状态读取中'}</span>
-      </div>
-
-      <div className="bm-user-actions">
-        <button type="button" onClick={onExport}>
-          <Download size={15} strokeWidth={1.8} />
-          <span>备份</span>
-        </button>
-        <button type="button" onClick={onCopy}>
-          <Copy size={15} strokeWidth={1.8} />
-          <span>复制ID</span>
-        </button>
-        <button type="button" className="danger" onClick={onReset}>
-          <RefreshCw size={15} strokeWidth={1.8} />
-          <span>换新身份</span>
-        </button>
-      </div>
-
-      {message ? <p className="bm-user-message">{message}</p> : null}
-    </div>
-  )
-}
-
 export default function Profile() {
-  const [skinType, setSkinType] = useState(() => localStorage.getItem(SKIN_TYPE_KEY) || '')
-  const [reminderOn, setReminderOn] = useState(() => localStorage.getItem(REMINDER_KEY) === 'true')
+  const [skinType, setSkinType] = useState(readSkinTypePreference)
+  const [reminderOn, setReminderOn] = useState(readReminderEnabledPreference)
   const [reminderSettings, setReminderSettings] = useState(readReminderSettings)
-  const [profileImage, setProfileImage] = useState(() => localStorage.getItem(PROFILE_IMAGE_KEY) || '')
+  const [profileImage, setProfileImage] = useState(readProfileImagePreference)
   const [themeSettings, setThemeSettings] = useState(readThemeSettings)
   const [products, setProducts] = useState([])
   const [userId, setUserId] = useState(() => getAnonymousUserId())
@@ -322,13 +140,13 @@ export default function Profile() {
 
   const handleSkinChange = (type) => {
     setSkinType(type)
-    localStorage.setItem(SKIN_TYPE_KEY, type)
+    saveSkinTypePreference(type)
     setShowSkinPicker(false)
   }
 
   const handleReminderOnChange = (checked) => {
     setReminderOn(checked)
-    localStorage.setItem(REMINDER_KEY, String(checked))
+    saveReminderEnabledPreference(checked)
   }
 
   const updateReminderSettings = (patch) => {
@@ -348,14 +166,14 @@ export default function Profile() {
     reader.onload = () => {
       const image = String(reader.result || '')
       setProfileImage(image)
-      localStorage.setItem(PROFILE_IMAGE_KEY, image)
+      saveProfileImagePreference(image)
     }
     reader.readAsDataURL(file)
   }
 
   const handleProfileImageRemove = () => {
     setProfileImage('')
-    localStorage.removeItem(PROFILE_IMAGE_KEY)
+    removeProfileImagePreference()
   }
 
   const handleThemeImageChange = (event) => {
@@ -437,9 +255,9 @@ export default function Profile() {
   }
 
   const profileHighlights = [
-    { icon: SlidersHorizontal, label: '肤质', value: skinType || '未设' },
-    { icon: Bell, label: '提醒', value: reminderOn ? `${activeReminders.length} 条` : '已关' },
-    { icon: Camera, label: '头像', value: profileImage ? '已设' : '未设' },
+    { icon: SlidersHorizontal, label: '肤质', value: getPreferenceStatus(skinType, '未设') },
+    { icon: Bell, label: '提醒', value: getReminderHighlightValue(reminderOn, activeReminders.length) },
+    { icon: Camera, label: '头像', value: getProfileImageStatus(profileImage) },
     { icon: Palette, label: '主题', value: activeTheme.label },
     { icon: ShieldCheck, label: '隐私', value: '本地' },
   ]
@@ -498,7 +316,7 @@ export default function Profile() {
 
         {showSkinPicker && (
           <div className="bm-skin-picker">
-            {SKIN_TYPES.map(type => (
+            {PROFILE_SKIN_TYPES.map(type => (
               <button
                 key={type}
                 type="button"
@@ -523,11 +341,11 @@ export default function Profile() {
             icon={Bell}
             label="护理提醒"
             desc="临期、低余量产品提醒"
-            badge={reminderOn ? `${activeReminders.length} 条` : '已关闭'}
+            badge={getReminderMenuBadge(reminderOn, activeReminders.length)}
             onClick={() => setShowReminderPanel(!showReminderPanel)}
           />
           {showReminderPanel && (
-            <ReminderPanel
+            <ProfileReminderPanel
               reminderOn={reminderOn}
               reminderSettings={reminderSettings}
               reminders={activeReminders}
@@ -543,7 +361,7 @@ export default function Profile() {
             onClick={() => setShowUserPanel(!showUserPanel)}
           />
           {showUserPanel && (
-            <UserDataPanel
+            <ProfileUserDataPanel
               session={userSession}
               userId={userId}
               message={userMessage}
